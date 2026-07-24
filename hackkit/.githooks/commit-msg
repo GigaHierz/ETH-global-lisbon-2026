@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Enforces Conventional Commits. Installed via scripts/install.sh
+set -uo pipefail
+MSG_FILE="$1"
+SUBJECT=$(head -n1 "$MSG_FILE")
+
+# Allow merge/revert commits through
+case "$SUBJECT" in
+  Merge*|Revert*|fixup!*|squash!*) exit 0;;
+esac
+
+RED=$'\033[31m'; RST=$'\033[0m'
+PATTERN='^(feat|fix|chore|docs|test|refactor|perf|ci|build|style|revert)(\([a-z0-9-]+\))?!?: [a-z].{3,70}$'
+
+if ! printf '%s' "$SUBJECT" | grep -qE "$PATTERN"; then
+  cat >&2 <<EOF
+${RED}Commit rejected — message does not follow Conventional Commits.${RST}
+
+  You wrote:  $SUBJECT
+
+  Required:   <type>(<scope>): <subject>
+
+  type    feat fix chore docs test refactor perf ci build style revert
+  scope   contracts backend frontend deploy ci docs   (optional)
+  subject imperative, lowercase, no trailing period, 4-70 chars
+
+  Examples:
+    feat(contracts): add HTS association guard to Vault
+    fix(backend): retry mirror node reads on 404
+    chore(ci): pin foundry to a fixed version
+
+EOF
+  exit 1
+fi
+
+if printf '%s' "$SUBJECT" | grep -qiE '\b(wip|asdf|stuff|things|updates?|final|test commit)\b'; then
+  echo "${RED}Commit rejected — placeholder wording in subject: $SUBJECT${RST}" >&2
+  exit 1
+fi
+exit 0
