@@ -17,7 +17,9 @@
       "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(s\\);console.log\\('default branch:',j.default_branch,'| msg:',j.message\\)}\\)\")",
       "Bash(curl -s \"https://api.github.com/repos/erc-8004/erc-8004-contracts/git/trees/HEAD?recursive=1\")",
       "Bash(curl -s \"https://api.github.com/repos/erc-8004/erc-8004-contracts/git/trees/master?recursive=1\")",
-      "Bash(curl -s \"https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/master/contracts/interfaces/IIdentityRegistry.sol\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/master/contracts/interfaces/IIdentityRegistry.sol\")",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'slice 2: exchange — cheapest-provider routing, x402/mock payer, SSE feed, slash + verify-report endpoints *)"
     ]
   }
 }
