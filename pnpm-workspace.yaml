@@ -1,0 +1,9 @@
+packages:
+  - shared
+  - provider
+  - exchange
+  - verifier
+  - agent
+  - dashboard
+allowBuilds:
+  esbuild: true
