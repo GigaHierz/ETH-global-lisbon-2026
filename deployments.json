@@ -1,0 +1,10 @@
+{
+  "baseSepolia": {
+    "chainId": 84532,
+    "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "reputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+    "staking": null,
+    "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "note": "identity/reputation are the official ERC-8004 reference deployments; staking is deployed by scripts/deploy-staking.sh once EXCHANGE_PK is funded with Base Sepolia ETH"
+  }
+}

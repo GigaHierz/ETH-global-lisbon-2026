@@ -27,7 +27,10 @@
       "Bash(node scripts/validate_palette.js \"#10b981,#0284c7\" --mode dark --surface \"#0a0f0a\")",
       "Bash(node scripts/validate_palette.js \"#059669,#0369a1\" --mode dark --surface \"#0a0f0a\")",
       "Bash(curl -s -X POST localhost:4100/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"llama-3.3-70b-versatile\",\"messages\":[{\"role\":\"user\",\"content\":\"What is Ethereum?\"}]}' -o /dev/null)",
-      "Bash(curl -s -X POST localhost:4100/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"user\",\"content\":\"2 + 2 = ?\"}]}' -o /dev/null)"
+      "Bash(curl -s -X POST localhost:4100/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"user\",\"content\":\"2 + 2 = ?\"}]}' -o /dev/null)",
+      "Bash(curl -s -X POST localhost:4100/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"llama-3.3-70b-versatile\",\"messages\":[{\"role\":\"user\",\"content\":\"What is Ethereum?\"}]}')",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(s\\);console.log\\('post-slash route → provider:',j.agentrouter?.provider,'| price:',j.agentrouter?.pricePaidUsd\\)}\\)\")",
+      "Bash(git commit -q -m 'slice 4: Staking.sol \\(+tests\\), deploy script, verifier — temp-0 replay vs witness, Jaccard similarity, slash + ERC-8004 negative feedback, exchange removes cheater *)"
     ]
   }
 }
