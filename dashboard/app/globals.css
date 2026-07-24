@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  --surface: #0a0f0a;
+  --panel: #0f1511;
+  --border: #1e2a22;
+  --ink: #d1e7d9;
+  --ink-muted: #6b8577;
+  --accent: #22c55e;
+  --danger: #ef4444;
+  --series-70b: #059669;
+  --series-8b: #0369a1;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "SF Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+}
+
+@keyframes slashflash {
+  0%, 100% { background-color: rgb(127 29 29 / 0.95); }
+  50% { background-color: rgb(220 38 38 / 0.95); }
+}
+.slash-banner { animation: slashflash 0.8s ease-in-out 6; }
+
+@keyframes rowin {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.row-in { animation: rowin 0.25s ease-out; }

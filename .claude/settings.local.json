@@ -19,7 +19,15 @@
       "Bash(curl -s \"https://api.github.com/repos/erc-8004/erc-8004-contracts/git/trees/master?recursive=1\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/master/contracts/interfaces/IIdentityRegistry.sol\")",
       "Bash(git add *)",
-      "Bash(git commit -q -m 'slice 2: exchange — cheapest-provider routing, x402/mock payer, SSE feed, slash + verify-report endpoints *)"
+      "Bash(git commit -q -m 'slice 2: exchange — cheapest-provider routing, x402/mock payer, SSE feed, slash + verify-report endpoints *)",
+      "Skill(dataviz)",
+      "Skill(dataviz:*)",
+      "Bash(node scripts/validate_palette.js \"#4ade80,#38bdf8\" --mode dark --surface \"#0a0f0a\")",
+      "Bash(node scripts/validate_palette.js \"#4ade80,#38bdf8\" --mode dark)",
+      "Bash(node scripts/validate_palette.js \"#10b981,#0284c7\" --mode dark --surface \"#0a0f0a\")",
+      "Bash(node scripts/validate_palette.js \"#059669,#0369a1\" --mode dark --surface \"#0a0f0a\")",
+      "Bash(curl -s -X POST localhost:4100/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"llama-3.3-70b-versatile\",\"messages\":[{\"role\":\"user\",\"content\":\"What is Ethereum?\"}]}' -o /dev/null)",
+      "Bash(curl -s -X POST localhost:4100/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"user\",\"content\":\"2 + 2 = ?\"}]}' -o /dev/null)"
     ]
   }
 }
