@@ -1,0 +1,9 @@
+{
+  "name": "@agentrouter/agent",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@agentrouter/shared": "workspace:*",
+    "viem": "^2.48.11"
+  }
+}
