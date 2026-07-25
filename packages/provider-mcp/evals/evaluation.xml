@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Agent-facing evaluations for the agentrouter-provider-mcp server (mcp-builder Phase 4).
+
+  Adaptation note: mcp-builder's canonical eval targets a large, read-only, historically
+  stable API. This server PROVISIONS providers (it mutates chain state), so a pure
+  "10 stable read-only questions" set doesn't map. These questions instead exercise the
+  server's deterministic, agent-observable surfaces:
+    - read-only discovery (verify_provider_live) against the running demo stack,
+    - the deterministic deploy_provider config + error contract (no live box needed),
+    - idempotency (create_provider_account for an already-provisioned role),
+    - documented defaults an agent reads from the tool schemas.
+  Each answer is a single, string-matchable value.
+
+  Assumptions for the discovery questions (1, 2, 9, 10): the local demo stack is running
+  (`pnpm demo`) so the exchange is at http://localhost:4100 with Titan Compute (0.0.9746381)
+  and NimbusAI (0.0.9746711) live. Questions 3-8 need no live provider.
+
+  Run (mcp-builder harness from anthropics/skills):
+    python scripts/evaluation.py -t stdio -c node \
+      -a "--import" -a "tsx" -a "<abs>/packages/provider-mcp/src/index.ts" \
+      packages/provider-mcp/evals/evaluation.xml
+-->
+<evaluation>
+  <qa_pair>
+    <question>Use verify_provider_live to look up the provider whose wallet is 0.0.9746711 on the exchange at http://localhost:4100. What model does that provider advertise?</question>
+    <answer>llama-3.3-70b-versatile</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Use verify_provider_live for the provider with wallet 0.0.9746381 (Titan Compute) on the exchange at http://localhost:4100. What is its price per request in HBAR?</question>
+    <answer>0.1</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call verify_provider_live for wallet 0.0.0000001 — an account that was never provisioned — on the exchange at http://localhost:4100. What is the value of the 'live' field in the result?</question>
+    <answer>false</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call deploy_provider with publicUrl http://127.0.0.1:59999 (nothing is listening there) and model llama-3.3-70b-versatile. What error code does the response report?</question>
+    <answer>ENDPOINT_UNREACHABLE</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Inspect the railwayConfig object returned by deploy_provider (call it with any publicUrl). What Start Command does it recommend for running the provider service?</question>
+    <answer>pnpm provider:prod</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Inspect the railwayConfig returned by deploy_provider. What is the value of its 'builder' field?</question>
+    <answer>DOCKERFILE</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call create_provider_account with role PROVIDER, which already exists in this environment. Did the call create a brand-new account? Answer yes or no.</question>
+    <answer>no</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>When the stakeHbar argument is omitted, how many HBAR does stake_collateral stake to the escrow account by default?</question>
+    <answer>50</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Use verify_provider_live for wallet 0.0.9746381 on the exchange at http://localhost:4100. What status does the exchange report for that provider?</question>
+    <answer>live</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Using verify_provider_live for wallet 0.0.9746711 on http://localhost:4100, read the provider's HCS-14 agent id. What is the full uaid string?</question>
+    <answer>uaid:aid:hedera:testnet:0.0.9746711</answer>
+  </qa_pair>
+</evaluation>
