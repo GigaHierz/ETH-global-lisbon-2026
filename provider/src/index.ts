@@ -15,7 +15,12 @@ import { ensureRegistered } from "./registry.js";
 const profile = resolveProfile();
 const TAG = profile.key;
 
-const { wallet, agentId } = await ensureRegistered(profile);
+// Hosting (Railway etc.): bind to the injected PORT and advertise a public URL so a
+// remote exchange can reach us. Locally (neither set) this stays localhost:profile.port — unchanged.
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : profile.port;
+const PUBLIC_URL = process.env.PROVIDER_PUBLIC_URL || `http://localhost:${PORT}`;
+
+const { wallet, agentId } = await ensureRegistered(profile, PUBLIC_URL);
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -28,7 +33,7 @@ app.get("/info", (_req, res) => {
     priceHbar: profile.priceHbar,
     wallet,
     agentId,
-    url: `http://localhost:${profile.port}`,
+    url: PUBLIC_URL,
   });
 });
 
@@ -95,10 +100,10 @@ app.post("/v1/chat/completions", async (req, res) => {
   }
 });
 
-app.listen(profile.port, () => {
+app.listen(PORT, () => {
   log(
     TAG,
-    `${profile.displayName} listening :${profile.port} | advertises ${profile.advertisedModel} @ ${profile.priceHbar} ℏ/req` +
+    `${profile.displayName} listening :${PORT} (${PUBLIC_URL}) | advertises ${profile.advertisedModel} @ ${profile.priceHbar} ℏ/req` +
       (profile.actualModel !== profile.advertisedModel ? ` | CHEAT_MODE: serving ${profile.actualModel}` : ""),
   );
 });

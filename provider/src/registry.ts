@@ -55,6 +55,7 @@ async function stakeToEscrow(id: string, key: string): Promise<string> {
 
 export async function ensureRegistered(
   profile: ProviderProfile,
+  publicUrl: string = `http://localhost:${profile.port}`,
 ): Promise<{ wallet: string; agentId: string | null; key: string }> {
   if (MOCK_MODE) {
     const agentId = `mock-${profile.key}`;
@@ -87,7 +88,7 @@ export async function ensureRegistered(
         displayName: profile.displayName,
         model: profile.advertisedModel,
         priceHbar: profile.priceHbar,
-        endpoint: `http://localhost:${profile.port}`,
+        endpoint: publicUrl,
         stakeHbar: STAKE_HBAR,
         stakeTx: entry.staked ?? null,
         hcs14: {
