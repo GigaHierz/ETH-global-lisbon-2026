@@ -27,7 +27,7 @@ const USDC_DECIMALS = 6;
 // ESCROW is the verifier-held stake escrow (no-Solidity staking): providers
 // transfer STAKE_HBAR here at registration; a slash moves it to the treasury
 // (= operator). Its key lives in HEDERA_ESCROW_KEY, loaded by the verifier.
-const ROLES = ["AGENT", "EXCHANGE", "PROVIDER1", "PROVIDER2", "PROVIDER3", "PROVIDER4", "VERIFIER", "ESCROW"] as const;
+const ROLES = ["AGENT", "EXCHANGE", "PROVIDER1", "PROVIDER2", "PROVIDER3", "PROVIDER4", "PROVIDER", "VERIFIER", "ESCROW"] as const;
 const HBAR_PER_ACCOUNT = 100;
 const USDC_PER_PAYER = 5; // agent + exchange only (USDC path is optional, behind SETTLEMENT_ASSET=usdc)
 const PAYERS = new Set(["AGENT", "EXCHANGE"]);

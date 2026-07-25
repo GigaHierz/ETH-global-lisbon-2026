@@ -56,8 +56,8 @@ Anyone with a box sells inference. On boot, a provider:
 
 3. **Serves an OpenAI-compatible endpoint** (`POST /v1/chat/completions`) behind an x402
    paywall. Unpaid requests get `402 Payment Required` with machine-readable payment
-   requirements; paid requests get inference. Backends: Groq API, optional local Ollama,
-   canned deterministic fallback (so demos survive with zero external dependencies).
+   requirements; paid requests get inference. Backends: Groq API, with a canned
+   deterministic fallback (so demos survive with zero external dependencies).
 
 There is **no signup and no permission** — the stake is the listing fee, the topic message
 is the listing, being reachable is the activation. The exchange discovers new supply from

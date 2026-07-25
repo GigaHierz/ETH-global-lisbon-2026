@@ -68,7 +68,7 @@ flowchart LR
 
 ## 🚫 Not in this MVP
 
-- **Real GPU supply** — providers proxy Groq (optional Ollama backend for real self-hosted supply); the marketplace mechanics are the point
+- **Real GPU supply** — providers proxy Groq (canned fallback without a key); the marketplace mechanics are the point
 - **TEE / zkML verification** — optimistic replay-and-compare sampling; production would attest execution
 - **Trustless staking contract** — `Staking.sol` + tests live in [`/contracts`](contracts) as future work; the MVP escrow is verifier-held (Hedera No-Solidity track: HCS + Mirror Node only)
 - **Orderbook / auctions** — routing is simple cheapest-first among live claimants

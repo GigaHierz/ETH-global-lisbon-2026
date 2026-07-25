@@ -2,13 +2,13 @@
 // provider3 is the cheater: advertises 70b, secretly serves 8b when CHEAT_MODE=true.
 
 export interface ProviderProfile {
-  key: "provider1" | "provider2" | "provider3" | "provider4";
+  key: "provider1" | "provider2" | "provider3" | "provider4" | "custom";
   displayName: string;
   port: number;
   advertisedModel: string;
   actualModel: string; // what we really send to Groq
   priceHbar: number;
-  hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4"; // HEDERA_<role>_ID/KEY in .env
+  hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "PROVIDER"; // HEDERA_<role>_ID/KEY in .env
   cannedCheat: boolean; // canned-mode: answer like a small model
 }
 
@@ -58,12 +58,30 @@ export const PROFILES: Record<string, ProviderProfile> = {
   },
 };
 
+// A fully env-driven provider — for anyone listing their own compute on AgentRouter
+// without editing this file. Advertise = serve (honest); the account is HEDERA_PROVIDER_ID/KEY.
+//   PROVIDER_NAME, PROVIDER_MODEL, PROVIDER_PRICE_HBAR, PROVIDER_PORT
+function customProfile(): ProviderProfile {
+  const model = process.env.PROVIDER_MODEL || "llama-3.3-70b-versatile";
+  return {
+    key: "custom",
+    displayName: process.env.PROVIDER_NAME || "Custom Provider",
+    port: parseInt(process.env.PROVIDER_PORT || "4025", 10),
+    advertisedModel: model,
+    actualModel: model, // honest: serve exactly what you advertise (the verifier checks this)
+    priceHbar: parseFloat(process.env.PROVIDER_PRICE_HBAR || "0.10"),
+    hederaRole: "PROVIDER",
+    cannedCheat: false,
+  };
+}
+
 export function resolveProfile(): ProviderProfile {
   const idx = process.argv.indexOf("--profile");
   const key = idx >= 0 ? process.argv[idx + 1] : process.env.PROVIDER_PROFILE;
+  if (key === "custom") return customProfile();
   const profile = key ? PROFILES[key] : undefined;
   if (!profile) {
-    console.error(`Unknown provider profile "${key}". Use --profile provider1|provider2|provider3`);
+    console.error(`Unknown provider profile "${key}". Use --profile provider1|provider2|provider3|provider4|custom`);
     process.exit(1);
   }
   return profile;

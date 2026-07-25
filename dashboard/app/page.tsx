@@ -215,7 +215,7 @@ export default function Landing() {
                   </div>
                   <div>
                     <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Minimum Hardware</div>
-                    <div className="font-data text-sm text-on-surface-variant">Any box — Groq/Ollama backend, 8GB VRAM for local models</div>
+                    <div className="font-data text-sm text-on-surface-variant">Any box — a Groq API key is enough, no GPU required</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 border border-outline-variant p-4 bg-surface-container">

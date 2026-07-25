@@ -10,7 +10,7 @@ flowchart LR
     E -->|"x402 HBAR"| P1[Titan 70b · 0.10 ℏ :4021]
     E -->|"x402 HBAR"| P2[Budget 8b · 0.04 ℏ :4022]
     E -->|"x402 HBAR"| P3[Sketchy 😈 claims 70b · 0.08 ℏ :4023]
-    P1 & P2 & P3 --> G[Groq / Ollama / canned]
+    P1 & P2 & P3 --> G[Groq / canned]
     P1 & P2 & P3 -->|"register + stake 50 ℏ"| H[HCS: registry · trades · verdicts<br/>escrow 0.0.9744157]
     E -->|trades| H
     V[Verifier] -->|"temp-0 replay vs witness"| P1 & P3
@@ -53,9 +53,10 @@ flowchart LR
 | `SIMILARITY_THRESHOLD` | `0.35` | fraud line (see [guides/jean-agent.md](guides/jean-agent.md)) |
 | `VERIFY_INTERVAL_MS` | `15000` | audit cadence |
 | `PROVIDER_URLS` | 3 localhosts | exchange discovery list |
+| `PROVIDER_NAME` / `PROVIDER_MODEL` / `PROVIDER_PRICE_HBAR` / `PROVIDER_PORT` | Custom Provider / 70b / `0.10` / `4025` | custom provider (`pnpm provider`) — list your own compute, no code edits |
+| `PROVIDER_PUBLIC_URL` | localhost:\<port\> | public address a provider registers on HCS (tunnel/VPS) |
 | `EXCHANGE_URL` | `http://localhost:4100` | agent, verifier, dashboard |
 | `AGENT_MODEL` / `AGENT_MOCK_BALANCE_HBAR` | 70b / `10` | agent |
-| `PROVIDER_BACKEND` / `OLLAMA_BASE_URL` | `groq` | optional Ollama supply (post-step-3) |
 | `HCS_REGISTRY_TOPIC` / `HCS_TRADES_TOPIC` / `HCS_VERDICTS_TOPIC` | deployments.json | HCS audit trail (live) |
 
 ## Demo script
@@ -72,7 +73,7 @@ Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` 
 
 | Person | Owns | Guide |
 |---|---|---|
-| Núria | Supply: providers, Ollama, VPS | [guides/nuria-supply.md](guides/nuria-supply.md) |
+| Núria | Supply: providers, VPS | [guides/nuria-supply.md](guides/nuria-supply.md) |
 | Jean | Buyer agent + verifier + test matrix | [guides/jean-agent.md](guides/jean-agent.md) |
 | Lena | Payments story, HCS map, bounty submission | [guides/lena-devrel.md](guides/lena-devrel.md) |
 | Sahil | Exchange + dashboard | [guides/sahil-exchange.md](guides/sahil-exchange.md) |

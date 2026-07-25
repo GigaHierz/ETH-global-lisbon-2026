@@ -54,10 +54,6 @@ Without `PROVIDER_PUBLIC_URL`, you register `http://localhost:PORT` — the exch
 
 Prices come from the profile at boot. To demo the reroute: stop provider2, drop its `priceHbar` below the current winner's, restart it. Watch the exchange's next request route to the new cheapest — visible in the dashboard feed within one request.
 
-## Optional: Ollama backend (real self-hosted supply)
-
-`PROVIDER_BACKEND=ollama` + `OLLAMA_BASE_URL=http://localhost:11434` switches a provider from Groq to a local Ollama (`ollama pull llama3.2:3b` first). If Ollama is unreachable the provider falls back to canned responses rather than dying — a missing backend never blocks the demo. (**Not built yet** — this flag is the one pending item on the supply side; ping Sahil for status.)
-
 ## Health & troubleshooting
 
 - `GET /healthz` → `{ok:true}` · `GET /info` → what the exchange sees
