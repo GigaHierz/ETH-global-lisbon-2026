@@ -21,13 +21,15 @@ interface ProviderRow {
 }
 interface RequestLogEntry {
   id: string; ts: number; model: string; provider: string; priceHbar: number;
+  feeHbar?: number; totalHbar?: number; inboundRef?: string; refundRef?: string;
   latencyMs: number; paymentRef: string; promptPreview: string; answerPreview: string;
-  status: "ok" | "error";
+  status: "ok" | "error" | "refunded";
 }
 interface SlashEvent { provider: string; amountHbar: number; reason: string }
 interface AuditMsg { topic: string; consensusTs: string; sequence: number; payload: Record<string, unknown> | null }
 interface TopicInfo { id: string | null; hashscan: string | null }
 interface VerifyEvent { provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
+interface ExchangeStats { totalVolumeHbar: number; requests: number; feeRevenueHbar: number; refunds: number; refundFailures: number; feeBps: number }
 
 const hashscanTx = (ref: string) =>
   ref.includes("@") ? `https://hashscan.io/testnet/transaction/${ref}` : null;
@@ -45,12 +47,14 @@ export default function ExchangeControlRoom() {
   const [auditMock, setAuditMock] = useState(true);
   const [audit, setAudit] = useState<AuditMsg[]>([]);
   const [activeTopic, setActiveTopic] = useState<"registry" | "trades" | "verdicts">("trades");
+  const [stats, setStats] = useState<ExchangeStats | null>(null);
   const slashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch(`${EXCHANGE}/providers`).then((r) => r.json()).then(setProviders).catch(() => {});
     fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()).then((l) => setFeed(l.reverse())).catch(() => {});
     fetch(`${EXCHANGE}/price-index`).then((r) => r.json()).then(setPrices).catch(() => {});
+    fetch(`${EXCHANGE}/stats`).then((r) => r.json()).then(setStats).catch(() => {});
 
     const es = new EventSource(`${EXCHANGE}/events`);
     es.onopen = () => setConnected(true);
@@ -68,6 +72,15 @@ export default function ExchangeControlRoom() {
         slashTimer.current = setTimeout(() => setSlash(null), 30000);
       }
       if (ev.type === "verify") setVerifies((v) => [ev, ...v].slice(0, 10));
+      if (ev.type === "stats") setStats(ev.stats);
+      if (ev.type === "request" && ev.entry?.inboundRef) {
+        // settle update for an existing row: replace in place
+        setFeed((f) => {
+          const i = f.findIndex((e) => e.id === ev.entry.id);
+          if (i < 0) return f;
+          const next = [...f]; next[i] = ev.entry; return next;
+        });
+      }
     };
     return () => es.close();
   }, []);
@@ -141,7 +154,8 @@ export default function ExchangeControlRoom() {
             ["VOLUME", `${totalVolume.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
             ["REQUESTS", String(okFeed.length), "text-primary-fixed-dim"],
             ["PROVIDERS", String(liveCount), "text-primary-fixed-dim"],
-            ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-accent-orange"],
+            ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-primary-fixed-dim"],
+            ["EXCHANGE REVENUE", stats ? `${stats.feeRevenueHbar.toFixed(4)} ℏ` : "—", "text-accent-orange"],
           ]}
         />
         <StatusPill
@@ -386,33 +400,51 @@ export default function ExchangeControlRoom() {
                       <th className="px-4 py-2">Model</th>
                       <th className="px-4 py-2">Prompt</th>
                       <th className="px-4 py-2 text-right">Price (ℏ)</th>
+                      <th className="px-4 py-2 text-right">Fee (ℏ)</th>
+                      <th className="px-4 py-2 text-right">Total (ℏ)</th>
                       <th className="px-4 py-2 text-right">Lat.</th>
                       <th className="px-4 py-2 text-center">Status</th>
-                      <th className="px-4 py-2 text-right">TX</th>
+                      <th className="px-4 py-2 text-right">TX in·out</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/30">
                     {feed.slice(0, 20).map((r) => (
-                      <tr key={r.id} className="row-in hover:bg-surface-variant/50">
+                      <tr key={r.id} className={`row-in hover:bg-surface-variant/50 ${r.status === "refunded" ? "bg-accent-orange/5" : ""}`}>
                         <td className="px-4 py-3 text-on-surface-variant">{new Date(r.ts).toLocaleTimeString()}</td>
                         <td className={`px-4 py-3 ${r.status === "error" ? "text-hud-error" : "text-primary-fixed-dim"}`}>{r.provider}</td>
                         <td className="px-4 py-3 opacity-70">{r.model.replace("-versatile", "").replace("-instant", "")}</td>
                         <td className="px-4 py-3 text-on-surface-variant max-w-[220px] truncate">{r.promptPreview}</td>
-                        <td className="px-4 py-3 text-right">{r.priceHbar.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right">{r.priceHbar.toFixed(3)}</td>
+                        <td className="px-4 py-3 text-right text-accent-orange">{r.feeHbar != null ? r.feeHbar.toFixed(3) : "—"}</td>
+                        <td className="px-4 py-3 text-right">{r.totalHbar != null ? r.totalHbar.toFixed(3) : "—"}</td>
                         <td className="px-4 py-3 text-right text-accent-cyan">{r.status === "ok" ? `${r.latencyMs}ms` : "--"}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className={r.status === "ok" ? "text-accent-cyan" : "text-hud-error"}>
-                            {r.status === "ok" ? "SETTLED" : "FAILED"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {hashscanTx(r.paymentRef) ? (
-                            <a className="text-on-surface-variant hover:text-accent-cyan" href={hashscanTx(r.paymentRef)!} target="_blank" rel="noreferrer">
-                              <Icon name="open_in_new" className="text-[14px]" />
-                            </a>
-                          ) : (
-                            <span className="text-on-surface-variant/40">—</span>
+                          {r.status === "ok" && <span className="text-accent-cyan">SETTLED</span>}
+                          {r.status === "error" && <span className="text-hud-error">FAILED</span>}
+                          {r.status === "refunded" && (
+                            <span className="px-1.5 py-0.5 bg-accent-orange/20 text-accent-orange rounded-sm">REFUNDED</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                          {r.inboundRef && hashscanTx(r.inboundRef) && (
+                            <a className="text-on-surface-variant hover:text-accent-cyan" title="agent→exchange settlement"
+                              href={hashscanTx(r.inboundRef)!} target="_blank" rel="noreferrer">
+                              <Icon name="call_received" className="text-[14px]" />
+                            </a>
+                          )}
+                          {hashscanTx(r.paymentRef) && (
+                            <a className="text-on-surface-variant hover:text-accent-cyan" title="exchange→provider settlement"
+                              href={hashscanTx(r.paymentRef)!} target="_blank" rel="noreferrer">
+                              <Icon name="call_made" className="text-[14px]" />
+                            </a>
+                          )}
+                          {r.refundRef && hashscanTx(r.refundRef) && (
+                            <a className="text-accent-orange hover:text-on-surface" title="refund to agent"
+                              href={hashscanTx(r.refundRef)!} target="_blank" rel="noreferrer">
+                              <Icon name="undo" className="text-[14px]" />
+                            </a>
+                          )}
+                          {!r.inboundRef && !hashscanTx(r.paymentRef) && !r.refundRef && <span className="text-on-surface-variant/40">—</span>}
                         </td>
                       </tr>
                     ))}
