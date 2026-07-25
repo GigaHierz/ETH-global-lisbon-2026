@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 // Backend URL priority: ?api=https://… query param → build-time env → Railway prod.
 // The query param survives tunnel churn without a rebuild.
@@ -429,18 +430,7 @@ export default function AgentDemoControlRoom() {
         </div>
       </main>
 
-      <footer className="w-full py-8 bg-surface-obsidian border-t border-outline-variant">
-        <div className="px-6 max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <span className="font-data text-primary-fixed-dim">AgentRouter Protocol</span>
-          <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant uppercase text-center">
-            autonomous buyer · x402 HBAR per answer · every payment an on-chain Hedera tx · HCS-14 UAID identity
-          </span>
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm">
-            <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            <span className="font-data text-[10px] uppercase text-on-surface">Hedera Testnet Active</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
