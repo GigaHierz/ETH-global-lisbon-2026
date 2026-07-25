@@ -52,6 +52,7 @@ export interface RequestLogEntry {
   promptPreview: string;
   answerPreview: string;
   status: "ok" | "error";
+  isAudit?: boolean; // replay issued by the verifier — never an audit candidate itself
 }
 
 // SSE events pushed by the exchange to the dashboard
