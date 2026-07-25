@@ -6,8 +6,8 @@
 
 | What | URL |
 |---|---|
-| **Dashboard** (the terminal UI) | https://holders-independent-amazing-text.trycloudflare.com |
-| **Exchange API** (buy inference) | https://posters-gordon-revised-payment.trycloudflare.com |
+| **Dashboard** (the terminal UI) | https://empirical-holds-struct-utc.trycloudflare.com |
+| **Exchange API** (buy inference) | https://provides-jeffrey-bidder-variations.trycloudflare.com |
 
 Everything behind these is running in **real mode**: HBAR settlements on Hedera Testnet, HCS audit trail, live escrow staking. Topic links + tx receipts: [PROOF.md](PROOF.md).
 
@@ -16,13 +16,13 @@ Everything behind these is running in **real mode**: HBAR settlements on Hedera 
 See the routing table:
 
 ```bash
-curl -s https://posters-gordon-revised-payment.trycloudflare.com/providers | jq
+curl -s https://provides-jeffrey-bidder-variations.trycloudflare.com/providers | jq
 ```
 
 Buy an inference call (the exchange pays the provider via x402 — you're the demo agent):
 
 ```bash
-curl -s -X POST https://posters-gordon-revised-payment.trycloudflare.com/v1/chat/completions \
+curl -s -X POST https://provides-jeffrey-bidder-variations.trycloudflare.com/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"What is x402? One sentence."}]}' | jq .agentrouter
 ```
@@ -34,6 +34,11 @@ To see a raw **402** (the paywall itself), hit a provider directly — providers
 ## The dashboard
 
 Open the dashboard URL in a browser. You should see: provider table (SketchyGPU Labs likely already ⚡slashed), live request feed, price index, and the **HCS audit trail** panel streaming consensus messages from the public Mirror Node with Hashscan links to all three topics. Fire a few curl requests at the exchange and watch them appear.
+
+## If the API tunnel URL changes later
+
+The dashboard accepts the exchange URL as a query param — no rebuild needed:
+`https://<dashboard-url>/?api=https://<new-api-tunnel-url>`
 
 ## ⚠️ Tunnel lifetime
 

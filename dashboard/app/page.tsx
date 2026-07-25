@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const AGENT = process.env.NEXT_PUBLIC_AGENT_URL || "http://localhost:4200";
+// Backend URL priority: ?api=https://… query param → build-time env → localhost.
+// The query param survives tunnel churn without a rebuild.
+const AGENT =
+  (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
+  process.env.NEXT_PUBLIC_AGENT_URL ||
+  "http://localhost:4200";
 
 // ---- types mirrored from the agent-server contract (dashboard is standalone) ----
 interface Budget { capHbar: number; spentHbar: number; remainingHbar: number }
