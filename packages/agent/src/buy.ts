@@ -8,20 +8,34 @@ import type { BuyResult } from "./loop.js";
 
 interface ExchangeCompletion {
   choices?: { message?: { content?: string } }[];
-  agentrouter?: { provider?: string; pricePaid?: number };
+  agentrouter?: {
+    provider?: string;
+    price?: number; // provider's listed price
+    fee?: number; // exchange taker fee
+    total?: number; // what the agent paid (budget charges this)
+    asset?: string; // what the three amounts above are denominated in
+  };
 }
 
 /** Parse the exchange completion + the agent's own settle tx into a BuyResult. */
 export function parseBuyResult(json: ExchangeCompletion, paymentRef: string): BuyResult {
   const answer = json.choices?.[0]?.message?.content;
-  const cost = json.agentrouter?.pricePaid;
+  const ar = json.agentrouter;
+  const cost = ar?.total; // the agent is charged the total: provider price + exchange fee
   if (typeof answer !== "string" || answer.length === 0) {
     throw new Error("exchange response missing completion content");
   }
   if (typeof cost !== "number") {
-    throw new Error("exchange response missing agentrouter.pricePaid");
+    throw new Error("exchange response missing agentrouter.total");
   }
-  return { answer, cost, provider: json.agentrouter?.provider ?? "unknown", paymentRef };
+  return {
+    answer,
+    cost,
+    price: ar?.price,
+    fee: ar?.fee,
+    provider: ar?.provider ?? "unknown",
+    paymentRef,
+  };
 }
 
 export interface BoughtWithLink extends BuyResult {

@@ -24,6 +24,7 @@ const spamIdx = process.argv.indexOf("--spam");
 const spamN = spamIdx >= 0 ? parseInt(process.argv[spamIdx + 1] || "10", 10) : 0;
 
 let mockBalance = parseFloat(process.env.AGENT_MOCK_BALANCE || "10");
+let spent = 0; // running total (price + fee) across the run
 
 async function realBalance(): Promise<string> {
   return (await settlementBalance(hederaAccount("AGENT").id)).toFixed(4);
@@ -42,10 +43,15 @@ async function callOnce(prompt: string, i: number, total: number) {
   }
   const data = await res.json();
   const m = data.agentrouter;
-  mockBalance -= m.pricePaid;
+  const paidTotal = m.total ?? 0;
+  spent += paidTotal;
+  mockBalance -= paidTotal;
   const balanceStr = MOCK_MODE ? `${money(mockBalance.toFixed(4))} (mock)` : `${money(await realBalance())}`;
   log("agent", `[${i}/${total}] "${prompt.slice(0, 40)}…"`);
-  log("agent", `    → ${m.provider} | paid ${money(m.pricePaid)} | ${Date.now() - t0}ms | balance ${balanceStr}`);
+  log(
+    "agent",
+    `    → ${m.provider} | price ${money(m.price ?? "?")} + fee ${money(m.fee ?? "?")} = ${money(paidTotal)} | spent ${money(spent.toFixed(4))} | ${Date.now() - t0}ms | balance ${balanceStr}`,
+  );
   log("agent", `    ✦ ${data.choices[0].message.content.slice(0, 90)}`);
 }
 
@@ -66,7 +72,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 800));
     }
   }
-  log("agent", `done. total spent: ${money((MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE || "10") - mockBalance : 0).toFixed(4))}${MOCK_MODE ? " (mock)" : ""}`);
+  log("agent", `done. total spent (incl. fees): ${money(spent.toFixed(4))}${MOCK_MODE ? " (mock)" : ""}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

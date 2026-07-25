@@ -28,6 +28,8 @@ function request(served: ProviderRow, overrides: Partial<RequestLogEntry> = {}):
     provider: served.displayName,
     providerUrl: served.url,
     price: served.price,
+    fee: 0,
+    total: served.price,
     latencyMs: 120,
     paymentRef: "mock-ref",
     promptPreview: "what is the capital of portugal?",

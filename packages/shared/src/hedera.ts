@@ -149,3 +149,41 @@ export async function settlementBalance(accountId: string): Promise<number> {
   return SETTLEMENT_ASSET === "hbar" ? hbarBalance(accountId) : usdcBalance(accountId);
 }
 /* v8 ignore stop */
+
+// ── exchange fee math: integer base units only, no float money ──────────
+// fee = ceil(price * feeBps / 10000). Rounding is always UP so the exchange
+// never underquotes. Floats appear only at the display edge.
+//
+// The arithmetic is scale-agnostic — only the conversion at the edges knows the
+// asset. A "base unit" is a tinybar under HBAR (10⁻⁸) and a micro-USDC under
+// USDC (10⁻⁶), so everything in between stays an exact integer either way.
+export const EXCHANGE_FEE_BPS = parseInt(process.env.EXCHANGE_FEE_BPS || "1000", 10); // 10%
+
+export const ASSET_DECIMALS = SETTLEMENT_ASSET === "hbar" ? 8 : USDC_DECIMALS;
+const ASSET_SCALE = 10 ** ASSET_DECIMALS;
+
+/** Decimal amount → integer base units of the active settlement asset. */
+export function baseUnitsOf(amount: number): number {
+  return Math.round(amount * ASSET_SCALE);
+}
+
+/** Integer base units → decimal amount. Display edge only. */
+export function fromBaseUnits(units: number): number {
+  return units / ASSET_SCALE;
+}
+
+export function feeForPrice(priceUnits: number, feeBps: number = EXCHANGE_FEE_BPS): number {
+  return Math.ceil((priceUnits * feeBps) / 10_000);
+}
+
+export function totalForPrice(priceUnits: number, feeBps: number = EXCHANGE_FEE_BPS): number {
+  return priceUnits + feeForPrice(priceUnits, feeBps);
+}
+
+// x402 price built straight from integer base units. Once fees are involved the
+// units ARE the source of truth, so this hands x402 the exact integer rather than
+// round-tripping through a decimal — both assets accept the explicit AssetAmount
+// form, so neither side has to re-derive a number we already computed exactly.
+export function settlementPriceFromUnits(units: number): { amount: string; asset: string } {
+  return { amount: String(units), asset: SETTLEMENT_ASSET === "hbar" ? HBAR_ASSET : USDC_TOKEN_ID };
+}

@@ -21,7 +21,8 @@ build. No code change, no re-migration.
 |---|---|---|
 | Settlement asset | native HBAR (`0.0.0`, tinybar) | HTS USDC `0.0.429274`, 6 dp |
 | Selected by | nothing — hardcoded | `SETTLEMENT_ASSET` (`usdc` default, `hbar` fallback) |
-| Price fields | `priceHbar`, `costHbar`, `pricePaidHbar`, … | `price`, `cost`, `pricePaid`, … |
+| Price fields | `priceHbar`, `costHbar`, `pricePaidHbar`, … | `price`, `cost`, `total`, … |
+| Fee math | `tinybarsOf` / `hbarOf` (fixed 10⁻⁸) | `baseUnitsOf` / `fromBaseUnits` (asset's own decimals) |
 | Stake / slash | `stakeHbar`, `amountHbar` in HBAR | **unchanged** |
 | Prerequisite | operator HBAR only | operator HBAR **+ a Circle faucet trip** |
 
@@ -80,6 +81,20 @@ below). Providers re-register automatically on next boot.
 
 New registrations carry an explicit `asset` field so an archived message can always say
 what its price was denominated in.
+
+## Interaction with the exchange taker fee
+
+The percentage fee (`EXCHANGE_FEE_BPS`, default 1000 = 10%) is computed in **integer base
+units of the active settlement asset** — micro-USDC at 6 dp, tinybar at 8 dp — and always
+rounds up, so the exchange never underquotes in either mode. The arithmetic itself is
+scale-agnostic; only the conversions at the edges know which asset is active.
+
+Two consequences worth knowing:
+
+- A refund moves the **same asset the payment did**. Refunding HBAR for a USDC payment
+  would return the wrong token at the wrong scale, so `sendRefund` branches on
+  `SETTLEMENT_ASSET` exactly like the payment path.
+- `EXCHANGE_FEE_BPS` needs no change when you switch assets — basis points are a ratio.
 
 ## Step 3 — per-service variables
 

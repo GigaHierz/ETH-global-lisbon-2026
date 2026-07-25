@@ -1,14 +1,36 @@
 // In-memory exchange state: provider table, request log, reputation, mock ledger.
 // No DB by design — hackathon MVP.
 
-import type { ProviderRow, RequestLogEntry, ExchangeEvent } from "@agentrouter/shared";
+import { EXCHANGE_FEE_BPS, ASSET_LABEL, fromBaseUnits } from "@agentrouter/shared";
+import type { ProviderRow, RequestLogEntry, ExchangeEvent, ExchangeStats } from "@agentrouter/shared";
 
 export const providers = new Map<string, ProviderRow>(); // key: provider url
 export const requestLog: RequestLogEntry[] = [];
 export const priceIndex: Array<{ ts: number; model: string; price: number }> = [];
 
-// MOCK_MODE ledger: usd balances per role/wallet
+// MOCK_MODE ledger: hbar balances per role/wallet
 export const mockLedger = new Map<string, number>();
+
+// ---- cumulative revenue (integer base units; floats only at the display edge) ----
+export const revenue = {
+  volumeUnits: 0, // provider prices settled
+  feeUnits: 0, // accrued exchange fees
+  requests: 0,
+  refunds: 0,
+  refundFailures: 0,
+};
+
+export function statsSnapshot(): ExchangeStats {
+  return {
+    totalVolume: fromBaseUnits(revenue.volumeUnits),
+    requests: revenue.requests,
+    feeRevenue: fromBaseUnits(revenue.feeUnits),
+    refunds: revenue.refunds,
+    refundFailures: revenue.refundFailures,
+    feeBps: EXCHANGE_FEE_BPS,
+    asset: ASSET_LABEL,
+  };
+}
 
 // ---- SSE fanout ----
 type SSEClient = { id: number; write: (chunk: string) => void };

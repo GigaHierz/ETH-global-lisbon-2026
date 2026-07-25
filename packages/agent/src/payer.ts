@@ -18,6 +18,8 @@ import {
 export interface PaidResult {
   res: Response;
   paymentRef: string;
+  /** What the mock leg actually paid (parsed from the 402 quote); real mode reads it from the response body. */
+  paid?: number; // what the mock payer actually paid (the quoted total)
 }
 
 let realFetch: ((url: string, init?: RequestInit) => Promise<Response>) | null = null;
@@ -58,12 +60,24 @@ export async function initAgentPayer() {
 // for the mock payment header.
 export async function paidPost(url: string, body: unknown, ask: number): Promise<PaidResult> {
   if (MOCK_MODE) {
+    // Mirror the real x402 client: fire unpaid, read the 402's dynamic quote
+    // (provider price + exchange fee), then retry paying the exact total.
+    const payload = { method: "POST" as const, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+    const unpaid = await fetch(url, payload);
+    if (unpaid.status !== 402) {
+      return { res: unpaid, paymentRef: `mock-agent-pay-${Date.now().toString(36)}` };
+    }
+    let quotedTotal = ask; // fallback guess if the 402 is unparseable
+    try {
+      const challenge = (await unpaid.json()) as { accepts?: Array<{ price?: string }> };
+      const m = challenge.accepts?.[0]?.price?.match(/([\d.]+)/);
+      if (m) quotedTotal = parseFloat(m[1]);
+    } catch { /* keep fallback */ }
     const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", [MOCK_PAYMENT_HEADER]: String(ask) },
-      body: JSON.stringify(body),
+      ...payload,
+      headers: { ...payload.headers, [MOCK_PAYMENT_HEADER]: String(quotedTotal) },
     });
-    return { res, paymentRef: `mock-agent-pay-${Date.now().toString(36)}` };
+    return { res, paymentRef: `mock-agent-pay-${Date.now().toString(36)}`, paid: quotedTotal };
   }
   const res = await realFetch!(url, {
     method: "POST",
