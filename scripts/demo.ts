@@ -6,9 +6,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { MOCK_PAYMENT_HEADER } from "@agentrouter/shared";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCK = process.env.MOCK_MODE !== "false";
+const EXCHANGE_ASK_HBAR = process.env.EXCHANGE_ASK_HBAR || "0.12";
 const procs: ChildProcess[] = [];
 
 function banner(msg: string) {
@@ -92,12 +94,26 @@ async function main() {
     const slashed = providers.find((p: { status: string }) => p.status === "slashed");
     if (slashed) {
       banner(`⚡ SLASHED: ${slashed.displayName} — stake cut, reputation zeroed, OUT of routing`);
-      const again = await fetch("http://localhost:4100/v1/chat/completions", {
+      // Same paywall as every other buyer call: in mock mode the exchange wants
+      // the mock payment header, in real mode the caller must settle over x402.
+      const res = await fetch("http://localhost:4100/v1/chat/completions", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK_HBAR } : {}),
+        },
         body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
-      }).then((r) => r.json());
-      console.log(`  next 70b request now routes to: ${again.agentrouter.provider} ($${again.agentrouter.pricePaidHbar}/req)`);
+      });
+      const raw = await res.text();
+      let routed: { provider: string; pricePaidHbar: number } | undefined;
+      try {
+        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; pricePaidHbar: number } }).agentrouter;
+      } catch { /* non-JSON error body — reported below */ }
+      if (res.ok && routed) {
+        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.pricePaidHbar} ℏ/req)`);
+      } else {
+        console.log(`  reroute check failed: exchange answered HTTP ${res.status} — ${raw.slice(0, 120)}`);
+      }
       banner("DEMO COMPLETE — services stay up for dashboard exploration. Ctrl-C to stop.");
       return; // keep processes alive
     }
