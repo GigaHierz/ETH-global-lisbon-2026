@@ -88,7 +88,6 @@ above stays honest:
 - Our own `scripts/demo.ts` used `spawn("npx", …)` without `shell:true`, which fails on Windows.
 - Windows PowerShell execution policy blocked `pnpm.ps1` (worked around with `pnpm.cmd`).
 - `@x402/*` vs legacy unscoped `x402-*` package confusion — that's **Coinbase's x402**, not Hedera.
-- USDC test funding depends on `faucet.circle.com` — **Circle**, not Hedera.
 
 ---
 

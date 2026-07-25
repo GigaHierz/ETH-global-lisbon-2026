@@ -43,9 +43,7 @@ flowchart LR
 | `MOCK_MODE` | `true` | all — in-memory chain/payments when true |
 | `GROQ_API_KEY` | — | providers (canned fallback without) |
 | `CHEAT_MODE` | `true` | provider3 serves 8b while advertising 70b |
-| `SETTLEMENT_ASSET` | `hbar` | `hbar` (native) or `usdc` (HTS 0.0.429274) |
 | `FACILITATOR_URL` | ladder | override rung 1; ladder = blocky402 → x402.org |
-| `SELF_HOST_FACILITATOR` | `false` | local facilitator stub (TODO) |
 | `HEDERA_OPERATOR_ID/KEY/EVM_ADDRESS` | — | setup script, topic creation, treasury |
 | `HEDERA_<ROLE>_ID/KEY/EVM` | from `pnpm setup-hedera` | AGENT, EXCHANGE, PROVIDER1-3, VERIFIER, ESCROW |
 | `STAKE_HBAR` | `50` | provider boot-time stake to escrow |
@@ -79,7 +77,7 @@ Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` 
 
 | Component | Owns |
 |---|---|
-| Supply | Providers, VPS hosting |
+| Supply | Providers (Groq-backed inference) |
 | Agent + verifier | Buyer agent, audit loop, test matrix |
 | DevRel | Payments story, HCS map, submission |
 | Exchange | Routing core + dashboard |
@@ -89,7 +87,7 @@ Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` 
 | Symptom | Cause / fix |
 |---|---|
 | Exchange sees no providers / stale table | **Mirror lag is 1-5s** — registration takes a beat to appear; also check provider `/healthz` and `PROVIDER_URLS` |
-| Tunnel URLs dead | trycloudflare quick tunnels die with the laptop/process — restart per [TESTING.md](TESTING.md); VPS is the durable home |
+| Tunnel URLs dead | trycloudflare quick tunnels die with the laptop/process — restart per [TESTING.md](TESTING.md); durable hosting (Railway/Vercel) avoids this |
 | Groq 429s under `--spam` | free-tier rate limit — slow down, or unset `GROQ_API_KEY` to switch to canned answers (flow unaffected) |
 | Boot log: facilitator rung unreachable | ladder auto-advances; if all rungs fail → `MOCK_MODE=true` and the demo continues offline |
 | `Missing HEDERA_*` | run `pnpm setup-hedera` where the operator key lives, or paste the role lines into `.env` |

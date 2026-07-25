@@ -19,7 +19,7 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 const STATS = [
   { icon: "payments", label: "Per 70B request", value: "0.10 ℏ" },
   { icon: "savings", label: "Quality bond", value: "50 ℏ" },
-  { icon: "memory", label: "Backend", value: "Groq API" },
+  { icon: "memory", label: "Backend", value: "Groq" },
   { icon: "hub", label: "Registry", value: "HCS on-chain" },
 ];
 
@@ -32,7 +32,7 @@ const STEPS = [
     title: "List your compute",
     items: [
       "Run the provider service on any box — VPS, cloud, or your laptop behind a tunnel.",
-      "Point it at a Groq API key (or run without one for canned answers).",
+      "Point it at a Groq API key, or run without one for canned demo answers.",
       "Advertise the model you serve and a price in HBAR per request.",
     ],
   },
@@ -232,12 +232,8 @@ export default function ProvidersPage() {
                 <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
                 <span>Set your own model, price, and name in <span className="font-data">.env</span> — no code changes.</span>
               </div>
-              <div className="flex items-start gap-3">
-                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>Or run the built-in demo profiles (<span className="font-data">provider1…provider4</span>) from the same repo.</span>
-              </div>
             </div>
-            <a href={`${REPO}/blob/main/GUIDE.md`} target="_blank" rel="noreferrer"
+            <a href={`${REPO}/blob/main/docs/GUIDE.md`} target="_blank" rel="noreferrer"
               className="mt-8 w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
               Full setup guide <Icon name="open_in_new" className="text-[14px]" />
             </a>

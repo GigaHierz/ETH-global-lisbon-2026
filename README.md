@@ -66,9 +66,9 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 Put operator credentials in `.env`, run `pnpm setup-hedera` to create and fund the demo
 accounts, set `MOCK_MODE=false`, then run `pnpm demo`. Payments are native HBAR via x402 v2
-`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas);
-USDC over HTS is available behind `SETTLEMENT_ASSET=usdc`. Live settlement transactions and
-account links: [docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
+`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas).
+Live settlement transactions and account links: [docs/PROOF.md](docs/PROOF.md). Funding
+decisions: [docs/FUNDING.md](docs/FUNDING.md).
 
 ## Documentation
 
@@ -95,15 +95,9 @@ scripts/       demo, smoke, and Hedera/HCS setup
 docs/          all documentation
 ```
 
-## Not in this MVP
+## Roadmap
 
-- Real GPU supply — providers proxy Groq; the marketplace mechanics are the point
-- TEE / zkML verification — the verifier does optimistic replay-and-compare sampling
-- Trustless staking contract — the MVP escrow is verifier-held (native HBAR, no Solidity); a contract- or multisig-enforced bond is future work
-- Orderbook / auctions — routing is simple cheapest-first among live claimants
-- Mainnet — Hedera Testnet only
-- Agent-to-exchange settlement — the agent pays the exchange off-band; the exchange pays
-  providers via x402 (exchange-as-taker)
+Planned work is tracked in the repo's [open issues](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues).
 
 ## Environment
 

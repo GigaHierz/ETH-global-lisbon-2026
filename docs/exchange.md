@@ -56,8 +56,8 @@ Anyone with a box sells inference. On boot, a provider:
 
 3. **Serves an OpenAI-compatible endpoint** (`POST /v1/chat/completions`) behind an x402
    paywall. Unpaid requests get `402 Payment Required` with machine-readable payment
-   requirements; paid requests get inference. Backends: Groq API, with a canned
-   deterministic fallback (so demos survive with zero external dependencies).
+   requirements; paid requests get inference. Backends: Groq API, or a
+   canned deterministic fallback (so demos survive with zero external dependencies).
 
 There is **no signup and no permission** — the stake is the listing fee, the topic message
 is the listing, being reachable is the activation. The exchange discovers new supply from
@@ -104,8 +104,7 @@ real — see the receipts in §7.
 The facilitator is **boot-time verified over a ladder**: `api.testnet.blocky402.com` →
 `x402.org/facilitator` — services probe `/supported` and log which rung answered; if one
 dies the next takes over, and `MOCK_MODE=true` keeps the entire system demoable offline.
-Settlement asset is native HBAR (tinybar-exact); USDC (HTS `0.0.429274`) works behind
-`SETTLEMENT_ASSET=usdc`.
+Settlement asset is native HBAR (tinybar-exact).
 
 ## 4 · What THIS service does (the exchange)
 
@@ -198,7 +197,6 @@ MOCK_MODE=false pnpm exchange    # real x402 + HCS (needs .env, see below)
 | `PROVIDER_URLS` | 3 localhosts | discovery seed; HCS registry adds everything else |
 | `EXCHANGE_PORT` / `PORT` | `4100` | host-injected `PORT` (Railway) wins |
 | `HCS_REGISTRY/TRADES/VERDICTS_TOPIC` | deployments.json | audit-trail topics |
-| `SETTLEMENT_ASSET` | `hbar` | or `usdc` (HTS 0.0.429274) |
 
 Full-system demo: `pnpm demo` (3 providers + exchange + verifier + agent, narrated,
 catches the cheater live). Account/topic bootstrap: `pnpm setup-hedera`, `pnpm setup-hcs`
@@ -224,12 +222,13 @@ live on-chain*, not in this process.
 Anyone can replay the entire market — who listed, every trade, every enforcement action —
 from public Mirror Node data. That is the point.
 
-## 8 · Honest limits (MVP scope)
+## 8 · Honest limits (current scope)
 
-- **Verifier is trusted** (it holds the escrow key). Production: verifier sets with their
-  own stakes and dispute rounds; a contract- or multisig-enforced escrow is the trustless
-  upgrade path (see the security follow-up issue).
-- **Optimistic sampling can be gamed** by a cheater that fingerprints audit traffic or only
-  cheats on long prompts — TEE attestation / zkML are the hardening path, out of scope.
-- **Exchange-as-taker**: buyer→exchange settlement is off-band; no spread/fee yet.
-- **In-memory exchange state**, cheapest-first only (no orderbook), testnet only.
+- **Verifier is trusted** — it holds the escrow key and is the sole slash authority.
+- **Optimistic sampling** — verification is replay-and-compare, which a cheater could game
+  by fingerprinting audit traffic or only cheating on long prompts.
+- **Exchange-as-taker** — the buyer→exchange leg settles off-band; there is no spread/fee.
+- **In-memory exchange state**, cheapest-first routing, Hedera Testnet only.
+
+Hardening and decentralization of the above are tracked as
+[open issues](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues).
