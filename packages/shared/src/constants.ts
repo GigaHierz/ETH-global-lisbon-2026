@@ -15,6 +15,12 @@ export const DEFAULT_EXCHANGE_URL = "http://localhost:4100";
 // silently end up smaller than the log it samples from.
 export const REQUEST_LOG_LIMIT = 500;
 
+// How much of a request's prompt the exchange stores on its log entry. It is what
+// the verifier replays, so cutting it short changes the task being audited: at 80
+// characters any real prompt was truncated mid-sentence and two honest providers
+// could diverge on the mutilated remainder. Display surfaces truncate their own.
+export const PROMPT_PREVIEW_LIMIT = 1000;
+
 // Local ports for the four provider personalities (provider1..provider4).
 export const PROVIDER_PORTS = [4021, 4022, 4023, 4024] as const;
 
