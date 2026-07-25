@@ -10,15 +10,18 @@ import {
   MOCK_PAYMENT_HEADER,
   HEDERA_NETWORK,
   TINYBAR,
+  DEFAULT_MODEL,
+  PROVIDER_PORTS,
+  localhostUrl,
   hbarBalance,
   hederaAccount,
   hashscanTx,
   log,
 } from "@agentrouter/shared";
 
-const PROVIDER_URL = process.env.PROVIDER_URL || "http://localhost:4021";
+const PROVIDER_URL = process.env.PROVIDER_URL || localhostUrl(PROVIDER_PORTS[0]);
 const body = JSON.stringify({
-  model: "llama-3.3-70b-versatile",
+  model: DEFAULT_MODEL,
   messages: [{ role: "user", content: "What is the capital of Portugal? One sentence." }],
   temperature: 0,
 });

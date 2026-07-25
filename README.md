@@ -1,80 +1,111 @@
-# ⚡ AgentRouter — the on-chain OpenRouter
+# AgentRouter — the on-chain OpenRouter
 
-**An inference exchange where AI agents buy LLM inference per-request with HBAR over x402, from providers identity- and reputation-tracked on Hedera Consensus Service — with a verifier that catches providers serving cheaper models than advertised and slashes their staked HBAR.**
+An inference exchange where AI agents buy LLM inference per request with HBAR over x402, from
+providers identity- and reputation-tracked on Hedera Consensus Service — with a verifier that
+catches providers serving cheaper models than advertised and slashes their staked HBAR.
 
-Built at ETHGlobal Lisbon 2026. **Everything on-chain runs on Hedera Testnet — payments, identity, staking, audit trail.**
+Built at ETHGlobal Lisbon 2026. Everything on-chain runs on Hedera Testnet: payments,
+identity, staking, and the audit trail.
 
-> 🧾 **[PROOF.md](PROOF.md) — live Hashscan links for real x402 settlements, all demo accounts, and the HCS audit topics.**
-> 🧪 **[TESTING.md](TESTING.md) — shared test URLs.** · 📖 **[GUIDE.md](GUIDE.md) — consolidated reference + role guides.**
+## Quickstart
 
-## 🚀 Run it (60 seconds, no chain needed)
+Prerequisites: Node 22+ and pnpm (`corepack enable`).
 
 ```bash
 pnpm install
-pnpm demo               # MOCK_MODE: boots 3 providers + exchange + verifier, runs the agent, catches the cheater
+pnpm demo            # boots the fleet, runs the agent, catches the cheater — no chain needed
+pnpm dashboard       # second terminal, then open http://localhost:3000
 ```
 
-In a second terminal:
+`pnpm demo` runs in mock mode by default (in-memory payments, registry, and stakes — zero RPC
+calls). The agent buys five inference calls; the exchange routes each to the cheapest provider
+claiming `llama-3.3-70b-versatile` — which is SketchyGPU Labs, undercutting on price while
+secretly serving a smaller model. The verifier replays a sampled prompt against an honest
+witness, measures the divergence, slashes the cheater's stake, publishes the verdict to HCS,
+and the dashboard flags the slash as the cheater drops out of routing.
 
-```bash
-pnpm dashboard          # → http://localhost:3000
-```
+Reset: Ctrl-C the demo, `rm -f .registry-cache.json`, then run `pnpm demo` again. Set
+`GROQ_API_KEY` in `.env` for real inference; without it, deterministic canned responses keep
+the whole flow (including the fraud divergence) working offline.
 
-**What you'll see:** the agent buys 5 inference calls; the exchange routes every one to the *cheapest* provider claiming `llama-3.3-70b-versatile` — which is **SketchyGPU Labs**, undercutting at 0.08 ℏ/req while secretly serving `llama-3.1-8b-instant`. The verifier replays a sampled prompt at temperature 0 against an honest witness, measures answer divergence, **slashes the cheater's escrowed stake**, publishes the verdict to HCS, and the dashboard flashes a red SLASHED banner as the cheater drops out of routing — and the 70b price index visibly steps up.
+## Architecture
 
-**Reset:** Ctrl-C the demo, `rm -f .registry-cache.json`, run `pnpm demo` again.
-
-Optional: set `GROQ_API_KEY` in `.env` (free at [console.groq.com/keys](https://console.groq.com/keys)) for real inference. Without it, canned responses keep the whole flow working — including the divergence sting.
-
-## 💸 Real payments on Hedera Testnet
-
-Proven working — see [PROOF.md](PROOF.md) for the settlement transactions.
-
-1. Put the operator credentials in `.env` (`HEDERA_OPERATOR_ID/KEY`), then `pnpm setup-hedera` — creates and funds all 7 demo accounts from the operator. **No faucets on the critical path** ([FUNDING.md](FUNDING.md)).
-2. Set `MOCK_MODE=false` in `.env`, run `pnpm demo`.
-
-Payments are **native HBAR** (`SETTLEMENT_ASSET=hbar`, default) via x402 v2 `exact` on `hedera:testnet`. The facilitator ladder tries `api.testnet.blocky402.com`, then `x402.org/facilitator` — both sponsor settlement fees (payers need zero gas). USDC (HTS `0.0.429274`) works behind `SETTLEMENT_ASSET=usdc`.
-
-## 🏗 Architecture
+Three autonomous actors — a buyer agent, provider agents, and a verifier — trade around a
+routing exchange, settling in HBAR over x402 and recording identity, trades, and verdicts on
+Hedera Consensus Service.
 
 ```mermaid
 flowchart LR
-    A[Agent CLI<br/>Hedera account] -->|"POST /v1/chat/completions"| E[Exchange :4100<br/>route to cheapest<br/>SSE feed + price index]
+    A[Agent<br/>Hedera account] -->|"POST /v1/chat/completions"| E[Exchange :4100<br/>route to cheapest<br/>SSE feed + price index]
     E -->|"x402 HBAR payment"| P1[Provider 1 · Titan<br/>70b @ 0.10 ℏ]
     E -->|"x402 HBAR payment"| P2[Provider 2 · Budget<br/>8b @ 0.04 ℏ]
-    E -->|"x402 HBAR payment"| P3[Provider 3 · Sketchy 😈<br/>claims 70b @ 0.08 ℏ<br/>serves 8b]
+    E -->|"x402 HBAR payment"| P3[Provider 3 · Sketchy<br/>claims 70b @ 0.08 ℏ<br/>serves 8b]
     P1 & P2 & P3 -->|proxy| G[Groq API]
-    P1 & P2 & P3 -->|"registration JSON<br/>+ 50 ℏ stake → escrow"| HCS[HCS topics<br/>registry · trades · verdicts]
+    P1 & P2 & P3 -->|"registration JSON<br/>+ 50 ℏ stake to escrow"| HCS[HCS topics<br/>registry · trades · verdicts]
     E -->|"trade messages"| HCS
     V[Verifier] -->|"replay temp-0 prompt<br/>vs witness · compare"| P1 & P3
-    V -->|"slash: escrow→treasury<br/>+ verdict message"| HCS
+    V -->|"slash: escrow to treasury<br/>+ verdict message"| HCS
     V -->|"POST /slash"| E
     M[Mirror Node REST] -.->|"1-5s lag"| E & D
     D[Dashboard :3000<br/>trading terminal<br/>+ audit trail panel] <-->|SSE| E
 ```
 
-| Package | What it does |
-|---|---|
-| [`/provider`](provider) | OpenAI-compatible `POST /v1/chat/completions` behind `@x402/express` + `@x402/hedera` paywall (HBAR, tinybar-exact); proxies Groq; registers on the HCS registry topic + stakes 50 ℏ to escrow on boot; 3 env-driven personalities |
-| [`/exchange`](exchange) | `GET /providers` (HCS registry via Mirror Node + `/info` + reputation), routes each request to the cheapest live provider claiming the model, pays via `@x402/fetch`, returns response + `{provider, price, latency, paymentRef}`; SSE event feed; publishes trades to HCS |
-| [`/verifier`](verifier) | Samples routed requests, replays prompt at temp 0 against target + witness, Jaccard-shingle similarity < 0.35 ⇒ escrow slash + HCS verdict + removal from routing |
-| [`/dashboard`](dashboard) | Next.js dark trading terminal: provider table, live request feed, per-model price index, SLASHED banner, HCS audit-trail panel (Mirror Node REST) |
-| [`/agent`](agent) | Demo buyer: 5 questions through the exchange, prints cost + remaining ℏ balance; `--spam N` for volume |
-| [`/contracts`](contracts) | `Staking.sol` + Foundry tests — **kept as future work**, not deployed: staking runs natively via the escrow account (No-Solidity track) |
+Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## 🎭 Mock mode (stage fallback)
+| Package | What it does | Docs |
+|---|---|---|
+| [`packages/agent`](packages/agent) | Autonomous buyer: plans a goal into questions, buys each answer through the exchange, budget-capped | [agent.md](docs/agent.md) |
+| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; registers on HCS and stakes to escrow on boot; four env-driven personalities | [provider.md](docs/provider.md) |
+| [`packages/exchange`](packages/exchange) | Discovers supply from HCS, routes each request to the cheapest live provider claiming the model, pays via x402, publishes trades | [exchange.md](docs/exchange.md) |
+| [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness, slashes providers whose answers diverge from the advertised model | [verifier.md](docs/verifier.md) |
+| [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| [`packages/shared`](packages/shared) | Shared Hedera plumbing, HCS helpers, chat types, and constants used by every service | — |
 
-`MOCK_MODE=true` (the default) swaps chain + facilitator for in-memory equivalents: payment ledger, registry, stakes — zero RPC calls, same UI, same flow, same one command. Groq stays real if a key is present; otherwise deterministic canned responses (whose "cheat variant" still diverges, so the slash demo works air-gapped). First-class path: if testnet or the facilitators die during judging, nothing changes on screen.
+## Real payments on Hedera Testnet
 
-## 🚫 Not in this MVP
+Put operator credentials in `.env`, run `pnpm setup-hedera` to create and fund the demo
+accounts, set `MOCK_MODE=false`, then run `pnpm demo`. Payments are native HBAR via x402 v2
+`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas);
+USDC over HTS is available behind `SETTLEMENT_ASSET=usdc`. Live settlement transactions and
+account links: [docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
 
-- **Real GPU supply** — providers proxy Groq (canned fallback without a key); the marketplace mechanics are the point
-- **TEE / zkML verification** — optimistic replay-and-compare sampling; production would attest execution
-- **Trustless staking contract** — `Staking.sol` + tests live in [`/contracts`](contracts) as future work; the MVP escrow is verifier-held (Hedera No-Solidity track: HCS + Mirror Node only)
-- **Orderbook / auctions** — routing is simple cheapest-first among live claimants
-- **Mainnet** — Hedera Testnet only
-- **Agent→exchange settlement** — the agent pays the exchange off-band in this MVP; the exchange pays providers via x402 (exchange-as-taker)
+## Documentation
 
-## Env
+Everything lives in [docs/](docs/README.md). Start there, or jump to:
 
-All keys via `.env` — see [.env.example](.env.example). Never hardcoded, never committed (`.env` is gitignored). Full variable reference in [GUIDE.md](GUIDE.md).
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — actors, flow, and the Hedera stack
+- [GUIDE.md](docs/GUIDE.md) — env vars, demo script, components, troubleshooting
+- Services: [agent.md](docs/agent.md) · [provider.md](docs/provider.md) · [exchange.md](docs/exchange.md) · [verifier.md](docs/verifier.md) · [FRONTEND.md](docs/FRONTEND.md)
+- [DEPLOY.md](docs/DEPLOY.md) — production URLs, per-service config, runbook
+- [PROOF.md](docs/PROOF.md) · [TRANSACTIONS.md](docs/TRANSACTIONS.md) — on-chain evidence and how native staking/slashing works
+- [RESEARCH.md](docs/RESEARCH.md) · [DEVREL_BRIEF.md](docs/DEVREL_BRIEF.md) · [HEDERAFEEDBACK.md](docs/HEDERAFEEDBACK.md)
+
+## Repository layout
+
+```
+packages/
+  agent/       buyer agent
+  provider/    inference supply (four personalities)
+  exchange/    routing + settlement core
+  verifier/    fraud auditor
+  dashboard/   Next.js trading terminal
+  shared/      Hedera + HCS + x402 plumbing
+scripts/       demo, smoke, and Hedera/HCS setup
+docs/          all documentation
+```
+
+## Not in this MVP
+
+- Real GPU supply — providers proxy Groq; the marketplace mechanics are the point
+- TEE / zkML verification — the verifier does optimistic replay-and-compare sampling
+- Trustless staking contract — the MVP escrow is verifier-held (native HBAR, no Solidity); a contract- or multisig-enforced bond is future work
+- Orderbook / auctions — routing is simple cheapest-first among live claimants
+- Mainnet — Hedera Testnet only
+- Agent-to-exchange settlement — the agent pays the exchange off-band; the exchange pays
+  providers via x402 (exchange-as-taker)
+
+## Environment
+
+All configuration is via `.env` — see [.env.example](.env.example). Nothing is hardcoded or
+committed (`.env` is gitignored). Full variable reference in [docs/GUIDE.md](docs/GUIDE.md).
