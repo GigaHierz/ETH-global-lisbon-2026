@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
-const EXCHANGE = process.env.NEXT_PUBLIC_EXCHANGE_URL || "http://localhost:4100";
+const EXCHANGE = process.env.NEXT_PUBLIC_EXCHANGE_URL || "https://agent-router-exchange-production.up.railway.app";
 
 // ---- types mirrored from @agentrouter/shared (kept local: dashboard is standalone) ----
 interface ProviderRow {
