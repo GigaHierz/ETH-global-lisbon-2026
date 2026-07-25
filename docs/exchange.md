@@ -222,12 +222,13 @@ live on-chain*, not in this process.
 Anyone can replay the entire market — who listed, every trade, every enforcement action —
 from public Mirror Node data. That is the point.
 
-## 8 · Honest limits (MVP scope)
+## 8 · Honest limits (current scope)
 
-- **Verifier is trusted** (it holds the escrow key). Production: verifier sets with their
-  own stakes and dispute rounds; a contract- or multisig-enforced escrow is the trustless
-  upgrade path (see the security follow-up issue).
-- **Optimistic sampling can be gamed** by a cheater that fingerprints audit traffic or only
-  cheats on long prompts — TEE attestation / zkML are the hardening path, out of scope.
-- **Exchange-as-taker**: buyer→exchange settlement is off-band; no spread/fee yet.
-- **In-memory exchange state**, cheapest-first only (no orderbook), testnet only.
+- **Verifier is trusted** — it holds the escrow key and is the sole slash authority.
+- **Optimistic sampling** — verification is replay-and-compare, which a cheater could game
+  by fingerprinting audit traffic or only cheating on long prompts.
+- **Exchange-as-taker** — the buyer→exchange leg settles off-band; there is no spread/fee.
+- **In-memory exchange state**, cheapest-first routing, Hedera Testnet only.
+
+Hardening and decentralization of the above are tracked as
+[open issues](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues).
