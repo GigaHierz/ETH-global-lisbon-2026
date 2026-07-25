@@ -5,12 +5,12 @@
 // payment for the exchange's 402 ask (see payer.ts). The exchange routes to the
 // cheapest live provider and settles that leg itself.
 
-import { MOCK_MODE, hbarBalance, hederaAccount, log } from "@agentrouter/shared";
+import { MOCK_MODE, hbarBalance, hederaAccount, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK_HBAR } from "@agentrouter/shared";
 import { initAgentPayer, paidPost } from "./payer.js";
 
-const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
-const MODEL = process.env.AGENT_MODEL || "llama-3.3-70b-versatile";
-const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || "0.12"); // mock-mode payment amount
+const EXCHANGE = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
+const MODEL = process.env.AGENT_MODEL || DEFAULT_MODEL;
+const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR)); // mock-mode payment amount
 
 const QUESTIONS = [
   "What is the capital of Portugal? One sentence.",

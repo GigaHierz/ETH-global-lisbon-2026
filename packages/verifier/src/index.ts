@@ -14,6 +14,7 @@ import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
   AUDIT_REQUEST_HEADER,
+  DEFAULT_EXCHANGE_URL,
   HEDERA_NETWORK,
   hederaAccount,
   publishToTopic,
@@ -26,7 +27,7 @@ import { selectAuditCandidate } from "./audit-selection.js";
 import { DEFAULT_SIMILARITY_THRESHOLD } from "./similarity.js";
 import { classifyReplayOutcomes, shouldEnforceSlash, type ReplayOutcome } from "./verification.js";
 
-const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
+const EXCHANGE = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const INTERVAL_MS = parseInt(process.env.VERIFY_INTERVAL_MS || "15000", 10);
 const THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || String(DEFAULT_SIMILARITY_THRESHOLD));
 const SLASH_HBAR = parseFloat(process.env.SLASH_HBAR || "25");

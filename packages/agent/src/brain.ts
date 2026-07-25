@@ -4,10 +4,10 @@
 // the demo-critical payment path independent of the agent's private reasoning.
 
 import type { Brain, Finding } from "./loop.js";
-import { log } from "@agentrouter/shared";
+import { log, DEFAULT_MODEL } from "@agentrouter/shared";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const BRAIN_MODEL = process.env.AGENT_BRAIN_MODEL || "llama-3.3-70b-versatile";
+const BRAIN_MODEL = process.env.AGENT_BRAIN_MODEL || DEFAULT_MODEL;
 
 async function groqChat(system: string, user: string, temperature = 0.3): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;

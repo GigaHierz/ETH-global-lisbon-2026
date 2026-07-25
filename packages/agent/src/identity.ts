@@ -45,6 +45,7 @@ export interface Identity {
   registeredHashscan?: string;
 }
 
+/* v8 ignore start -- Agent Kit + Hedera SDK network registration; real mode only */
 /**
  * Register the agent's HCS-14 identity on the registry topic using the Hedera
  * Agent Kit's consensus (HCS) tool. Idempotency isn't enforced on-chain — HCS is
@@ -115,3 +116,4 @@ function extractTxId(out: unknown): string | undefined {
   const m = s.match(/\d+\.\d+\.\d+@\d+\.\d+/);
   return m?.[0];
 }
+/* v8 ignore stop */

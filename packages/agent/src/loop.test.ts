@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { Budget } from "./budget.js";
 import { runGoal, type AgentEvent, type Brain, type BuyResult } from "./loop.js";

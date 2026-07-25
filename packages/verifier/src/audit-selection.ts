@@ -28,6 +28,7 @@ export type AuditSelection =
 function compareStrings(a: string, b: string): number {
   if (a < b) return -1;
   if (a > b) return 1;
+  /* v8 ignore next -- providers are keyed by unique url, so the tie is unreachable in sorts */
   return 0;
 }
 

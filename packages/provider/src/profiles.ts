@@ -1,5 +1,7 @@
-// Provider instance profiles. One codebase, three personalities.
+// Provider instance profiles. One codebase, four personalities.
 // provider3 is the cheater: advertises 70b, secretly serves 8b when CHEAT_MODE=true.
+
+import { DEFAULT_MODEL, SMALL_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
 
 export interface ProviderProfile {
   key: "provider1" | "provider2" | "provider3" | "provider4";
@@ -18,9 +20,9 @@ export const PROFILES: Record<string, ProviderProfile> = {
   provider1: {
     key: "provider1",
     displayName: "Titan Compute",
-    port: 4021,
-    advertisedModel: "llama-3.3-70b-versatile",
-    actualModel: "llama-3.3-70b-versatile",
+    port: PROVIDER_PORTS[0],
+    advertisedModel: DEFAULT_MODEL,
+    actualModel: DEFAULT_MODEL,
     priceHbar: 0.10, // 10,000,000 tinybars
     hederaRole: "PROVIDER1",
     cannedCheat: false,
@@ -28,9 +30,9 @@ export const PROFILES: Record<string, ProviderProfile> = {
   provider2: {
     key: "provider2",
     displayName: "Budget Inference Co",
-    port: 4022,
-    advertisedModel: "llama-3.1-8b-instant",
-    actualModel: "llama-3.1-8b-instant",
+    port: PROVIDER_PORTS[1],
+    advertisedModel: SMALL_MODEL,
+    actualModel: SMALL_MODEL,
     priceHbar: 0.04,
     hederaRole: "PROVIDER2",
     cannedCheat: false,
@@ -38,10 +40,10 @@ export const PROFILES: Record<string, ProviderProfile> = {
   provider3: {
     key: "provider3",
     displayName: "SketchyGPU Labs",
-    port: 4023,
-    advertisedModel: "llama-3.3-70b-versatile",
+    port: PROVIDER_PORTS[2],
+    advertisedModel: DEFAULT_MODEL,
     // The scam: advertise 70b, serve 8b, undercut provider1 on price.
-    actualModel: CHEAT ? "llama-3.1-8b-instant" : "llama-3.3-70b-versatile",
+    actualModel: CHEAT ? SMALL_MODEL : DEFAULT_MODEL,
     priceHbar: 0.08,
     hederaRole: "PROVIDER3",
     cannedCheat: CHEAT,
@@ -49,9 +51,9 @@ export const PROFILES: Record<string, ProviderProfile> = {
   provider4: {
     key: "provider4",
     displayName: "NimbusAI",
-    port: 4024,
-    advertisedModel: "llama-3.3-70b-versatile",
-    actualModel: "llama-3.3-70b-versatile", // honest: serves exactly what it advertises
+    port: PROVIDER_PORTS[3],
+    advertisedModel: DEFAULT_MODEL,
+    actualModel: DEFAULT_MODEL, // honest: serves exactly what it advertises
     priceHbar: 0.06, // undercuts Titan's 0.10 on 70b, but plays fair — survives verification
     hederaRole: "PROVIDER4",
     cannedCheat: false,

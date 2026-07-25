@@ -5,6 +5,7 @@ import {
   MOCK_MODE,
   AUDIT_REQUEST_HEADER,
   MOCK_PAYMENT_HEADER,
+  DEFAULT_EXCHANGE_ASK_HBAR,
   HEDERA_NETWORK,
   hbarPrice,
   resolveFacilitator,
@@ -26,13 +27,14 @@ import {
 } from "./state.js";
 import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
 import { initPayer, paidPost } from "./payer.js";
+import { applySlash } from "./slash.js";
 
 // Hosts (Railway/Render/Fly) inject PORT; fall back to EXCHANGE_PORT locally.
 const PORT = parseInt(process.env.PORT || process.env.EXCHANGE_PORT || "4100", 10);
 // The flat x402 ask the agent pays the exchange per request. The exchange routes
 // to the cheapest live provider and keeps the spread (ask − provider cost); that
 // margin compresses when the verifier slashes a fraudulent low-baller out of routing.
-const EXCHANGE_ASK_HBAR = parseFloat(process.env.EXCHANGE_ASK_HBAR || "0.12");
+const EXCHANGE_ASK_HBAR = parseFloat(process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR));
 const exchangeWallet = MOCK_MODE ? "0.0.mock-exchange" : hederaAccount("EXCHANGE").id;
 
 await initPayer();
@@ -69,14 +71,12 @@ app.get("/events", (req, res) => {
 
 // Verifier calls this to take a provider out of rotation after a slash.
 app.post("/slash", (req, res) => {
-  const { wallet, amountHbar, reason } = req.body as { wallet: string; amountHbar: number; reason: string };
-  const row = providerList().find((p) => p.wallet.toLowerCase() === wallet?.toLowerCase());
-  if (!row) return res.status(404).json({ error: "unknown provider wallet" });
-  row.status = "slashed";
-  row.reputation = 0;
-  row.stakeHbar = Math.max(0, row.stakeHbar - amountHbar);
+  const result = applySlash(providerList(), req.body ?? {});
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  const { row } = result;
+  const { amountHbar, reason } = req.body as { amountHbar: number; reason: string };
   providers.set(row.url, row);
-  log("exchange", `💀 SLASHED ${row.displayName}: -${amountHbar} ℏ stake. Reason: ${reason}`);
+  log("exchange", `SLASHED ${row.displayName}: -${amountHbar} ℏ stake. Reason: ${reason}`);
   broadcast({ type: "slashed", provider: row.displayName, amountHbar, reason });
   broadcast({ type: "providers", providers: providerList() });
   res.json({ ok: true });

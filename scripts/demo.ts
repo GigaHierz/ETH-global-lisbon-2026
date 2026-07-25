@@ -6,11 +6,12 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MOCK_PAYMENT_HEADER } from "@agentrouter/shared";
+import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK_HBAR, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL } from "@agentrouter/shared";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCK = process.env.MOCK_MODE !== "false";
-const EXCHANGE_ASK_HBAR = process.env.EXCHANGE_ASK_HBAR || "0.12";
+const EXCHANGE_ASK_HBAR = process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR);
+const EXCHANGE_URL = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const procs: ChildProcess[] = [];
 
 function banner(msg: string) {
@@ -71,7 +72,7 @@ async function main() {
   // 2. exchange
   banner("2/5 · booting exchange (routes to cheapest provider per model)");
   boot("exchange", ["packages/exchange/src/index.ts"]);
-  await waitFor("http://localhost:4100/healthz");
+  await waitFor(`${EXCHANGE_URL}/healthz`);
   await new Promise((r) => setTimeout(r, 1500)); // let discovery run
 
   // 3. verifier
@@ -91,19 +92,19 @@ async function main() {
   console.log("  (provider3 undercuts on price, wins 70b traffic, and gets caught replaying)");
   const t0 = Date.now();
   while (Date.now() - t0 < 60000) {
-    const providers = await fetch("http://localhost:4100/providers").then((r) => r.json());
+    const providers = await fetch(`${EXCHANGE_URL}/providers`).then((r) => r.json());
     const slashed = providers.find((p: { status: string }) => p.status === "slashed");
     if (slashed) {
       banner(`⚡ SLASHED: ${slashed.displayName} — stake cut, reputation zeroed, OUT of routing`);
       // Same paywall as every other buyer call: in mock mode the exchange wants
       // the mock payment header, in real mode the caller must settle over x402.
-      const res = await fetch("http://localhost:4100/v1/chat/completions", {
+      const res = await fetch(`${EXCHANGE_URL}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK_HBAR } : {}),
         },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
+        body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       });
       const raw = await res.text();
       let routed: { provider: string; pricePaidHbar: number } | undefined;

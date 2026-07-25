@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "tsx --test src/*.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@agentrouter/shared": "workspace:*",
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17"
+    "@types/cors": "^2.8.17",
+    "vitest": "^4.1.10"
   }
 }

@@ -33,6 +33,7 @@ export function topicLinks(): Record<TopicName, { id: string | null; hashscan: s
   return out;
 }
 
+/* v8 ignore start -- Hedera SDK + Mirror Node network I/O; real mode only */
 // Publish a JSON message to a topic, signed/paid by the given account.
 // Fire-and-forget friendly: callers may .catch(log) — never block the hot path.
 export async function publishToTopic(
@@ -84,3 +85,4 @@ export async function readTopicMessages(topic: TopicName, limit = 25): Promise<T
     return { consensusTs: m.consensus_timestamp, sequence: m.sequence_number, payload };
   });
 }
+/* v8 ignore stop */

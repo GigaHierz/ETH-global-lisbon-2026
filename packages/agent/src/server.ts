@@ -5,7 +5,7 @@
 
 import express from "express";
 import cors from "cors";
-import { MOCK_MODE, hbarBalance, hederaAccount, hashscanTx, log } from "@agentrouter/shared";
+import { MOCK_MODE, hbarBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK_HBAR } from "@agentrouter/shared";
 import { Budget } from "./budget.js";
 import { groqBrain } from "./brain.js";
 import { makeBuy } from "./buy.js";
@@ -15,9 +15,9 @@ import { runGoal, type AgentEvent } from "./loop.js";
 
 // Hosts (Railway/Render/Fly) inject PORT; fall back to AGENT_PORT locally.
 const PORT = parseInt(process.env.PORT || process.env.AGENT_PORT || "4200", 10);
-const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
-const MODEL = process.env.AGENT_MODEL || "llama-3.3-70b-versatile";
-const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || "0.12");
+const EXCHANGE = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
+const MODEL = process.env.AGENT_MODEL || DEFAULT_MODEL;
+const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR));
 const BUDGET_HBAR = parseFloat(process.env.AGENT_BUDGET_HBAR || "2");
 // Public URL advertised in the HCS-14 registration (set to the host's URL in prod).
 const ENDPOINT = process.env.AGENT_PUBLIC_URL || `http://localhost:${PORT}`;

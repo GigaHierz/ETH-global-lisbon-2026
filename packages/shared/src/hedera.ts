@@ -30,6 +30,7 @@ export function hashscanTopic(id: string): string {
 
 export type HederaRole = "AGENT" | "EXCHANGE" | "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "VERIFIER" | "ESCROW";
 
+/* v8 ignore start -- reads env + process.exit; exercised only in real mode */
 export function hederaAccount(role: HederaRole): { id: string; key: string } {
   const id = process.env[`HEDERA_${role}_ID`];
   const key = process.env[`HEDERA_${role}_KEY`];
@@ -39,6 +40,7 @@ export function hederaAccount(role: HederaRole): { id: string; key: string } {
   }
   return { id, key };
 }
+/* v8 ignore stop */
 
 // ── facilitator ladder ──────────────────────────────────────────────────
 // Boot-time: walk the ladder, use the first /supported that serves
@@ -53,6 +55,7 @@ const LADDER = [
 
 let resolved: string | null = null;
 
+/* v8 ignore start -- network I/O (facilitator ladder); real mode only */
 export async function resolveFacilitator(tag = "x402"): Promise<string> {
   if (resolved) return resolved;
   if (process.env.SELF_HOST_FACILITATOR === "true") {
@@ -94,3 +97,4 @@ export async function hbarBalance(accountId: string): Promise<number> {
     client.close();
   }
 }
+/* v8 ignore stop */

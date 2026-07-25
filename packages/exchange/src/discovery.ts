@@ -3,11 +3,10 @@
 // liveness + current price. PROVIDER_URLS env stays as seed/fallback (and the
 // only source in mock mode). Slashed providers stay slashed even if live.
 
-import { log, MOCK_MODE, readTopicMessages, type ProviderInfo } from "@agentrouter/shared";
+import { log, MOCK_MODE, DEFAULT_PROVIDER_URLS, readTopicMessages, type ProviderInfo } from "@agentrouter/shared";
 import { providers, providerList, broadcast, mockLedger } from "./state.js";
 
-const DEFAULT_URLS = ["http://localhost:4021", "http://localhost:4022", "http://localhost:4023"];
-export const PROVIDER_URLS = (process.env.PROVIDER_URLS || DEFAULT_URLS.join(","))
+export const PROVIDER_URLS = (process.env.PROVIDER_URLS || DEFAULT_PROVIDER_URLS.join(","))
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -18,6 +17,7 @@ const INITIAL_STAKE_HBAR = 50; // display fallback; real entries carry stakeHbar
 interface HcsReg { stakeHbar?: number; agentId?: string; displayName?: string; model?: string; priceHbar?: number; account?: string }
 const hcsRegistrations = new Map<string, HcsReg>();
 
+/* v8 ignore start -- Mirror Node + provider /info network I/O; covered via integration/demo */
 async function refreshHcsRegistry(): Promise<void> {
   if (MOCK_MODE) return;
   try {
@@ -81,10 +81,15 @@ export function startDiscovery() {
   });
   setInterval(refreshProviders, 5000);
 }
+/* v8 ignore stop */
 
-/** Cheapest live provider claiming the requested model. */
+/**
+ * Cheapest live provider claiming the requested model. Ties on price are broken
+ * deterministically by url, so routing is stable regardless of discovery order
+ * (two providers at the same price always resolve to the same winner).
+ */
 export function pickProvider(model: string) {
   return providerList()
     .filter((p) => p.status === "live" && p.model === model)
-    .sort((a, b) => a.priceHbar - b.priceHbar)[0];
+    .sort((a, b) => a.priceHbar - b.priceHbar || a.url.localeCompare(b.url))[0];
 }

@@ -3,6 +3,7 @@ node_modules/
 .next/
 dist/
 out/
+coverage/
 contracts/cache/
 contracts/out/
 contracts/broadcast/

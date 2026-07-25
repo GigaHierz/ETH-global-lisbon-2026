@@ -28,6 +28,7 @@ export interface BoughtWithLink extends BuyResult {
   hashscan: string;
 }
 
+/* v8 ignore start -- x402/HTTP network wiring around the unit-tested parseBuyResult */
 /** Build the loop's `buy` function: POST a single question to the exchange, paying its x402 ask. */
 export function makeBuy(exchangeUrl: string, askHbar: number, model: string) {
   return async (question: string): Promise<BoughtWithLink> => {
@@ -44,3 +45,4 @@ export function makeBuy(exchangeUrl: string, askHbar: number, model: string) {
     return { ...result, hashscan: hashscanTx(paymentRef) };
   };
 }
+/* v8 ignore stop */
