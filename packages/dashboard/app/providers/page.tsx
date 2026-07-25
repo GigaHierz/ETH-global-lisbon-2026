@@ -19,7 +19,7 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 const STATS = [
   { icon: "payments", label: "Per 70B request", value: "0.10 ℏ" },
   { icon: "savings", label: "Quality bond", value: "50 ℏ" },
-  { icon: "memory", label: "Backend", value: "Groq · Ollama" },
+  { icon: "memory", label: "Backend", value: "Groq" },
   { icon: "hub", label: "Registry", value: "HCS on-chain" },
 ];
 
@@ -32,7 +32,7 @@ const STEPS = [
     title: "List your compute",
     items: [
       "Run the provider service on any box — local GPU, VPS, or cloud.",
-      "Point it at a Groq API key, or a local Ollama backend for your own models.",
+      "Point it at a Groq API key, or run without one for canned demo answers.",
       "Advertise the model you serve and a price in HBAR per request.",
     ],
   },
@@ -66,7 +66,7 @@ const REQUIREMENTS = [
   {
     icon: "memory",
     title: "Minimum hardware",
-    body: "Any box. A Groq or Ollama backend is enough; ~8GB VRAM if you serve local models.",
+    body: "Any box that can reach the Groq API — no local GPU required.",
   },
   {
     icon: "account_balance",
@@ -92,7 +92,6 @@ const ENV_VARS: Array<[string, string, string]> = [
   ["PROVIDER_PUBLIC_URL", "http://localhost:4021", "Public address the exchange routes to."],
   ["GROQ_API_KEY", "—", "Upstream inference. Omitted → canned fallback answers."],
   ["STAKE_HBAR", "50", "Boot-time stake posted to escrow."],
-  ["PROVIDER_BACKEND / OLLAMA_BASE_URL", "groq", "Switch to a local Ollama supply instead of Groq."],
 ];
 
 // Public provider endpoints — from provider/src/index.ts.
@@ -231,12 +230,8 @@ export default function ProvidersPage() {
                 <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
                 <span>Run multiple profiles (<span className="font-data">provider1…provider4</span>) from one repo.</span>
               </div>
-              <div className="flex items-start gap-3">
-                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>Swap Groq for a local Ollama backend to serve your own models.</span>
-              </div>
             </div>
-            <a href={`${REPO}/blob/main/GUIDE.md`} target="_blank" rel="noreferrer"
+            <a href={`${REPO}/blob/main/docs/GUIDE.md`} target="_blank" rel="noreferrer"
               className="mt-8 w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
               Full setup guide <Icon name="open_in_new" className="text-[14px]" />
             </a>

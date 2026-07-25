@@ -13,8 +13,7 @@
 | `@x402/core` | 2.19.0 | `HTTPFacilitatorClient` (from `@x402/core/server`) |
 
 - **Network:** `hedera:testnet` (CAIP-2). Explorer: Hashscan (`https://hashscan.io/testnet`).
-- **Settlement asset:** native **HBAR** by default (`SETTLEMENT_ASSET=hbar`), tinybar-exact via
-  x402 v2 `exact`. Optional USDC path uses HTS token `0.0.429274` (6 decimals).
+- **Settlement asset:** native **HBAR**, tinybar-exact via x402 v2 `exact`.
 - **Facilitator ladder (hosted, testnet):** tries `https://api.testnet.blocky402.com`, then
   `https://x402.org/facilitator` — both list `{scheme:"exact", network:"hedera:testnet"}` and
   **sponsor the settlement fee** (feePayer sponsorship — payers need zero gas).
@@ -79,8 +78,7 @@ Spec: https://hol.org/docs/standards/hcs-14/
 ## Decisions
 
 1. Identity/reputation are HCS-native (HCS-14 UAID + HCS topics) — no registry contract to deploy.
-2. Chain: **Hedera Testnet** (`hedera:testnet`), native HBAR settlement (`SETTLEMENT_ASSET=hbar`);
-   optional USDC path via HTS token `0.0.429274`.
+2. Chain: **Hedera Testnet** (`hedera:testnet`), native HBAR settlement.
 3. Funding: create a testnet operator at https://portal.hedera.com, then `pnpm setup-hedera`
    creates + funds all role accounts from the operator — no faucets on the critical path.
 4. MOCK_MODE=true is a first-class path: in-memory ledger/registry/stakes, no RPC, canned Groq responses if no key.

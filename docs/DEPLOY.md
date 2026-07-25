@@ -43,7 +43,7 @@ service needs, and how to run — and re-arm — the demo on stage.
 - Each service differs only by its **Start Command** and **Variables** (below).
 
 ### Per-service Start Command + Variables
-Shared everywhere: `MOCK_MODE=false`, `SETTLEMENT_ASSET=hbar`.
+Shared everywhere: `MOCK_MODE=false`.
 
 | Service | Start Command | Domain | Variables (in addition to shared) |
 |---|---|---|---|

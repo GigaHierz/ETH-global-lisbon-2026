@@ -56,7 +56,7 @@ Anyone with a box sells inference. On boot, a provider:
 
 3. **Serves an OpenAI-compatible endpoint** (`POST /v1/chat/completions`) behind an x402
    paywall. Unpaid requests get `402 Payment Required` with machine-readable payment
-   requirements; paid requests get inference. Backends: Groq API, optional local Ollama,
+   requirements; paid requests get inference. Backends: Groq API, or a
    canned deterministic fallback (so demos survive with zero external dependencies).
 
 There is **no signup and no permission** — the stake is the listing fee, the topic message
@@ -104,8 +104,7 @@ real — see the receipts in §7.
 The facilitator is **boot-time verified over a ladder**: `api.testnet.blocky402.com` →
 `x402.org/facilitator` — services probe `/supported` and log which rung answered; if one
 dies the next takes over, and `MOCK_MODE=true` keeps the entire system demoable offline.
-Settlement asset is native HBAR (tinybar-exact); USDC (HTS `0.0.429274`) works behind
-`SETTLEMENT_ASSET=usdc`.
+Settlement asset is native HBAR (tinybar-exact).
 
 ## 4 · What THIS service does (the exchange)
 
@@ -198,7 +197,6 @@ MOCK_MODE=false pnpm exchange    # real x402 + HCS (needs .env, see below)
 | `PROVIDER_URLS` | 3 localhosts | discovery seed; HCS registry adds everything else |
 | `EXCHANGE_PORT` / `PORT` | `4100` | host-injected `PORT` (Railway) wins |
 | `HCS_REGISTRY/TRADES/VERDICTS_TOPIC` | deployments.json | audit-trail topics |
-| `SETTLEMENT_ASSET` | `hbar` | or `usdc` (HTS 0.0.429274) |
 
 Full-system demo: `pnpm demo` (3 providers + exchange + verifier + agent, narrated,
 catches the cheater live). Account/topic bootstrap: `pnpm setup-hedera`, `pnpm setup-hcs`
