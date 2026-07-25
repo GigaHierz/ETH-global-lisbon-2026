@@ -136,7 +136,7 @@ export default function Landing() {
                 className="w-full md:w-auto bg-accent-cyan text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all">
                 View the market
               </a>
-              <a href="#list-gpu"
+              <a href="/providers"
                 className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
                 List your GPU
               </a>
@@ -232,9 +232,10 @@ export default function Landing() {
                   className="bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
                   Join the Provider Waitlist
                 </a>
-                <span className="font-data text-[11px] text-on-surface-variant">
-                  or start now — the terminal on the right is the whole onboarding
-                </span>
+                <a href="/providers"
+                  className="font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                  Read the provider docs →
+                </a>
               </div>
             </div>
 
