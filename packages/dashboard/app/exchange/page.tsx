@@ -5,13 +5,13 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import Navbar from "@/components/Navbar";
-
-// Backend URL priority: ?api=https://… query param → build-time env → Railway prod.
-// The query param survives tunnel/host churn without a rebuild.
-const EXCHANGE =
-  (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
-  process.env.NEXT_PUBLIC_EXCHANGE_URL ||
-  "https://agent-router-exchange-production.up.railway.app";
+import Icon from "@/components/Icon";
+import Card from "@/components/Card";
+import NavStats from "@/components/NavStats";
+import StatusPill from "@/components/StatusPill";
+import Footer from "@/components/Footer";
+import { EXCHANGE } from "@/lib/config";
+import { CHART, SERIES_HEX } from "@/lib/chart";
 
 // ---- types mirrored from @agentrouter/shared (kept local: dashboard is standalone) ----
 interface ProviderRow {
@@ -29,19 +29,10 @@ interface AuditMsg { topic: string; consensusTs: string; sequence: number; paylo
 interface TopicInfo { id: string | null; hashscan: string | null }
 interface VerifyEvent { provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
 
-const SERIES_HEX: Record<string, string> = {
-  "llama-3.3-70b-versatile": "#00f0ff",
-  "llama-3.1-8b-instant": "#ff6b00",
-};
-
 const hashscanTx = (ref: string) =>
   ref.includes("@") ? `https://hashscan.io/testnet/transaction/${ref}` : null;
 const hashscanAccount = (id: string) =>
   id.startsWith("0.0.") ? `https://hashscan.io/testnet/account/${id}` : null;
-
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
-}
 
 export default function ExchangeControlRoom() {
   const [providers, setProviders] = useState<ProviderRow[]>([]);
@@ -143,30 +134,21 @@ export default function ExchangeControlRoom() {
 
   return (
     <div className="min-h-screen bg-surface-obsidian text-on-surface hud-grid-bg font-body selection:bg-accent-cyan/30">
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-
       {/* ── Top Navigation ── */}
       <Navbar>
-        <div className="hidden xl:flex items-center gap-4 px-4 py-1.5 border border-outline-variant bg-surface-container-low rounded">
-          {[
+        <NavStats
+          stats={[
             ["VOLUME", `${totalVolume.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
             ["REQUESTS", String(okFeed.length), "text-primary-fixed-dim"],
             ["PROVIDERS", String(liveCount), "text-primary-fixed-dim"],
             ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-accent-orange"],
-          ].map(([label, value, color], i) => (
-            <div key={label} className={`flex flex-col ${i > 0 ? "border-l border-outline-variant pl-4" : ""}`}>
-              <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant">{label}</span>
-              <span className={`font-data text-base font-medium ${color}`}>{value}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant">
-          <span className={`w-2 h-2 rounded-full ${connected ? "bg-accent-cyan" : "bg-hud-error"} animate-pulse`} />
-          <span className="font-data text-[10px] text-on-surface-variant uppercase tracking-widest">
-            {connected ? "Hedera Testnet" : "Feed Down"}
-          </span>
-        </div>
+          ]}
+        />
+        <StatusPill
+          variant="nav"
+          dotClassName={connected ? "bg-accent-cyan" : "bg-hud-error"}
+          label={connected ? "Hedera Testnet" : "Feed Down"}
+        />
       </Navbar>
 
       <main className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto space-y-6">
@@ -189,7 +171,7 @@ export default function ExchangeControlRoom() {
           {/* ── Sidebar ── */}
           <div className="lg:col-span-3 space-y-6">
             {/* Session card */}
-            <div className="bg-surface-container border border-outline-variant p-5 relative overflow-hidden group">
+            <Card className="p-5 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <Icon name="account_balance_wallet" className="text-8xl" />
               </div>
@@ -215,10 +197,10 @@ export default function ExchangeControlRoom() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
 
             {/* Price index chart */}
-            <div className="bg-surface-container border border-outline-variant p-5">
+            <Card className="p-5">
               <div className="flex justify-between items-center mb-4">
                 <span className="font-data text-[11px] tracking-[0.1em]">PRICE INDEX (cℏ/REQ)</span>
                 <Icon name="trending_up" className="text-primary-fixed-dim text-sm" />
@@ -226,17 +208,17 @@ export default function ExchangeControlRoom() {
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 6, right: 6, bottom: 0, left: -24 }}>
-                    <CartesianGrid stroke="#3b494b" strokeOpacity={0.3} strokeDasharray="2 4" vertical={false} />
-                    <XAxis dataKey="t" tick={{ fill: "#849495", fontSize: 9, fontFamily: "JetBrains Mono" }} tickLine={false} axisLine={{ stroke: "#3b494b" }} />
-                    <YAxis tick={{ fill: "#849495", fontSize: 9, fontFamily: "JetBrains Mono" }} tickLine={false} axisLine={false} />
+                    <CartesianGrid stroke={CHART.grid} strokeOpacity={0.3} strokeDasharray="2 4" vertical={false} />
+                    <XAxis dataKey="t" tick={{ fill: CHART.axis, fontSize: 9, fontFamily: "JetBrains Mono" }} tickLine={false} axisLine={{ stroke: CHART.grid }} />
+                    <YAxis tick={{ fill: CHART.axis, fontSize: 9, fontFamily: "JetBrains Mono" }} tickLine={false} axisLine={false} />
                     <Tooltip
-                      contentStyle={{ background: "#1a1b21", border: "1px solid #3b494b", fontSize: 11, fontFamily: "JetBrains Mono" }}
-                      labelStyle={{ color: "#b9cacb" }}
+                      contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.grid}`, fontSize: 11, fontFamily: "JetBrains Mono" }}
+                      labelStyle={{ color: CHART.tooltipLabel }}
                       formatter={(v: number, name: string) => [`${v} cℏ`, name]}
                     />
                     <Legend wrapperStyle={{ fontSize: 10, fontFamily: "JetBrains Mono" }} iconType="plainline" />
                     {models.map((m) => (
-                      <Line key={m} type="stepAfter" dataKey={m} stroke={SERIES_HEX[m] ?? "#849495"}
+                      <Line key={m} type="stepAfter" dataKey={m} stroke={SERIES_HEX[m] ?? CHART.axis}
                         strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
                     ))}
                   </LineChart>
@@ -245,13 +227,13 @@ export default function ExchangeControlRoom() {
               <p className="mt-3 font-body text-[11px] text-on-surface-variant leading-tight">
                 Cheapest live claimant wins routing. Watch the step when fraud exits the market.
               </p>
-            </div>
+            </Card>
           </div>
 
           {/* ── Main column ── */}
           <div className="lg:col-span-9 space-y-6">
             {/* Provider registry */}
-            <div id="providers" className="bg-surface-container border border-outline-variant overflow-hidden">
+            <Card id="providers" className="overflow-hidden">
               <div className="p-4 border-b border-outline-variant flex justify-between items-center">
                 <span className="font-data text-[11px] tracking-[0.1em]">PROVIDER REGISTRY</span>
                 <span className="bg-accent-cyan/10 text-primary-fixed-dim px-2 py-0.5 rounded font-data text-[10px]">
@@ -307,12 +289,12 @@ export default function ExchangeControlRoom() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Card>
 
             {/* Verifier + audit trail */}
             <div id="audit" className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Verifier audit log */}
-              <div className="bg-surface-container border border-outline-variant p-5 space-y-4 relative hud-scanline overflow-hidden">
+              <Card className="p-5 space-y-4 relative hud-scanline overflow-hidden">
                 <div className="flex justify-between items-center border-b border-outline-variant pb-3">
                   <span className="font-data text-[11px] tracking-[0.1em]">VERIFIER AUDIT LOG</span>
                   <span className="font-data text-[10px] text-on-surface-variant">THRESHOLD: 0.35</span>
@@ -344,10 +326,10 @@ export default function ExchangeControlRoom() {
                     <div className="p-3 text-xs font-data text-on-surface-variant">no audits yet — the verifier samples routed requests</div>
                   )}
                 </div>
-              </div>
+              </Card>
 
               {/* On-chain audit trail */}
-              <div className="bg-surface-container border border-outline-variant flex flex-col">
+              <Card className="flex flex-col">
                 <div className="flex border-b border-outline-variant">
                   {(["registry", "trades", "verdicts"] as const).map((name) => (
                     <button key={name} onClick={() => setActiveTopic(name)}
@@ -383,11 +365,11 @@ export default function ExchangeControlRoom() {
                     </a>
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
 
             {/* Live settlement feed */}
-            <div className="bg-surface-container border border-outline-variant">
+            <Card>
               <div className="p-4 border-b border-outline-variant flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${connected ? "bg-accent-cyan" : "bg-hud-error"} animate-pulse`} />
@@ -440,23 +422,12 @@ export default function ExchangeControlRoom() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Card>
           </div>
         </div>
       </main>
 
-      <footer className="w-full py-8 bg-surface-obsidian border-t border-outline-variant">
-        <div className="px-6 max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <span className="font-data text-primary-fixed-dim">AgentRouter Protocol</span>
-          <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant uppercase">
-            x402 HBAR settlement · HCS-14 identity · escrow staking · Hedera Testnet
-          </span>
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm">
-            <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            <span className="font-data text-[10px] uppercase text-on-surface">Hedera Testnet Active</span>
-          </div>
-        </div>
-      </footer>
+      <Footer tagline="x402 HBAR settlement · HCS-14 identity · escrow staking · Hedera Testnet" />
     </div>
   );
 }

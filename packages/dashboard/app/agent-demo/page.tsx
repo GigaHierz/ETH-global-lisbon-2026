@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
-
-// Backend URL priority: ?api=https://… query param → build-time env → Railway prod.
-// The query param survives tunnel churn without a rebuild.
-const AGENT =
-  (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
-  process.env.NEXT_PUBLIC_AGENT_URL ||
-  "https://agent-router-agent-server-production.up.railway.app";
+import Icon from "@/components/Icon";
+import Card from "@/components/Card";
+import NavStats from "@/components/NavStats";
+import StatusPill from "@/components/StatusPill";
+import Footer from "@/components/Footer";
+import TerminalDots from "@/components/TerminalDots";
+import { AGENT } from "@/lib/config";
 
 // ---- types mirrored from the agent-server contract (dashboard is standalone) ----
 interface Budget { capHbar: number; spentHbar: number; remainingHbar: number }
@@ -51,10 +51,6 @@ type AgentEvent =
 type Conn = "connecting" | "live" | "offline";
 
 const DEFAULT_BUDGET: Budget = { capHbar: 0, spentHbar: 0, remainingHbar: 0 };
-
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
-}
 
 export default function AgentDemoControlRoom() {
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -207,27 +203,16 @@ export default function AgentDemoControlRoom() {
 
   return (
     <div className="min-h-screen bg-surface-obsidian text-on-surface hud-grid-bg font-body selection:bg-accent-cyan/30">
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-
       {/* ── Top Navigation ── */}
       <Navbar>
-        <div className="hidden xl:flex items-center gap-4 px-4 py-1.5 border border-outline-variant bg-surface-container-low rounded">
-          {[
+        <NavStats
+          stats={[
             ["BALANCE", balance == null ? "—" : `${balance.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
             ["SPENT", `${budget.spentHbar.toFixed(2)} ℏ`, "text-accent-orange"],
             ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
-          ].map(([label, value, color], i) => (
-            <div key={label} className={`flex flex-col ${i > 0 ? "border-l border-outline-variant pl-4" : ""}`}>
-              <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant">{label}</span>
-              <span className={`font-data text-base font-medium ${color}`}>{value}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant">
-          <span className={`w-2 h-2 rounded-full ${connDot} animate-pulse`} />
-          <span className="font-data text-[10px] text-on-surface-variant uppercase tracking-widest">{connLabel}</span>
-        </div>
+          ]}
+        />
+        <StatusPill variant="nav" dotClassName={connDot} label={connLabel} />
       </Navbar>
 
       <main className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto space-y-6">
@@ -243,7 +228,7 @@ export default function AgentDemoControlRoom() {
           {/* ── Sidebar: identity + wallet ── */}
           <div className="lg:col-span-3 space-y-6">
             {/* Identity card */}
-            <div className="bg-surface-container border border-outline-variant p-5 relative overflow-hidden group">
+            <Card className="p-5 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <Icon name="fingerprint" className="text-8xl" />
               </div>
@@ -261,10 +246,10 @@ export default function AgentDemoControlRoom() {
                   Autonomous buyer: plans a goal into sub-questions, buys each answer from the exchange in HBAR via x402, then synthesizes.
                 </p>
               </div>
-            </div>
+            </Card>
 
             {/* Wallet + budget card */}
-            <div className="bg-surface-container border border-outline-variant p-5 relative overflow-hidden group">
+            <Card className="p-5 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <Icon name="account_balance_wallet" className="text-8xl" />
               </div>
@@ -294,20 +279,16 @@ export default function AgentDemoControlRoom() {
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           </div>
 
           {/* ── Main: goal + reasoning stream ── */}
           <div className="lg:col-span-9 space-y-6">
             {/* Goal command bar */}
-            <div className="bg-surface-container border border-outline-variant overflow-hidden">
+            <Card className="overflow-hidden">
               <div className="bg-surface-container-low px-4 py-2 border-b border-outline-variant flex items-center justify-between">
                 <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant uppercase">Mission Control · Set a goal</span>
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-hud-error/40" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-accent-orange/40" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-accent-cyan/40" />
-                </div>
+                <TerminalDots gapClassName="gap-1.5" dotClassName="w-2.5 h-2.5" />
               </div>
               <form onSubmit={submitGoal} className="flex gap-3 p-4 items-center">
                 <span className="font-data text-accent-cyan shrink-0">&gt;_</span>
@@ -321,7 +302,7 @@ export default function AgentDemoControlRoom() {
                 <button
                   type="submit"
                   disabled={running || submitting || !goalInput.trim()}
-                  className="bg-accent-cyan text-on-primary px-6 py-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold disabled:opacity-40 hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all active:scale-95"
+                  className="bg-accent-cyan text-on-primary px-6 py-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold disabled:opacity-40 hover:glow-cyan transition-all active:scale-95"
                 >
                   {running ? "Running…" : submitting ? "…" : "Run"}
                 </button>
@@ -332,10 +313,10 @@ export default function AgentDemoControlRoom() {
                   ACTIVE GOAL: <span className="text-on-surface">{goal}</span>
                 </p>
               )}
-            </div>
+            </Card>
 
             {/* Live reasoning stream */}
-            <div className="bg-surface-container border border-outline-variant relative hud-scanline overflow-hidden">
+            <Card className="relative hud-scanline overflow-hidden">
               <div className="p-4 border-b border-outline-variant flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${connDot} animate-pulse`} />
@@ -424,23 +405,12 @@ export default function AgentDemoControlRoom() {
 
                 <div ref={streamEnd} />
               </div>
-            </div>
+            </Card>
           </div>
         </div>
       </main>
 
-      <footer className="w-full py-8 bg-surface-obsidian border-t border-outline-variant">
-        <div className="px-6 max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <span className="font-data text-primary-fixed-dim">AgentRouter Protocol</span>
-          <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant uppercase text-center">
-            autonomous buyer · x402 HBAR per answer · every payment an on-chain Hedera tx · HCS-14 UAID identity
-          </span>
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm">
-            <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            <span className="font-data text-[10px] uppercase text-on-surface">Hedera Testnet Active</span>
-          </div>
-        </div>
-      </footer>
+      <Footer centered tagline="autonomous buyer · x402 HBAR per answer · every payment an on-chain Hedera tx · HCS-14 UAID identity" />
     </div>
   );
 }

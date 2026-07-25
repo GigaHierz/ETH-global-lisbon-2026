@@ -23,6 +23,26 @@
   --font-data: "JetBrains Mono", ui-monospace, monospace;
   --font-display: "Geist", "Inter", sans-serif;
   --font-body: "Inter", sans-serif;
+
+  /* Chart palette — recharts needs literal colors, so lib/chart.ts mirrors these. */
+  --color-chart-series-70b: #00f0ff; /* == --color-accent-cyan */
+  --color-chart-series-8b: #ff6b00; /* == --color-accent-orange */
+  --color-chart-grid: #3b494b; /* == --color-outline-variant */
+  --color-chart-axis: #849495; /* == --color-outline */
+  --color-chart-tooltip-bg: #1a1b21; /* == --color-surface-container-low */
+  --color-chart-tooltip-label: #b9cacb; /* == --color-on-surface-variant */
+
+  /* Glow shadows — token-backed; used via the .glow-cyan / .glow-orange utilities. */
+  --shadow-glow-cyan: 0 0 20px rgba(0, 240, 255, 0.4);
+  --shadow-glow-orange: 0 0 20px rgba(255, 107, 0, 0.4);
+}
+
+/* Token-backed glow utilities (replace the inline shadow-[…] arbitrary values). */
+@utility glow-cyan {
+  box-shadow: var(--shadow-glow-cyan);
+}
+@utility glow-orange {
+  box-shadow: var(--shadow-glow-orange);
 }
 
 .hud-grid-lines {
@@ -67,21 +87,9 @@
   vertical-align: middle;
 }
 
-:root {
-  --surface: #0a0f0a;
-  --panel: #0f1511;
-  --border: #1e2a22;
-  --ink: #d1e7d9;
-  --ink-muted: #6b8577;
-  --accent: #22c55e;
-  --danger: #ef4444;
-  --series-70b: #059669;
-  --series-8b: #0369a1;
-}
-
 body {
-  background: var(--surface);
-  color: var(--ink);
+  background: var(--color-surface-obsidian);
+  color: var(--color-on-surface);
   font-family: "SF Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
 }
 

@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
-
-// Live stats source (same override pattern as /exchange and /agent-demo).
-const EXCHANGE =
-  (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
-  process.env.NEXT_PUBLIC_EXCHANGE_URL ||
-  "https://agent-router-exchange-production.up.railway.app";
+import Icon from "@/components/Icon";
+import Card from "@/components/Card";
+import StatusPill from "@/components/StatusPill";
+import TerminalDots from "@/components/TerminalDots";
+import { EXCHANGE } from "@/lib/config";
 
 const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
 
@@ -20,10 +19,6 @@ const PROOF_LINKS: Array<{ label: string; href: string; color: "cyan" | "orange"
   { label: "HCS Topic: Trades", href: "https://hashscan.io/testnet/topic/0.0.9744594", color: "orange" },
   { label: "HCS Topic: Verdicts", href: "https://hashscan.io/testnet/topic/0.0.9744595", color: "orange" },
 ];
-
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
-}
 
 function MarqueeRow() {
   return (
@@ -100,9 +95,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-surface-obsidian text-on-surface font-body selection:bg-accent-cyan selection:text-on-primary scroll-smooth">
-      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-
       {/* ── Top Navigation ── */}
       <Navbar>
         <a href={REPO} target="_blank" rel="noreferrer"
@@ -133,7 +125,7 @@ export default function Landing() {
             </p>
             <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
               <a href="/exchange"
-                className="w-full md:w-auto bg-accent-cyan text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all">
+                className="w-full md:w-auto bg-accent-cyan text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:glow-cyan transition-all">
                 View the market
               </a>
               <a href="#list-gpu"
@@ -146,14 +138,14 @@ export default function Landing() {
           {/* Live stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-24 w-full max-w-6xl">
             {STAT_CARDS.map((s) => (
-              <div key={s.label}
-                className="bg-surface-container border border-outline-variant p-6 rounded-sm glow-accent hover:border-accent-cyan transition-colors text-left">
+              <Card key={s.label}
+                className="p-6 rounded-sm glow-accent hover:border-accent-cyan transition-colors text-left">
                 <div className="flex items-center gap-2 mb-2 text-on-surface-variant">
                   <Icon name={s.icon} className="text-[18px]" />
                   <span className="font-data text-[11px] font-bold tracking-[0.1em] uppercase">{s.label}</span>
                 </div>
                 <div className="font-data text-xl font-medium text-primary-fixed-dim">{s.value}</div>
-              </div>
+              </Card>
             ))}
           </div>
         </section>
@@ -173,7 +165,7 @@ export default function Landing() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {STEPS.map((step) => (
-              <div key={step.n} className="relative bg-surface-container border border-outline-variant p-8 group">
+              <Card key={step.n} className="relative p-8 group">
                 <span className="absolute top-4 right-6 font-data text-8xl text-outline-variant/30 select-none group-hover:text-accent-cyan/40 transition-colors">
                   {step.n}
                 </span>
@@ -191,7 +183,7 @@ export default function Landing() {
                     ))}
                   </ul>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </section>
@@ -208,7 +200,7 @@ export default function Landing() {
                 of AI inference and earn HBAR for every request served.
               </p>
               <div className="space-y-4">
-                <div className="flex items-center gap-4 border border-outline-variant p-4 bg-surface-container">
+                <Card className="flex items-center gap-4 p-4">
                   <div className="p-2 bg-surface-variant text-accent-cyan">
                     <Icon name="memory" />
                   </div>
@@ -216,8 +208,8 @@ export default function Landing() {
                     <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Minimum Hardware</div>
                     <div className="font-data text-sm text-on-surface-variant">Any box — Groq/Ollama backend, 8GB VRAM for local models</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4 border border-outline-variant p-4 bg-surface-container">
+                </Card>
+                <Card className="flex items-center gap-4 p-4">
                   <div className="p-2 bg-surface-variant text-accent-cyan">
                     <Icon name="verified_user" />
                   </div>
@@ -225,11 +217,11 @@ export default function Landing() {
                     <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Quality Bond</div>
                     <div className="font-data text-sm text-on-surface-variant">50 ℏ stake — slashed if you serve a cheaper model than advertised</div>
                   </div>
-                </div>
+                </Card>
               </div>
               <div className="mt-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <a href="mailto:sahilmarketingid@gmail.com?subject=AgentRouter%20Provider%20Waitlist&body=I%20want%20to%20list%20my%20compute%20on%20AgentRouter.%0A%0AHardware%3A%20%0AModels%20I%20can%20serve%3A%20%0AHedera%20account%20(if%20any)%3A%20"
-                  className="bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
+                  className="bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:glow-orange transition-all active:scale-95">
                   Join the Provider Waitlist
                 </a>
                 <span className="font-data text-[11px] text-on-surface-variant">
@@ -241,11 +233,7 @@ export default function Landing() {
             {/* Code terminal — the real onboarding */}
             <div className="bg-surface-obsidian rounded-lg border border-outline/30 shadow-2xl overflow-hidden font-data text-sm">
               <div className="bg-surface-container px-4 py-3 border-b border-outline-variant flex items-center justify-between">
-                <div className="flex gap-2">
-                  <div className="w-3 h-3 rounded-full bg-hud-error/40" />
-                  <div className="w-3 h-3 rounded-full bg-accent-orange/40" />
-                  <div className="w-3 h-3 rounded-full bg-accent-cyan/40" />
-                </div>
+                <TerminalDots gapClassName="gap-2" dotClassName="w-3 h-3" />
                 <span className="text-on-surface-variant text-[11px] uppercase tracking-widest">provision.sh — bash</span>
               </div>
               <div className="p-6 space-y-4 text-[13px]">
@@ -287,10 +275,7 @@ export default function Landing() {
           <div className="flex flex-col gap-4">
             <span className="font-data text-primary-fixed-dim font-bold text-lg">AgentRouter</span>
             <p className="font-body text-sm text-on-surface-variant">The decentralized economy for AI intelligence.</p>
-            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm w-fit">
-              <div className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-              <span className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Hedera Testnet Active</span>
-            </div>
+            <StatusPill variant="hero" />
           </div>
           <div>
             <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Protocol</h4>
