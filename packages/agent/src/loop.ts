@@ -13,6 +13,10 @@ export interface Finding {
 }
 
 export interface BuyResult {
+  /** provider's listed price (present when the exchange itemizes) */
+  priceHbar?: number;
+  /** exchange taker fee (present when the exchange itemizes) */
+  feeHbar?: number;
   answer: string;
   costHbar: number;
   provider: string;

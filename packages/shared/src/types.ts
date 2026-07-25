@@ -53,13 +53,27 @@ export interface RequestLogEntry {
   model: string;
   provider: string; // displayName
   providerUrl: string;
-  priceHbar: number;
+  priceHbar: number; // provider's listed price (what the provider receives)
+  feeHbar: number; // exchange fee on top (EXCHANGE_FEE_BPS of price, ceil in tinybars)
+  totalHbar: number; // what the agent pays the exchange (price + fee)
   latencyMs: number;
-  paymentRef: string; // tx hash or mock ref
+  paymentRef: string; // exchange→provider settle tx (or mock ref)
+  inboundRef?: string; // agent→exchange settle tx (or mock ref), set post-settlement
+  refundRef?: string; // refund tx when a settled payment was refunded after provider failure
   promptPreview: string;
   answerPreview: string;
-  status: "ok" | "error";
+  status: "ok" | "error" | "refunded";
   isAudit?: boolean; // replay issued by the verifier — never an audit candidate itself
+}
+
+// Cumulative exchange revenue/refund stats (served by GET /stats)
+export interface ExchangeStats {
+  totalVolumeHbar: number; // sum of provider prices settled
+  requests: number; // successful routed requests
+  feeRevenueHbar: number; // accrued exchange fees (ceil-rounded tinybars, displayed as ℏ)
+  refunds: number; // refunded trades
+  refundFailures: number; // refunds that themselves failed (logged loudly)
+  feeBps: number; // active EXCHANGE_FEE_BPS
 }
 
 // SSE events pushed by the exchange to the dashboard
@@ -68,6 +82,7 @@ export type ExchangeEvent =
   | { type: "providers"; providers: ProviderRow[] }
   | { type: "slashed"; provider: string; amountHbar: number; reason: string }
   | { type: "verify"; provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
+  | { type: "stats"; stats: ExchangeStats }
   | {
       type: "bond";
       provider: string; // displayName

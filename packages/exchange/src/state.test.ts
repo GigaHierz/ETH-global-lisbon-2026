@@ -18,6 +18,8 @@ function entry(i: number): RequestLogEntry {
     provider: "Titan Compute",
     providerUrl: "http://localhost:4021",
     priceHbar: 0.1,
+    feeHbar: 0.01,
+    totalHbar: 0.11,
     latencyMs: 5,
     paymentRef: `pay-${i}`,
     promptPreview: "q",

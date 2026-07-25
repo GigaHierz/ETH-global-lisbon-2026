@@ -47,6 +47,8 @@ flowchart LR
 | `HEDERA_OPERATOR_ID/KEY/EVM_ADDRESS` | — | setup script, topic creation, treasury |
 | `HEDERA_<ROLE>_ID/KEY/EVM` | from `pnpm setup-hedera` | AGENT, EXCHANGE, PROVIDER1-3, VERIFIER, ESCROW |
 | `STAKE_HBAR` | `50` | provider boot-time stake to escrow |
+| `EXCHANGE_FEE_BPS` | `1000` | taker fee in basis points (10%) |
+| `REFUND_ON_FAILURE` | `true` | refund settled payments when the provider call fails |
 | `SLASH_HBAR` | `25` | verifier slash amount |
 | `SIMILARITY_THRESHOLD` | `0.35` | fraud line |
 | `VERIFY_INTERVAL_MS` | `15000` | audit cadence |
@@ -56,6 +58,24 @@ flowchart LR
 | `EXCHANGE_URL` | `http://localhost:4100` | agent, verifier, dashboard |
 | `AGENT_MODEL` / `AGENT_MOCK_BALANCE_HBAR` | 70b / `10` | agent |
 | `HCS_REGISTRY_TOPIC` / `HCS_TRADES_TOPIC` / `HCS_VERDICTS_TOPIC` | deployments.json | HCS audit trail (live) |
+
+## Pricing: 10% taker-side fee
+
+The exchange charges a percentage fee on top of each provider's ask — **the provider
+always receives exactly its listed price**; the agent pays `price + fee`.
+
+- `EXCHANGE_FEE_BPS` (default `1000` = 10%). Fee math is integer tinybars only:
+  `fee = ceil(price × bps / 10000)` — rounded UP so the exchange never underquotes.
+- The 402 quote is **dynamic per request** (depends on which provider routing picks) and
+  **pinned for 60s**: the paid retry settles at the quoted total even if provider prices
+  change in between. Expired/unknown quote → fresh 402.
+- On provider failure the agent is made whole: in real mode the verified payment is
+  canceled before settlement (never charged); if money already moved, `REFUND_ON_FAILURE`
+  (default true) sends it back with memo `refund:<quoteId>`.
+- `GET /stats` → `{ totalVolumeHbar, requests, feeRevenueHbar, refunds, refundFailures, feeBps }`;
+  the dashboard's EXCHANGE REVENUE chip mirrors it live.
+- HCS trade messages carry `priceHbar`, `feeHbar`, `totalHbar` and BOTH settlement txs
+  (`inboundTx` agent→exchange, `paymentTx` exchange→provider).
 
 ## Demo script
 
