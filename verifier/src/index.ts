@@ -2,9 +2,13 @@
 // same prompt (temperature 0) against BOTH the original provider and a witness
 // provider claiming the same model, compare answers, and slash on divergence.
 //
-// Real mode: pays both providers via x402 HBAR (verifier Hedera account),
-// slash = escrow→treasury transfer + HCS verdict (playbook steps 3-4).
-// Mock mode: mock payment headers, slash via exchange /slash only.
+// Only two intact, comparable replies can yield a divergent verdict. Timeouts,
+// transport failures and unusably short answers are inconclusive and enforce nothing.
+//
+// Real mode pays both providers via x402 HBAR from the verifier Hedera account, then
+// slashes by moving stake from escrow to treasury and publishing an HCS verdict
+// (playbook steps 3-4). Mock mode uses mock payment headers and the exchange /slash
+// endpoint only.
 
 import {
   MOCK_MODE,
@@ -16,12 +20,14 @@ import {
   type ProviderRow,
   type ChatCompletionResponse,
 } from "@agentrouter/shared";
-import { similarity } from "./similarity.js";
+import { DEFAULT_SIMILARITY_THRESHOLD } from "./similarity.js";
+import { classifyReplayOutcomes, type ReplayOutcome } from "./verification.js";
 
 const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
 const INTERVAL_MS = parseInt(process.env.VERIFY_INTERVAL_MS || "15000", 10);
-const THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || "0.35");
+const THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || String(DEFAULT_SIMILARITY_THRESHOLD));
 const SLASH_HBAR = parseFloat(process.env.SLASH_HBAR || "25");
+const REPLAY_TIMEOUT_MS = parseInt(process.env.REPLAY_TIMEOUT_MS || "20000", 10);
 
 const audited = new Set<string>(); // request ids already checked
 
@@ -48,23 +54,54 @@ async function initPayFetch() {
   payFetch = (url, init) => wrapped(url, init as never);
 }
 
-async function ask(providerUrl: string, model: string, prompt: string, priceHbar: number): Promise<string> {
-  const res = await payFetch(
-    `${providerUrl}/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0,
-      }),
-    },
-    priceHbar,
-  );
-  if (!res.ok) throw new Error(`provider ${res.status}`);
-  const data = (await res.json()) as ChatCompletionResponse;
-  return data.choices?.[0]?.message?.content ?? "";
+// Replays one prompt and maps every failure mode onto a ReplayOutcome instead
+// of throwing, so the classifier — not the transport — decides the verdict.
+async function ask(
+  providerUrl: string,
+  model: string,
+  prompt: string,
+  priceHbar: number,
+): Promise<ReplayOutcome> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS);
+  try {
+    let res: Response;
+    try {
+      res = await payFetch(
+        `${providerUrl}/v1/chat/completions`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0,
+          }),
+          signal: controller.signal,
+        },
+        priceHbar,
+      );
+    } catch (err) {
+      if (controller.signal.aborted) return { kind: "timeout" };
+      return { kind: "network_error", message: (err as Error).message };
+    }
+
+    if (!res.ok) return { kind: "http_error", status: res.status };
+
+    let data: ChatCompletionResponse;
+    try {
+      data = (await res.json()) as ChatCompletionResponse;
+    } catch {
+      return { kind: "malformed_response" };
+    }
+
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== "string") return { kind: "malformed_response" };
+    if (content.trim() === "") return { kind: "empty_response" };
+    return { kind: "ok", text: content };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // No-Solidity slash: move SLASH_HBAR from the verifier-held escrow account to
@@ -138,12 +175,23 @@ async function auditOnce() {
 
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
-    const [a, b] = await Promise.all([
+    const [targetOutcome, witnessOutcome] = await Promise.all([
       ask(target.url, target.model, candidate.promptPreview, target.priceHbar),
       ask(witness.url, witness.model, candidate.promptPreview, witness.priceHbar),
     ]);
-    const sim = similarity(a, b);
-    const divergent = sim < THRESHOLD;
+    const result = classifyReplayOutcomes(targetOutcome, witnessOutcome, THRESHOLD);
+
+    // A flaky or silent provider is not a cheating one: nothing is reported,
+    // published or slashed unless both replays came back intact and comparable.
+    if (result.verdict === "inconclusive") {
+      log("verifier", `🤷 inconclusive audit of ${target.displayName} (${result.reason}) — no enforcement`);
+      return;
+    }
+
+    const a = targetOutcome.kind === "ok" ? targetOutcome.text : "";
+    const b = witnessOutcome.kind === "ok" ? witnessOutcome.text : "";
+    const sim = result.similarity ?? 0;
+    const divergent = result.verdict === "divergent";
 
     await fetch(`${EXCHANGE}/verify-report`, {
       method: "POST",
