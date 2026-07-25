@@ -29,7 +29,7 @@ export interface ProviderInfo {
   model: string; // advertised model
   priceHbar: number; // per request
   wallet: `0x${string}`;
-  agentId: string | null; // ERC-8004 agentId (or mock)
+  agentId: string | null; // HCS-14 UAID (or mock)
   url: string;
 }
 

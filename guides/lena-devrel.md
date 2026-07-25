@@ -15,7 +15,7 @@
 
 | Topic | Carries | Who writes |
 |---|---|---|
-| **registry** | provider registration JSON: agent id (HCS-14-style), model, price, endpoint, `erc8004_compat` block | providers, on boot |
+| **registry** | provider registration JSON: HCS-14 agent id, model, price, endpoint, `hcs14` profile block | providers, on boot |
 | **trades** | one JSON message per paid request: provider, price, latency, payment tx | exchange |
 | **verdicts** | verification results + slashes: similarity score, threshold, slash tx | verifier |
 

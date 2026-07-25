@@ -30,7 +30,7 @@ All three proxy Groq (set `GROQ_API_KEY`, free at console.groq.com/keys) or fall
 
 ## What fires on boot (real mode, after step 3 lands)
 
-1. **HCS registration:** the provider publishes a registration JSON (agent id, model, price, endpoint, `erc8004_compat` block) to the registry topic. The exchange discovers it from the Mirror Node within ~1-5s.
+1. **HCS registration:** the provider publishes a registration JSON (HCS-14 agent id, model, price, endpoint, `hcs14` profile block) to the registry topic. The exchange discovers it from the Mirror Node within ~1-5s.
 2. **Staking:** a one-time 50 ℏ transfer (`STAKE_HBAR` env to change) from the provider account to the escrow account `0.0.9744157`. Cached locally so reboots don't re-stake.
 
 ## Add a 4th provider with a new model/price

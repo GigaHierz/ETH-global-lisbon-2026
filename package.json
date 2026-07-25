@@ -2,9 +2,8 @@
   "name": "agentrouter",
   "private": true,
   "version": "0.1.0",
-  "description": "AgentRouter — on-chain OpenRouter: agents buy LLM inference per-request with USDC via x402, providers registered + reputation-tracked via ERC-8004",
+  "description": "AgentRouter — on-chain OpenRouter: agents buy LLM inference per-request with HBAR via x402 on Hedera, providers registered + reputation-tracked via HCS-14 + Hedera Consensus Service",
   "scripts": {
-    "gen-wallets": "tsx scripts/gen-wallets.ts",
     "provider1": "tsx --env-file=.env provider/src/index.ts --profile provider1",
     "provider2": "tsx --env-file=.env provider/src/index.ts --profile provider2",
     "provider3": "tsx --env-file=.env provider/src/index.ts --profile provider3",

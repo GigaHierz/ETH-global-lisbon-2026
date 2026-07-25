@@ -1,17 +1,14 @@
 {
-  "baseSepolia": {
-    "chainId": 84532,
-    "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
-    "reputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
-    "staking": null,
-    "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-    "note": "identity/reputation are the official ERC-8004 reference deployments; staking is deployed by scripts/deploy-staking.sh once EXCHANGE_PK is funded with Base Sepolia ETH"
-  },
   "hederaTestnet": {
+    "network": "hedera:testnet",
+    "explorer": "https://hashscan.io/testnet",
+    "settlementAsset": "hbar",
+    "usdcTokenId": "0.0.429274",
     "topics": {
       "registry": "0.0.9744593",
       "trades": "0.0.9744594",
       "verdicts": "0.0.9744595"
-    }
+    },
+    "note": "Agent identity is HCS-14 (uaid:aid:hedera:testnet:0.0.x) published to the registry topic; staking/slash is native-HBAR escrow via the Hedera SDK. No Solidity on the critical path."
   }
 }

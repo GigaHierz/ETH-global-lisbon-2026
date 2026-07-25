@@ -9,55 +9,64 @@
 |---|---|---|
 | `@x402/express` | 2.19.0 | Server payment middleware (`paymentMiddleware`, `x402ResourceServer`) |
 | `@x402/fetch` | 2.19.0 | Paying client (`x402Client`, `wrapFetchWithPayment`, `x402HTTPClient`) |
-| `@x402/evm` | 2.19.0 | EVM scheme impls (`ExactEvmScheme` — separate `/exact/server` and `/exact/client` entry points) |
+| `@x402/hedera` | 2.19.0 | Hedera scheme impls (`ExactHederaScheme`, `createClientHederaSigner` — separate `/exact/server` and `/exact/client` entry points) |
 | `@x402/core` | 2.19.0 | `HTTPFacilitatorClient` (from `@x402/core/server`) |
 
-- **Facilitator (hosted, testnet):** `https://x402.org/facilitator` — probed live, supports
-  `{scheme: "exact", network: "eip155:84532"}` (x402Version 2). Base Sepolia = CAIP-2 `eip155:84532`.
-- **Price format:** dollar string with `$` prefix, e.g. `"$0.002"`. Settles in testnet USDC.
+- **Network:** `hedera:testnet` (CAIP-2). Explorer: Hashscan (`https://hashscan.io/testnet`).
+- **Settlement asset:** native **HBAR** by default (`SETTLEMENT_ASSET=hbar`), tinybar-exact via
+  x402 v2 `exact`. Optional USDC path uses HTS token `0.0.429274` (6 decimals).
+- **Facilitator ladder (hosted, testnet):** tries `https://api.testnet.blocky402.com`, then
+  `https://x402.org/facilitator` — both list `{scheme:"exact", network:"hedera:testnet"}` and
+  **sponsor the settlement fee** (feePayer sponsorship — payers need zero gas).
 
-### Server (verified from coinbase/x402 `examples/typescript/servers/express`)
+### Server (provider paywall — `@x402/express` + `@x402/hedera`)
 ```ts
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { ExactHederaScheme } from "@x402/hedera/exact/server";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 
-const server = new x402ResourceServer(new HTTPFacilitatorClient({ url: "https://x402.org/facilitator" }))
-  .register("eip155:84532", new ExactEvmScheme());
+const server = new x402ResourceServer(new HTTPFacilitatorClient({ url: facilitatorUrl }))
+  .register("hedera:testnet", new ExactHederaScheme());
 
 app.use(paymentMiddleware({
   "POST /v1/chat/completions": {
-    accepts: [{ scheme: "exact", price: "$0.002", network: "eip155:84532", payTo: evmAddress }],
+    accepts: [{ scheme: "exact", price: hbarPrice, network: "hedera:testnet", payTo: accountId }],
     description: "...", mimeType: "application/json",
   },
 }, server));
 ```
 
-### Client (verified from `examples/typescript/clients/fetch`)
+### Client (paying fetch — `@x402/fetch` + `@x402/hedera`, see `exchange/src/payer.ts`)
 ```ts
 import { x402Client, wrapFetchWithPayment, x402HTTPClient } from "@x402/fetch";
-import { ExactEvmScheme } from "@x402/evm/exact/client";
-import { privateKeyToAccount } from "viem/accounts";
+import { ExactHederaScheme } from "@x402/hedera/exact/client";
+import { createClientHederaSigner } from "@x402/hedera";
+import { PrivateKey } from "@hiero-ledger/sdk";
 
+const signer = createClientHederaSigner(accountId, PrivateKey.fromStringECDSA(key), { network: "testnet" });
 const client = new x402Client();
-client.register("eip155:*", new ExactEvmScheme(privateKeyToAccount(pk)));
+client.register("hedera:testnet", new ExactHederaScheme(signer));
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 // settle receipt: new x402HTTPClient(client).getPaymentSettleResponse(n => res.headers.get(n))
 ```
 
 Links: https://github.com/coinbase/x402 · https://docs.cdp.coinbase.com/x402 · npm `@x402/*`
 
-## ERC-8004 (Trustless Agents)
+## Agent identity — HCS-14 (Universal Agent IDs)
 
-Official reference deployments are **live on Base Sepolia** (verified `eth_getCode` — both are proxies):
+Identity is **native to Hedera** — no EVM registries. Each agent/provider gets an HCS-14-style
+Universal Agent ID and publishes a registration record to the HCS registry topic.
 
-- **IdentityRegistry:** `0x8004A818BFB912233c491871b3d84c89A494BD9e` (ERC-721; `register()`, `register(string agentURI)`, `setAgentURI`, `setAgentWallet`; `Registered(uint256 agentId, string agentURI, address owner)` event)
-- **ReputationRegistry:** `0x8004B663056A597Dffe9eCcC1965A193B7388713`
-  (`giveFeedback(uint256 agentId, int128 value, uint8 valueDecimals, string tag1, string tag2, string endpoint, string feedbackURI, bytes32 feedbackHash)`;
-  `getSummary(agentId, address[] clients, tag1, tag2)`; **self-feedback by owner/operator reverts** — feedback must come from a different wallet, e.g. exchange/verifier)
-- **ValidationRegistry:** no Base Sepolia address published → we skip on-chain validation; slashing via our own `Staking.sol` + reputation feedback covers the demo.
+- **UAID:** `uaid:aid:hedera:testnet:0.0.<account>` (see `provider/src/registry.ts`).
+- **Registration:** a signed JSON message to the HCS registry topic (`0.0.9744593`) carrying
+  `{agentId, account, displayName, model, priceHbar, stakeHbar, stakeTx}` — the on-chain,
+  Mirror-Node-readable directory the exchange discovers providers from.
+- **Reputation / audit:** trades → topic `0.0.9744594`, verifier verdicts → topic `0.0.9744595`.
+- **Staking / slash (no Solidity):** stake 50 ℏ to the escrow account via a Hedera SDK
+  `TransferTransaction`; a fraud verdict slashes escrow→treasury with a second SDK transfer plus
+  a verdict message to HCS. HCS-14 is spec-bridged to ERC-8004 / A2A / x402 if EVM interop is ever needed.
 
-Repo: https://github.com/erc-8004/erc-8004-contracts (Hardhat, UUPS upgradeable) · Spec: https://eips.ethereum.org/EIPS/eip-8004
+Spec: https://hol.org/docs/standards/hcs-14/
 
 ## Groq
 
@@ -69,7 +78,9 @@ Repo: https://github.com/erc-8004/erc-8004-contracts (Hardhat, UUPS upgradeable)
 
 ## Decisions
 
-1. Use official ERC-8004 registries on Base Sepolia — no registry deployment needed. Only `Staking.sol` is ours.
-2. Chain: Base Sepolia (`eip155:84532`), RPC `https://sepolia.base.org`, USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (canonical Circle testnet USDC on Base Sepolia).
-3. Funding: Base Sepolia ETH via https://portal.cdp.coinbase.com/products/faucet or https://www.alchemy.com/faucets/base-sepolia; testnet USDC via https://faucet.circle.com (select Base Sepolia).
+1. Identity/reputation are HCS-native (HCS-14 UAID + HCS topics) — no registry contract to deploy.
+2. Chain: **Hedera Testnet** (`hedera:testnet`), native HBAR settlement (`SETTLEMENT_ASSET=hbar`);
+   optional USDC path via HTS token `0.0.429274`.
+3. Funding: create a testnet operator at https://portal.hedera.com, then `pnpm setup-hedera`
+   creates + funds all role accounts from the operator — no faucets on the critical path.
 4. MOCK_MODE=true is a first-class path: in-memory ledger/registry/stakes, no RPC, canned Groq responses if no key.

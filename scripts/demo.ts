@@ -47,14 +47,16 @@ process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
 
 async function main() {
-  banner(`AGENTROUTER DEMO — ${MOCK ? "MOCK MODE (no chain, in-memory ledger)" : "LIVE on Base Sepolia"}`);
+  banner(`AGENTROUTER DEMO — ${MOCK ? "MOCK MODE (no chain, in-memory ledger)" : "LIVE on Hedera Testnet"}`);
 
-  // 0. contracts check
-  banner("0/5 · contracts check");
+  // 0. on-chain config check
+  banner("0/5 · Hedera config check");
   const deployments = JSON.parse(fs.readFileSync(path.join(ROOT, "deployments.json"), "utf8"));
-  console.log(`  ERC-8004 IdentityRegistry:   ${deployments.baseSepolia.identityRegistry}`);
-  console.log(`  ERC-8004 ReputationRegistry: ${deployments.baseSepolia.reputationRegistry}`);
-  console.log(`  Staking:                     ${deployments.baseSepolia.staking ?? "(not deployed — mock slash only)"}`);
+  const h = deployments.hederaTestnet;
+  console.log(`  Network:            ${h.network}  (${h.explorer})`);
+  console.log(`  HCS registry topic: ${h.topics.registry}`);
+  console.log(`  HCS trades topic:   ${h.topics.trades}`);
+  console.log(`  HCS verdicts topic: ${h.topics.verdicts}`);
 
   // 1. providers
   banner("1/5 · booting 3 providers (provider3 is CHEATING: advertises 70b, serves 8b)");
