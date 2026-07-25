@@ -1,13 +1,18 @@
-# FUNDING.md — Hedera Testnet money plan (HBAR-default)
-*Verified 2026-07-25 against both live facilitators, Mirror Node, and `@x402/hedera@2.19.0` package source. No guessed values.*
+# FUNDING.md — Hedera Testnet money plan (USDC-default)
+*Verified against both live facilitators, Mirror Node, and `@x402/hedera@2.19.0` package source. No guessed values.*
 
-## Settlement: native HBAR (locked decision)
+## Settlement: HTS USDC, with an HBAR fallback
 
 | | |
 |---|---|
-| Asset | **HBAR, `asset: "0.0.0"`** — amounts in **tinybars** (1 ℏ = 10⁸ tb) |
-| Prices | p1 **0.10 ℏ** = 10,000,000 tb · p2 **0.04 ℏ** = 4,000,000 tb · p3 **0.08 ℏ** = 8,000,000 tb |
-| Why | Zero faucet dependency on the critical path — operator's 1000 tHBAR funds everything, fully scripted |
+| Asset | **USDC, `asset: "0.0.429274"`** — 6 dp (1 USDC = 10⁶ base units) |
+| Prices | p1 **$0.10** · p2 **$0.04** · p3 **$0.08** · p4 **$0.06** · exchange ask **$0.12** |
+| Why | Stablecoin pricing: buyers and providers quote in dollars, with no HBAR volatility between quote and settle |
+| Fallback | `SETTLEMENT_ASSET=hbar` settles in native HBAR (`0.0.0`, tinybars) — no faucet, fully scriptable, used by CI |
+| Bond | Staking/slashing is **always native HBAR**, in both modes — a security bond belongs in the network's own token |
+
+Switching costs one variable and no redeploy of a different build. See
+[MIGRATION-USDC.md](MIGRATION-USDC.md) for moving an existing deployment across.
 
 ## Facilitator ladder (both probed live today, both serve hedera:testnet exact/v2)
 
@@ -24,14 +29,34 @@ Boot-time: services walk the ladder, verify `/supported` contains `hedera:testne
 
 ## 🛒 Human shopping list
 
-**Nothing.** HBAR-default removes every manual step: no Circle faucet, no ETH, no Base. Operator refill (only if balance drops below ~150 ℏ): https://portal.hedera.com — testnet, 1000 ℏ/day.
+**One faucet trip.** USDC cannot be minted from the operator, so unlike the HBAR path this
+is not fully scriptable:
+
+1. **https://faucet.circle.com** → Hedera Testnet → your operator id (~20 USDC / 2h).
+2. Re-run `pnpm setup-hedera` to fan it out to the paying roles.
+
+That manual step is the whole cost of stablecoin pricing. If you need a zero-dependency
+run — CI, an offline demo, a flaky conference network — use `SETTLEMENT_ASSET=hbar` or
+`MOCK_MODE=true`, both of which need no faucet at all.
+
+Operator HBAR refill (only if below ~150 ℏ): https://portal.hedera.com — 1000 ℏ/day.
 
 ## What `pnpm setup-hedera` does (idempotent, roles in .env are skipped)
 
-1. Creates **7 ECDSA accounts** with EVM aliases: agent, exchange, provider1-3, verifier, **escrow**.
+1. Creates **ECDSA accounts** with EVM aliases for every role: agent, exchange, provider1-4,
+   provider (the generic custom-profile slot), verifier, **escrow**.
    - **escrow** = verifier-held stake pot (no-Solidity staking): providers transfer `STAKE_HBAR` (default 50 ℏ) there at registration; a slash is an escrow→treasury transfer (treasury = operator) plus a verdict on HCS.
-2. Funds each with **100 tHBAR** (700 total, ~300 stays with operator as buffer).
-3. Appends ready-to-paste `HEDERA_<ROLE>_ID/KEY/EVM` lines to `.env`, prints Hashscan links.
+2. Funds each with **100 tHBAR** for its own transactions (HCS messages, stake transfers).
+3. **Associates every account with USDC `0.0.429274`.** Hedera requires an explicit
+   association before an account can hold a token, and the x402 scheme pre-flights it —
+   an unassociated *receiver* fails the payment with `pay_to_not_associated`. Providers
+   only receive, so they need association but no balance.
+4. **Distributes 6 USDC each to AGENT, EXCHANGE, and VERIFIER** once the faucet has landed.
+   The verifier is easy to overlook: it pays providers directly for its audit replays, and
+   an unfunded one makes every audit return `inconclusive` so **no slash ever fires**.
+5. Appends ready-to-paste `HEDERA_<ROLE>_ID/KEY/EVM` lines to `.env`, prints Hashscan links.
+
+Idempotent throughout — re-running skips existing accounts and already-associated tokens.
 
 ## Money flow at a glance
 
@@ -43,16 +68,18 @@ Boot-time: services walk the ladder, verify `/supported` contains `hedera:testne
       agent    exchange  provider1  provider2     provider3   verifier    escrow
       100 ℏ     100 ℏ      100 ℏ      100 ℏ         100 ℏ       100 ℏ      100 ℏ
         │          │          └──── stake 50 ℏ each at registration ────▶ escrow
-        │x402 HBAR ▼                                                        │
-        └────▶ exchange ──x402 HBAR──▶ providers                            │ slash 25 ℏ
+        │x402 USDC ▼                                                        │
+        └────▶ exchange ──x402 USDC──▶ providers                            │ slash 25 ℏ
                (settlement fees sponsored by facilitator feePayer)          ▼
                                                                         treasury (operator)
 ```
 
 ## Costs sanity check
 
-- Demo spend: 5 calls ≈ 0.4 ℏ agent-side — 100 ℏ is 250× headroom, `--spam`-proof.
-- Stakes: 3 × 50 ℏ out of provider balances (they keep 50 ℏ working capital each).
+- Demo spend: 5 calls ≈ $0.60 agent-side — 6 USDC is ~50 requests per faucet trip.
+- Settlement fees are facilitator-sponsored, so **payers need no HBAR to settle** — only
+  to associate the token once and to pay for their own txs (HCS messages, stake transfers).
+- Stakes: 50 ℏ per provider, still native HBAR and unaffected by the settlement asset.
 - HCS: ~$0.0001/message equivalent. Account creation ~$0.05 eq. All noise against 100 ℏ.
 
 ## Explorer links

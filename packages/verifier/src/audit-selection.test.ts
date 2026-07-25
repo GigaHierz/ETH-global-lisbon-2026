@@ -8,7 +8,7 @@ function provider(overrides: Partial<ProviderRow> = {}): ProviderRow {
   return {
     displayName: "Titan Compute",
     model: MODEL,
-    priceHbar: 0.1,
+    price: 0.1,
     wallet: "0.0.1001",
     agentId: null,
     url: "http://localhost:4021",
@@ -27,7 +27,7 @@ function request(served: ProviderRow, overrides: Partial<RequestLogEntry> = {}):
     model: served.model,
     provider: served.displayName,
     providerUrl: served.url,
-    priceHbar: served.priceHbar,
+    price: served.price,
     latencyMs: 120,
     paymentRef: "mock-ref",
     promptPreview: "what is the capital of portugal?",
@@ -37,7 +37,7 @@ function request(served: ProviderRow, overrides: Partial<RequestLogEntry> = {}):
   };
 }
 
-const ACCUSED = provider({ displayName: "SketchyGPU Labs", wallet: "0.0.1003", url: "http://localhost:4023", priceHbar: 0.08 });
+const ACCUSED = provider({ displayName: "SketchyGPU Labs", wallet: "0.0.1003", url: "http://localhost:4023", price: 0.08 });
 const WITNESS = provider();
 
 function select(overrides: Partial<AuditSelectionInput> = {}) {
@@ -183,9 +183,9 @@ describe("selectAuditCandidate: who witnesses", () => {
   });
 
   it("picks the cheapest eligible witness, breaking ties on url", () => {
-    const pricey = provider({ displayName: "Pricey", wallet: "0.0.1008", url: "http://localhost:4029", priceHbar: 0.5 });
-    const cheapA = provider({ displayName: "Cheap A", wallet: "0.0.1009", url: "http://localhost:4030", priceHbar: 0.02 });
-    const cheapB = provider({ displayName: "Cheap B", wallet: "0.0.1010", url: "http://localhost:4020", priceHbar: 0.02 });
+    const pricey = provider({ displayName: "Pricey", wallet: "0.0.1008", url: "http://localhost:4029", price: 0.5 });
+    const cheapA = provider({ displayName: "Cheap A", wallet: "0.0.1009", url: "http://localhost:4030", price: 0.02 });
+    const cheapB = provider({ displayName: "Cheap B", wallet: "0.0.1010", url: "http://localhost:4020", price: 0.02 });
 
     const result = select({ requestLog: [entry], providers: [ACCUSED, pricey, cheapA, cheapB] });
 

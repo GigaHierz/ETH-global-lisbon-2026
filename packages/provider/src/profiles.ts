@@ -9,7 +9,7 @@ export interface ProviderProfile {
   port: number;
   advertisedModel: string;
   actualModel: string; // what we really send to Groq
-  priceHbar: number;
+  price: number;
   hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "PROVIDER"; // HEDERA_<role>_ID/KEY in .env
   cannedCheat: boolean; // canned-mode: answer like a small model
 }
@@ -23,7 +23,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
     port: PROVIDER_PORTS[0],
     advertisedModel: DEFAULT_MODEL,
     actualModel: DEFAULT_MODEL,
-    priceHbar: 0.10, // 10,000,000 tinybars
+    price: 0.10, // 10,000,000 tinybars
     hederaRole: "PROVIDER1",
     cannedCheat: false,
   },
@@ -33,7 +33,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
     port: PROVIDER_PORTS[1],
     advertisedModel: SMALL_MODEL,
     actualModel: SMALL_MODEL,
-    priceHbar: 0.04,
+    price: 0.04,
     hederaRole: "PROVIDER2",
     cannedCheat: false,
   },
@@ -44,7 +44,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
     advertisedModel: DEFAULT_MODEL,
     // The scam: advertise 70b, serve 8b, undercut provider1 on price.
     actualModel: CHEAT ? SMALL_MODEL : DEFAULT_MODEL,
-    priceHbar: 0.08,
+    price: 0.08,
     hederaRole: "PROVIDER3",
     cannedCheat: CHEAT,
   },
@@ -54,7 +54,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
     port: PROVIDER_PORTS[3],
     advertisedModel: DEFAULT_MODEL,
     actualModel: DEFAULT_MODEL, // honest: serves exactly what it advertises
-    priceHbar: 0.06, // undercuts Titan's 0.10 on 70b, but plays fair — survives verification
+    price: 0.06, // undercuts Titan's 0.10 on 70b, but plays fair — survives verification
     hederaRole: "PROVIDER4",
     cannedCheat: false,
   },
@@ -62,7 +62,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
 
 // A fully env-driven provider — for anyone listing their own compute on AgentRouter
 // without editing this file. Advertise = serve (honest); the account is HEDERA_PROVIDER_ID/KEY.
-//   PROVIDER_NAME, PROVIDER_MODEL, PROVIDER_PRICE_HBAR, PROVIDER_PORT
+//   PROVIDER_NAME, PROVIDER_MODEL, PROVIDER_PRICE, PROVIDER_PORT
 function customProfile(): ProviderProfile {
   const model = process.env.PROVIDER_MODEL || "llama-3.3-70b-versatile";
   return {
@@ -71,7 +71,7 @@ function customProfile(): ProviderProfile {
     port: parseInt(process.env.PROVIDER_PORT || "4025", 10),
     advertisedModel: model,
     actualModel: model, // honest: serve exactly what you advertise (the verifier checks this)
-    priceHbar: parseFloat(process.env.PROVIDER_PRICE_HBAR || "0.10"),
+    price: parseFloat(process.env.PROVIDER_PRICE || "0.10"),
     hederaRole: "PROVIDER",
     cannedCheat: false,
   };

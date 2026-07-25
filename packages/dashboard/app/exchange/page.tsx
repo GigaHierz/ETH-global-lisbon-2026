@@ -11,16 +11,17 @@ import NavStats from "@/components/NavStats";
 import StatusPill from "@/components/StatusPill";
 import Footer from "@/components/Footer";
 import { EXCHANGE } from "@/lib/config";
+import { useAssetSymbol } from "@/lib/settlement";
 import { CHART, SERIES_HEX } from "@/lib/chart";
 
 // ---- types mirrored from @agentrouter/shared (kept local: dashboard is standalone) ----
 interface ProviderRow {
-  displayName: string; model: string; priceHbar: number; wallet: string;
+  displayName: string; model: string; price: number; wallet: string;
   agentId: string | null; url: string; status: "live" | "down" | "slashed";
   reputation: number; stakeHbar: number; requestsServed: number;
 }
 interface RequestLogEntry {
-  id: string; ts: number; model: string; provider: string; priceHbar: number;
+  id: string; ts: number; model: string; provider: string; price: number;
   latencyMs: number; paymentRef: string; promptPreview: string; answerPreview: string;
   status: "ok" | "error";
 }
@@ -37,7 +38,7 @@ const hashscanAccount = (id: string) =>
 export default function ExchangeControlRoom() {
   const [providers, setProviders] = useState<ProviderRow[]>([]);
   const [feed, setFeed] = useState<RequestLogEntry[]>([]);
-  const [prices, setPrices] = useState<Array<{ ts: number; model: string; priceHbar: number }>>([]);
+  const [prices, setPrices] = useState<Array<{ ts: number; model: string; price: number }>>([]);
   const [slash, setSlash] = useState<SlashEvent | null>(null);
   const [verifies, setVerifies] = useState<VerifyEvent[]>([]);
   const [connected, setConnected] = useState(false);
@@ -46,6 +47,7 @@ export default function ExchangeControlRoom() {
   const [audit, setAudit] = useState<AuditMsg[]>([]);
   const [activeTopic, setActiveTopic] = useState<"registry" | "trades" | "verdicts">("trades");
   const slashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sym = useAssetSymbol();
 
   useEffect(() => {
     fetch(`${EXCHANGE}/providers`).then((r) => r.json()).then(setProviders).catch(() => {});
@@ -60,7 +62,7 @@ export default function ExchangeControlRoom() {
       if (ev.type === "providers") setProviders(ev.providers);
       if (ev.type === "request") {
         setFeed((f) => [ev.entry, ...f].slice(0, 60));
-        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, priceHbar: ev.entry.priceHbar }]);
+        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, price: ev.entry.price }]);
       }
       if (ev.type === "slashed") {
         setSlash({ provider: ev.provider, amountHbar: ev.amountHbar, reason: ev.reason });
@@ -110,7 +112,7 @@ export default function ExchangeControlRoom() {
       const b = Math.floor(p.ts / 5000) * 5000;
       const row = buckets.get(b) ?? {};
       const cell = row[p.model] ?? { sum: 0, n: 0 };
-      cell.sum += p.priceHbar; cell.n += 1;
+      cell.sum += p.price; cell.n += 1;
       row[p.model] = cell; buckets.set(b, row);
     }
     return [...buckets.entries()]
@@ -126,8 +128,11 @@ export default function ExchangeControlRoom() {
   }, [prices]);
 
   const models = useMemo(() => [...new Set(prices.map((p) => p.model))], [prices]);
+  // The chart plots hundredths of a unit (see chartData), so the axis unit is the
+  // settlement asset's "cent": ¢ for USDC, cℏ for HBAR.
+  const centLabel = sym === "$" ? "¢" : `c${sym}`;
   const okFeed = feed.filter((f) => f.status === "ok");
-  const totalVolume = okFeed.reduce((s, f) => s + f.priceHbar, 0);
+  const totalVolume = okFeed.reduce((s, f) => s + f.price, 0);
   const liveCount = providers.filter((p) => p.status === "live").length;
   const avgPrice = okFeed.length ? totalVolume / okFeed.length : 0;
   const topicMsgs = audit.filter((m) => m.topic === activeTopic);
@@ -138,10 +143,10 @@ export default function ExchangeControlRoom() {
       <Navbar>
         <NavStats
           stats={[
-            ["VOLUME", `${totalVolume.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
+            ["VOLUME", `${sym}${totalVolume.toFixed(2)}`, "text-primary-fixed-dim"],
             ["REQUESTS", String(okFeed.length), "text-primary-fixed-dim"],
             ["PROVIDERS", String(liveCount), "text-primary-fixed-dim"],
-            ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-accent-orange"],
+            ["AVG PRICE", `${sym}${avgPrice.toFixed(3)}`, "text-accent-orange"],
           ]}
         />
         <StatusPill
@@ -183,7 +188,7 @@ export default function ExchangeControlRoom() {
                 <div className="space-y-4">
                   <div>
                     <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant block">SESSION VOLUME</span>
-                    <span className="font-data text-3xl font-bold text-on-surface">{totalVolume.toFixed(2)} <span className="text-primary-fixed-dim">ℏ</span></span>
+                    <span className="font-data text-3xl font-bold text-on-surface"><span className="text-primary-fixed-dim">{sym}</span>{totalVolume.toFixed(2)}</span>
                   </div>
                   <div className="pt-4 border-t border-outline-variant flex justify-between">
                     <div>
@@ -202,7 +207,7 @@ export default function ExchangeControlRoom() {
             {/* Price index chart */}
             <Card className="p-5">
               <div className="flex justify-between items-center mb-4">
-                <span className="font-data text-[11px] tracking-[0.1em]">PRICE INDEX (cℏ/REQ)</span>
+                <span className="font-data text-[11px] tracking-[0.1em]">PRICE INDEX ({centLabel}/REQ)</span>
                 <Icon name="trending_up" className="text-primary-fixed-dim text-sm" />
               </div>
               <div className="h-44">
@@ -214,7 +219,7 @@ export default function ExchangeControlRoom() {
                     <Tooltip
                       contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.grid}`, fontSize: 11, fontFamily: "JetBrains Mono" }}
                       labelStyle={{ color: CHART.tooltipLabel }}
-                      formatter={(v: number, name: string) => [`${v} cℏ`, name]}
+                      formatter={(v: number, name: string) => [`${v}${centLabel}`, name]}
                     />
                     <Legend wrapperStyle={{ fontSize: 10, fontFamily: "JetBrains Mono" }} iconType="plainline" />
                     {models.map((m) => (
@@ -273,7 +278,7 @@ export default function ExchangeControlRoom() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-on-surface-variant">{p.model}</td>
-                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{p.priceHbar.toFixed(2)} ℏ</td>
+                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{sym}{p.price.toFixed(2)}</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error font-bold" : ""}`}>{p.stakeHbar.toFixed(0)} ℏ</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error" : "text-accent-cyan"}`}>{p.reputation}%</td>
                         <td className="px-6 py-4 text-center">
@@ -385,7 +390,7 @@ export default function ExchangeControlRoom() {
                       <th className="px-4 py-2">Provider</th>
                       <th className="px-4 py-2">Model</th>
                       <th className="px-4 py-2">Prompt</th>
-                      <th className="px-4 py-2 text-right">Price (ℏ)</th>
+                      <th className="px-4 py-2 text-right">Price ({sym})</th>
                       <th className="px-4 py-2 text-right">Lat.</th>
                       <th className="px-4 py-2 text-center">Status</th>
                       <th className="px-4 py-2 text-right">TX</th>
@@ -398,7 +403,7 @@ export default function ExchangeControlRoom() {
                         <td className={`px-4 py-3 ${r.status === "error" ? "text-hud-error" : "text-primary-fixed-dim"}`}>{r.provider}</td>
                         <td className="px-4 py-3 opacity-70">{r.model.replace("-versatile", "").replace("-instant", "")}</td>
                         <td className="px-4 py-3 text-on-surface-variant max-w-[220px] truncate">{r.promptPreview}</td>
-                        <td className="px-4 py-3 text-right">{r.priceHbar.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right">{r.price.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-accent-cyan">{r.status === "ok" ? `${r.latencyMs}ms` : "--"}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={r.status === "ok" ? "text-accent-cyan" : "text-hud-error"}>

@@ -5,7 +5,7 @@ import type { ProviderRow, RequestLogEntry, ExchangeEvent } from "@agentrouter/s
 
 export const providers = new Map<string, ProviderRow>(); // key: provider url
 export const requestLog: RequestLogEntry[] = [];
-export const priceIndex: Array<{ ts: number; model: string; priceHbar: number }> = [];
+export const priceIndex: Array<{ ts: number; model: string; price: number }> = [];
 
 // MOCK_MODE ledger: usd balances per role/wallet
 export const mockLedger = new Map<string, number>();
@@ -39,7 +39,7 @@ export function providerList(): ProviderRow[] {
 export function pushRequest(entry: RequestLogEntry) {
   requestLog.push(entry);
   if (requestLog.length > 500) requestLog.shift();
-  priceIndex.push({ ts: entry.ts, model: entry.model, priceHbar: entry.priceHbar });
+  priceIndex.push({ ts: entry.ts, model: entry.model, price: entry.price });
   if (priceIndex.length > 2000) priceIndex.shift();
   broadcast({ type: "request", entry });
 }

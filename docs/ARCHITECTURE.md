@@ -12,8 +12,8 @@ There are three kinds of autonomous actors, each with its own Hedera account + H
 An autonomous agent with its own wallet that **accomplishes a goal by buying inference**:
 - Registers an **HCS-14 identity** (`uaid:aid:hedera:testnet:0.0.9746264`) on-chain.
 - Given a goal, **plans** sub-questions, **buys** an answer to each through the exchange (paying
-  real HBAR via x402 from its own account), and **synthesizes** a result.
-- **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET_HBAR`.
+  real USDC via x402 from its own account), and **synthesizes** a result.
+- **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET`.
 
 ### The provider agents (`packages/provider/`, supply side)
 One codebase, four "personalities" (Titan, Budget, NimbusAI, SketchyGPU):
@@ -37,7 +37,7 @@ An autonomous auditor:
 provider ──stake 50 ℏ──▶ escrow account          provider ──register──▶ HCS registry topic
 agent ──register HCS-14──▶ registry topic
 agent goal ─▶ plan (Groq) ─▶ for each question:
-    agent ──0.12 ℏ x402──▶ exchange ──routes to cheapest──▶ provider ──▶ Groq completion
+    agent ──$0.12 x402──▶ exchange ──routes to cheapest──▶ provider ──▶ Groq completion
     (exchange keeps the spread; every buy logged to the trades topic)
 verifier ─▶ sample log ─▶ replay accused vs witness ─▶ divergent? ─▶ slash 25 ℏ + verdict to HCS
 ```
@@ -57,7 +57,7 @@ verifier ─▶ sample log ─▶ replay accused vs witness ─▶ divergent? �
 | **Hedera Consensus Service (HCS)** | 3 topics — **registry** (`0.0.9744593`, identities), **trades** (`0.0.9744594`), **verdicts** (`0.0.9744595`) — the identity directory + audit trail |
 | **Hedera Agent Kit** (`hedera-agent-kit` v3) | The buyer agent registers its HCS-14 identity via the kit's `HederaLangchainToolkit` + `coreConsensusPlugin` → `submit_topic_message_tool` (autonomous mode) |
 | **HCS-14 (Universal Agent IDs)** | Every actor's on-chain identity: `uaid:aid:hedera:testnet:0.0.x` |
-| **x402 + `@x402/hedera`** | `ExactHederaScheme` + `createClientHederaSigner` for HBAR settlement on `hedera:testnet`; hosted facilitator ladder (fee-sponsored) |
+| **x402 + `@x402/hedera`** | `ExactHederaScheme` + `createClientHederaSigner` for USDC (or HBAR) settlement on `hedera:testnet`; hosted facilitator ladder (fee-sponsored) |
 | **Mirror Node REST API** | Reading topic messages, balances, and tx history (dashboard audit panel + verifier + our proofs) |
 | **Hashscan** | Explorer links for every payment, stake, slash, and topic |
 | **Hedera Portal / Testnet** | Operator account + funding |

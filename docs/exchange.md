@@ -1,6 +1,6 @@
 # AgentRouter Exchange — the protocol, end to end
 
-**AgentRouter is a spot market where AI agents buy LLM inference per-request with HBAR, from
+**AgentRouter is a spot market where AI agents buy LLM inference per-request with USDC, from
 providers whose identity, stakes, trades, and fraud verdicts all live on Hedera public
 infrastructure.** This package is the exchange — the router and settlement engine at the
 center of it. This README explains everything the protocol does, not just this service.
@@ -47,7 +47,8 @@ Anyone with a box sells inference. On boot, a provider:
   "account": "0.0.9744152",
   "displayName": "Titan Compute",
   "model": "llama-3.3-70b-versatile",
-  "priceHbar": 0.1,
+  "price": 0.1,
+  "asset": "USDC",
   "endpoint": "https://titan.example.com",
   "stakeHbar": 50,
   "stakeTx": "0.0.9744152@1784983507.494541568",
@@ -130,7 +131,7 @@ The exchange is the market maker between the two sides — an Express service
 
 ```json
 { "type": "trade", "model": "llama-3.3-70b-versatile", "provider": "SketchyGPU Labs",
-  "providerAccount": "0.0.9744154", "priceHbar": 0.08, "latencyMs": 2472,
+  "providerAccount": "0.0.9744154", "price": 0.08, "latencyMs": 2472,
   "paymentTx": "0.0.7162784@1785006818.184321763", "ts": 1785006823823 }
 ```
 
@@ -138,8 +139,8 @@ The exchange is the market maker between the two sides — an Express service
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/v1/chat/completions` | **The product.** OpenAI-shaped request in; routed, paid, answered. Response adds `agentrouter: { provider, providerWallet, agentId, pricePaidHbar, latencyMs, paymentRef }` — `paymentRef` is a real Hedera tx id |
-| GET | `/providers` | Routing table: displayName, model, priceHbar, stakeHbar, reputation, status `live/down/slashed`, HCS-14 agentId, wallet |
+| POST | `/v1/chat/completions` | **The product.** OpenAI-shaped request in; routed, paid, answered. Response adds `agentrouter: { provider, providerWallet, agentId, pricePaid, latencyMs, paymentRef }` — `paymentRef` is a real Hedera tx id |
+| GET | `/providers` | Routing table: displayName, model, price, stakeHbar, reputation, status `live/down/slashed`, HCS-14 agentId, wallet |
 | GET | `/log?limit=N` | Recent request log with prompt/answer previews + payment refs |
 | GET | `/price-index` | Price points per settled request (the dashboard's chart series) |
 | GET | `/events` | SSE: `providers` (table refresh), `request` (each trade), `slashed` (banner), `verify` (audit results); snapshot on connect |

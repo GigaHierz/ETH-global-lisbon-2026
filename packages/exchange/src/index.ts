@@ -5,9 +5,14 @@ import {
   MOCK_MODE,
   AUDIT_REQUEST_HEADER,
   MOCK_PAYMENT_HEADER,
-  DEFAULT_EXCHANGE_ASK_HBAR,
+  DEFAULT_EXCHANGE_ASK,
   HEDERA_NETWORK,
-  hbarPrice,
+  ASSET_LABEL,
+  ASSET_SYMBOL,
+  money,
+  SCHEME_CONFIG,
+  SETTLEMENT_ASSET,
+  settlementPrice,
   resolveFacilitator,
   hederaAccount,
   publishToTopic,
@@ -34,7 +39,7 @@ const PORT = parseInt(process.env.PORT || process.env.EXCHANGE_PORT || "4100", 1
 // The flat x402 ask the agent pays the exchange per request. The exchange routes
 // to the cheapest live provider and keeps the spread (ask − provider cost); that
 // margin compresses when the verifier slashes a fraudulent low-baller out of routing.
-const EXCHANGE_ASK_HBAR = parseFloat(process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR));
+const EXCHANGE_ASK = parseFloat(process.env.EXCHANGE_ASK || String(DEFAULT_EXCHANGE_ASK));
 const exchangeWallet = MOCK_MODE ? "0.0.mock-exchange" : hederaAccount("EXCHANGE").id;
 
 await initPayer();
@@ -44,7 +49,13 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/healthz", (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
+app.get("/healthz", (_req, res) => res.json({ ok: true, mock: MOCK_MODE, settlement: SETTLEMENT_ASSET }));
+
+// What every price on this exchange is denominated in. The dashboard reads this to
+// label its axes; it defaults to USDC on its own side if the exchange is unreachable.
+app.get("/settlement", (_req, res) =>
+  res.json({ asset: SETTLEMENT_ASSET, label: ASSET_LABEL, symbol: ASSET_SYMBOL }),
+);
 
 app.get("/providers", (_req, res) => res.json(providerList()));
 
@@ -94,18 +105,18 @@ app.post("/verify-report", (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- payment gate: the agent pays the exchange's flat ask via x402 (HBAR) ----
+// ---- payment gate: the agent pays the exchange's flat ask via x402 ----
 if (MOCK_MODE) {
   app.use("/v1/chat/completions", (req, res, next) => {
     if (req.method !== "POST") return next();
     const paid = parseFloat(req.header(MOCK_PAYMENT_HEADER) ?? "0");
-    if (paid >= EXCHANGE_ASK_HBAR) return next();
+    if (paid >= EXCHANGE_ASK) return next();
     return res.status(402).json({
       error: "Payment Required (mock)",
-      accepts: [{ scheme: "mock", price: `${EXCHANGE_ASK_HBAR} HBAR`, payTo: exchangeWallet }],
+      accepts: [{ scheme: "mock", price: `${EXCHANGE_ASK} ${ASSET_LABEL}`, payTo: exchangeWallet }],
     });
   });
-  log("exchange", `MOCK paywall: require ${MOCK_PAYMENT_HEADER} >= ${EXCHANGE_ASK_HBAR} ℏ`);
+  log("exchange", `MOCK paywall: require ${MOCK_PAYMENT_HEADER} >= ${money(EXCHANGE_ASK)}`);
 } else {
   const { paymentMiddleware, x402ResourceServer } = await import("@x402/express");
   const { ExactHederaScheme } = await import("@x402/hedera/exact/server");
@@ -113,7 +124,7 @@ if (MOCK_MODE) {
   const facilitatorUrl = await resolveFacilitator("exchange");
   const server = new x402ResourceServer(
     new HTTPFacilitatorClient({ url: facilitatorUrl }),
-  ).register("hedera:*", new ExactHederaScheme());
+  ).register("hedera:*", new ExactHederaScheme(SCHEME_CONFIG));
   app.use(
     paymentMiddleware(
       {
@@ -121,7 +132,7 @@ if (MOCK_MODE) {
           accepts: [
             {
               scheme: "exact",
-              price: hbarPrice(EXCHANGE_ASK_HBAR),
+              price: settlementPrice(EXCHANGE_ASK),
               network: HEDERA_NETWORK,
               payTo: exchangeWallet,
             },
@@ -133,7 +144,7 @@ if (MOCK_MODE) {
       server,
     ),
   );
-  log("exchange", `x402 paywall: ${EXCHANGE_ASK_HBAR} ℏ/req via ${facilitatorUrl} → ${exchangeWallet}`);
+  log("exchange", `x402 paywall: ${money(EXCHANGE_ASK)}/req via ${facilitatorUrl} → ${exchangeWallet}`);
 }
 
 // ---- the router itself ----
@@ -156,7 +167,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     const { res: upstream, paymentRef } = await paidPost(
       `${provider.url}/v1/chat/completions`,
       body,
-      provider.priceHbar,
+      provider.price,
       provider.wallet,
     );
     const latencyMs = Date.now() - t0;
@@ -175,7 +186,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       model: body.model,
       provider: provider.displayName,
       providerUrl: provider.url,
-      priceHbar: provider.priceHbar,
+      price: provider.price,
       latencyMs,
       paymentRef,
       promptPreview: body.messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, 80) ?? "",
@@ -187,7 +198,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     broadcast({ type: "providers", providers: providerList() });
     log(
       "exchange",
-      `routed → ${provider.displayName} (${provider.priceHbar} ℏ, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
+      `routed → ${provider.displayName} (${money(provider.price)}, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
     );
     if (!MOCK_MODE) {
       publishToTopic("trades", hederaAccount("EXCHANGE"), {
@@ -195,7 +206,8 @@ app.post("/v1/chat/completions", async (req, res) => {
         model: body.model,
         provider: provider.displayName,
         providerAccount: provider.wallet,
-        priceHbar: provider.priceHbar,
+        price: provider.price,
+        asset: ASSET_LABEL, // immutable log: the price unit has to travel with the price
         latencyMs,
         paymentTx: paymentRef,
       }).catch((e) => log("exchange", `HCS trade publish failed: ${(e as Error).message.slice(0, 80)}`));
@@ -207,9 +219,10 @@ app.post("/v1/chat/completions", async (req, res) => {
         provider: provider.displayName,
         providerWallet: provider.wallet,
         agentId: provider.agentId,
-        pricePaidHbar: EXCHANGE_ASK_HBAR, // what the agent paid the exchange (x402 ask)
-        providerCostHbar: provider.priceHbar, // what the exchange paid the provider
-        marginHbar: Number((EXCHANGE_ASK_HBAR - provider.priceHbar).toFixed(8)),
+        pricePaid: EXCHANGE_ASK, // what the agent paid the exchange (x402 ask)
+        providerCost: provider.price, // what the exchange paid the provider
+        margin: Number((EXCHANGE_ASK - provider.price).toFixed(8)),
+        asset: ASSET_LABEL, // what pricePaid/providerCost/margin are denominated in
         latencyMs,
         paymentRef, // exchange→provider settle tx
       },
@@ -222,7 +235,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       model: body.model,
       provider: provider.displayName,
       providerUrl: provider.url,
-      priceHbar: provider.priceHbar,
+      price: provider.price,
       latencyMs: Date.now() - t0,
       paymentRef: "-",
       promptPreview: body.messages.at(-1)?.content.slice(0, 80) ?? "",

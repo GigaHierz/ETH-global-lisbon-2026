@@ -8,20 +8,20 @@ import type { BuyResult } from "./loop.js";
 
 interface ExchangeCompletion {
   choices?: { message?: { content?: string } }[];
-  agentrouter?: { provider?: string; pricePaidHbar?: number };
+  agentrouter?: { provider?: string; pricePaid?: number };
 }
 
 /** Parse the exchange completion + the agent's own settle tx into a BuyResult. */
 export function parseBuyResult(json: ExchangeCompletion, paymentRef: string): BuyResult {
   const answer = json.choices?.[0]?.message?.content;
-  const costHbar = json.agentrouter?.pricePaidHbar;
+  const cost = json.agentrouter?.pricePaid;
   if (typeof answer !== "string" || answer.length === 0) {
     throw new Error("exchange response missing completion content");
   }
-  if (typeof costHbar !== "number") {
-    throw new Error("exchange response missing agentrouter.pricePaidHbar");
+  if (typeof cost !== "number") {
+    throw new Error("exchange response missing agentrouter.pricePaid");
   }
-  return { answer, costHbar, provider: json.agentrouter?.provider ?? "unknown", paymentRef };
+  return { answer, cost, provider: json.agentrouter?.provider ?? "unknown", paymentRef };
 }
 
 export interface BoughtWithLink extends BuyResult {
@@ -30,12 +30,12 @@ export interface BoughtWithLink extends BuyResult {
 
 /* v8 ignore start -- x402/HTTP network wiring around the unit-tested parseBuyResult */
 /** Build the loop's `buy` function: POST a single question to the exchange, paying its x402 ask. */
-export function makeBuy(exchangeUrl: string, askHbar: number, model: string) {
+export function makeBuy(exchangeUrl: string, ask: number, model: string) {
   return async (question: string): Promise<BoughtWithLink> => {
     const { res, paymentRef } = await paidPost(
       `${exchangeUrl}/v1/chat/completions`,
       { model, messages: [{ role: "user", content: question }], temperature: 0 },
-      askHbar,
+      ask,
     );
     if (!res.ok) {
       throw new Error(`exchange ${res.status}: ${(await res.text()).slice(0, 160)}`);

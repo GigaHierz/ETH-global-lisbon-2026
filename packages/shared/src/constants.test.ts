@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_MODEL,
   SMALL_MODEL,
-  DEFAULT_EXCHANGE_ASK_HBAR,
+  DEFAULT_EXCHANGE_ASK,
   DEFAULT_EXCHANGE_URL,
   PROVIDER_PORTS,
   localhostUrl,
@@ -13,7 +13,7 @@ describe("shared constants", () => {
   it("pins the model ids and exchange defaults", () => {
     expect(DEFAULT_MODEL).toBe("llama-3.3-70b-versatile");
     expect(SMALL_MODEL).toBe("llama-3.1-8b-instant");
-    expect(DEFAULT_EXCHANGE_ASK_HBAR).toBe(0.12);
+    expect(DEFAULT_EXCHANGE_ASK).toBe(0.12);
     expect(DEFAULT_EXCHANGE_URL).toBe("http://localhost:4100");
   });
 

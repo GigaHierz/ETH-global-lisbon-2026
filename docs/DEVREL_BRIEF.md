@@ -4,7 +4,7 @@
 
 ## The one-liner
 
-**AgentRouter is an on-chain OpenRouter: a marketplace where AI agents buy LLM inference per-request with native HBAR on Hedera, and where providers who lie about what model they're serving get caught and financially slashed.**
+**AgentRouter is an on-chain OpenRouter: a marketplace where AI agents buy LLM inference per-request with USDC on Hedera, and where providers who lie about what model they're serving get caught and financially slashed.**
 
 ## The story (use this narrative)
 
@@ -24,12 +24,12 @@ The demo makes this visceral: the cheating provider *wins all the traffic* on pr
 
 | # | Beat | On screen |
 |---|------|-----------|
-| 1 | 3 providers boot: **Titan Compute** (llama-3.3-70b @ 0.10 ℏ), **Budget Inference Co** (llama-3.1-8b @ 0.04 ℏ), **SketchyGPU Labs** (*claims* 70b @ 0.08 ℏ, **secretly serves 8b**). Each self-registers its HCS-14 Universal Agent ID on the HCS registry topic | Provider table fills, all ● live, 50 ℏ stake each |
+| 1 | 3 providers boot: **Titan Compute** (llama-3.3-70b @ $0.10), **Budget Inference Co** (llama-3.1-8b @ $0.04), **SketchyGPU Labs** (*claims* 70b @ $0.08, **secretly serves 8b**). Each self-registers its HCS-14 Universal Agent ID on the HCS registry topic | Provider table fills, all ● live, 50 ℏ stake each |
 | 2 | Exchange discovers them from the HCS registry, routes by cheapest-per-model | — |
-| 3 | Agent buys 5 completions. Every one routes to SketchyGPU (cheapest 70b claimant). Balance drains 10.00 → 9.60 ℏ with per-call payment refs (Hashscan) | Request feed streams, price index draws at 0.08 ℏ/req |
+| 3 | Agent buys 5 completions. Every one routes to SketchyGPU (cheapest 70b claimant). Balance drains $10.00 → $9.40 with per-call payment refs (Hashscan) | Request feed streams, price index draws at $0.08/req |
 | 4 | Verifier samples a past request, replays it at temp 0 against SketchyGPU **and** witness Titan. Similarity: **0–7%** (threshold: 35%) | Verifier panel: "7% ✗ DIVERGENT" |
 | 5 | Slash: stake 50 → 25 ℏ (escrow→treasury), reputation → 0, verdict published to HCS, removed from routing | 🔴 Full-width flashing SLASHED banner, row struck through |
-| 6 | Next 70b request routes to honest Titan at 0.10 ℏ | **Price index steps up 0.08 → 0.10 ℏ/req** — the market repricing after fraud exits. This is the closing line. |
+| 6 | Next 70b request routes to honest Titan at $0.10 | **Price index steps up $0.08 → $0.10/req** — the market repricing after fraud exits. This is the closing line. |
 
 The cheat is even visible in the answers: SketchyGPU's canned/8B response to "What is x402?" is *"x402 is an HTTP error code for payments"* (wrong), vs Titan's correct protocol description.
 
@@ -84,7 +84,7 @@ Per-request granularity with zero relationship setup. An agent that has never se
 Portable, standard identity + reputation, native to Hedera. Each agent gets a Universal Agent ID (`uaid:aid:hedera:testnet:0.0.x`) and a tamper-evident record on the HCS registry/verdicts topics. A provider slashed on AgentRouter carries that record to any other marketplace reading the same topics — and HCS-14 is spec-bridged to ERC-8004 / A2A / x402 if EVM interop is ever needed. The point of a standard is sharing it.
 
 **"Why should the price go UP after the slash? Isn't that bad?"**
-That's the demo's best moment, lean into it: the cheater's 0.08 ℏ price was *fraudulent* — you were paying for 70b and getting 8b. The index stepping up to the honest 0.10 ℏ is the market pricing truthfully again. Verification makes prices *honest*, not low.
+That's the demo's best moment, lean into it: the cheater's $0.08 price was *fraudulent* — you were paying for 70b and getting 8b. The index stepping up to the honest $0.10 is the market pricing truthfully again. Verification makes prices *honest*, not low.
 
 **"What's the business model?"**
 (MVP has none — be honest.) Natural candidates: exchange spread/fee per routed request, listing stakes, verifier rewards funded from slashes.

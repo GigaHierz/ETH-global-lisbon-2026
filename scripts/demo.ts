@@ -6,11 +6,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK_HBAR, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL } from "@agentrouter/shared";
+import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, money } from "@agentrouter/shared";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCK = process.env.MOCK_MODE !== "false";
-const EXCHANGE_ASK_HBAR = process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR);
+const EXCHANGE_ASK = process.env.EXCHANGE_ASK || String(DEFAULT_EXCHANGE_ASK);
 const EXCHANGE_URL = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const procs: ChildProcess[] = [];
 
@@ -102,17 +102,17 @@ async function main() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK_HBAR } : {}),
+          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK } : {}),
         },
         body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       });
       const raw = await res.text();
-      let routed: { provider: string; pricePaidHbar: number } | undefined;
+      let routed: { provider: string; pricePaid: number } | undefined;
       try {
-        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; pricePaidHbar: number } }).agentrouter;
+        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; pricePaid: number } }).agentrouter;
       } catch { /* non-JSON error body — reported below */ }
       if (res.ok && routed) {
-        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.pricePaidHbar} ℏ/req)`);
+        console.log(`  next 70b request now routes to: ${routed.provider} (${money(routed.pricePaid)}/req)`);
       } else {
         console.log(`  reroute check failed: exchange answered HTTP ${res.status} — ${raw.slice(0, 120)}`);
       }

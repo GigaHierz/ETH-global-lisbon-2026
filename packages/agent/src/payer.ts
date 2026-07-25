@@ -1,5 +1,5 @@
 // The agent's paying HTTP client. Real mode: x402-wrapped fetch that signs the
-// HBAR payment to the exchange with the AGENT's own Hedera key (settlement fee
+// settlement-asset payment to the exchange with the AGENT's own Hedera key (settlement fee
 // sponsored by the facilitator feePayer). Mock mode: plain fetch + mock header.
 //
 // This is the "both A1+A2" leg: the AGENT account itself signs the x402 payment,
@@ -10,6 +10,7 @@ import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
   HEDERA_NETWORK,
+  ASSET_LABEL,
   hederaAccount,
   log,
 } from "@agentrouter/shared";
@@ -49,17 +50,17 @@ export async function initAgentPayer() {
       return "settled";
     }
   };
-  log("agent", `x402 payer ready: ${id} (HBAR on ${HEDERA_NETWORK})`);
+  log("agent", `x402 payer ready: ${id} (${ASSET_LABEL} on ${HEDERA_NETWORK})`);
 }
 
 // POST to the exchange, paying its x402 ask. In real mode the x402 client reads
-// the 402 challenge and pays the exact amount automatically; askHbar is only used
+// the 402 challenge and pays the exact amount automatically; ask is only used
 // for the mock payment header.
-export async function paidPost(url: string, body: unknown, askHbar: number): Promise<PaidResult> {
+export async function paidPost(url: string, body: unknown, ask: number): Promise<PaidResult> {
   if (MOCK_MODE) {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", [MOCK_PAYMENT_HEADER]: String(askHbar) },
+      headers: { "content-type": "application/json", [MOCK_PAYMENT_HEADER]: String(ask) },
       body: JSON.stringify(body),
     });
     return { res, paymentRef: `mock-agent-pay-${Date.now().toString(36)}` };

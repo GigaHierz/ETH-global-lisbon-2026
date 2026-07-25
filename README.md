@@ -1,6 +1,6 @@
 # AgentRouter — the on-chain OpenRouter
 
-An inference exchange where AI agents buy LLM inference per request with HBAR over x402, from
+An inference exchange where AI agents buy LLM inference per request with USDC over x402, from
 providers identity- and reputation-tracked on Hedera Consensus Service — with a verifier that
 catches providers serving cheaper models than advertised and slashes their staked HBAR.
 
@@ -31,7 +31,7 @@ the whole flow (including the fraud divergence) working offline.
 ## Architecture
 
 Three autonomous actors — a buyer agent, provider agents, and a verifier — trade around a
-routing exchange, settling in HBAR over x402 and recording identity, trades, and verdicts on
+routing exchange, settling in USDC over x402 and recording identity, trades, and verdicts on
 Hedera Consensus Service.
 
 ```mermaid
@@ -64,11 +64,16 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 ## Real payments on Hedera Testnet
 
-Put operator credentials in `.env`, run `pnpm setup-hedera` to create and fund the demo
-accounts, set `MOCK_MODE=false`, then run `pnpm demo`. Payments are native HBAR via x402 v2
-`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas).
+Put operator credentials in `.env`, run `pnpm setup-hedera` to create, fund, and USDC-associate
+the demo accounts, set `MOCK_MODE=false`, then run `pnpm demo`. Payments settle in **HTS USDC**
+(`0.0.429274`, 6 dp) via x402 v2 `exact` on `hedera:testnet`, through a fee-sponsored facilitator
+(payers need no gas). USDC needs one manual step — testnet USDC comes from
+[Circle's faucet](https://faucet.circle.com), not the operator — so set `SETTLEMENT_ASSET=hbar`
+for a fully scriptable, faucet-free run. Staking and slashing stay in native HBAR either way.
+
 Live settlement transactions and account links: [docs/PROOF.md](docs/PROOF.md). Funding
-decisions: [docs/FUNDING.md](docs/FUNDING.md).
+decisions: [docs/FUNDING.md](docs/FUNDING.md). Moving an existing deployment to USDC:
+[docs/MIGRATION-USDC.md](docs/MIGRATION-USDC.md).
 
 ## Documentation
 

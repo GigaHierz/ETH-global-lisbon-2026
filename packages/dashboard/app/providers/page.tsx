@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 export const metadata = {
   title: "AgentRouter — Become a Provider",
   description:
-    "Run a provider on AgentRouter: stake HBAR, register on Hedera Consensus Service, and earn HBAR for every LLM request you serve over x402.",
+    "Run a provider on AgentRouter: stake HBAR, register on Hedera Consensus Service, and earn USDC for every LLM request you serve over x402.",
 };
 
 const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
@@ -17,7 +17,7 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 
 // Provider economics — sourced from provider/src/profiles.ts and GUIDE.md.
 const STATS = [
-  { icon: "payments", label: "Per 70B request", value: "0.10 ℏ" },
+  { icon: "payments", label: "Per 70B request", value: "$0.10" },
   { icon: "savings", label: "Quality bond", value: "50 ℏ" },
   { icon: "memory", label: "Backend", value: "Groq" },
   { icon: "hub", label: "Registry", value: "HCS on-chain" },
@@ -33,7 +33,7 @@ const STEPS = [
     items: [
       "Run the provider service on any box — VPS, cloud, or your laptop behind a tunnel.",
       "Point it at a Groq API key, or run without one for canned demo answers.",
-      "Advertise the model you serve and a price in HBAR per request.",
+      "Advertise the model you serve and a price in USDC per request.",
     ],
   },
   {
@@ -56,7 +56,7 @@ const STEPS = [
     title: "Serve & earn",
     items: [
       "Cheapest live provider for a model wins the request.",
-      "x402 settles the payment in HBAR before you return the completion.",
+      "x402 settles the payment in USDC before you return the completion.",
       "Every settlement is an on-chain Hedera transaction — no invoicing.",
     ],
   },
@@ -89,7 +89,7 @@ const REQUIREMENTS = [
 const ENV_VARS: Array<[string, string, string]> = [
   ["PROVIDER_NAME", "Custom Provider", "Display name shown in the routing table."],
   ["PROVIDER_MODEL", "llama-3.3-70b-versatile", "The model you advertise — and must actually serve."],
-  ["PROVIDER_PRICE_HBAR", "0.10", "Your price per request, in HBAR."],
+  ["PROVIDER_PRICE", "0.10", "Your price per request, in USDC."],
   ["HEDERA_PROVIDER_ID / _KEY", "from pnpm setup-hedera", "Account that stakes, registers, and receives payment."],
   ["PROVIDER_PUBLIC_URL", "http://localhost:4025", "Public address the exchange routes to."],
   ["GROQ_API_KEY", "—", "Upstream inference. Omitted → canned fallback answers."],
@@ -98,9 +98,9 @@ const ENV_VARS: Array<[string, string, string]> = [
 
 // Public provider endpoints — from provider/src/index.ts.
 const ENDPOINTS: Array<[string, string, string]> = [
-  ["GET", "/info", "name, model, priceHbar, wallet, agentId, url"],
+  ["GET", "/info", "name, model, price, wallet, agentId, url"],
   ["GET", "/healthz", "liveness probe used by the exchange"],
-  ["POST", "/v1/chat/completions", "402-gated inference — pay in HBAR, receive the completion"],
+  ["POST", "/v1/chat/completions", "402-gated inference — pay in USDC, receive the completion"],
 ];
 
 export default function ProvidersPage() {
@@ -257,7 +257,7 @@ export default function ProvidersPage() {
               <div>
                 <span className="text-accent-orange"># 2. Add your Hedera keys + advertise a model/price in .env</span><br />
                 <span className="text-on-surface">HEDERA_PROVIDER_ID=0.0.xxxxx · HEDERA_PROVIDER_KEY=0x…</span><br />
-                <span className="text-on-surface">PROVIDER_NAME=Acme · PROVIDER_MODEL=llama-3.3-70b-versatile · PROVIDER_PRICE_HBAR=0.10</span>
+                <span className="text-on-surface">PROVIDER_NAME=Acme · PROVIDER_MODEL=llama-3.3-70b-versatile · PROVIDER_PRICE=0.10</span>
               </div>
               <div>
                 <span className="text-accent-orange"># 3. Make your box reachable</span><br />

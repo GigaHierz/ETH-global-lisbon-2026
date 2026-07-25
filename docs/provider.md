@@ -33,10 +33,10 @@ payments) + **`@x402/express`** paywall. Everything on-chain is real testnet —
 
 | Profile | Name | Advertises | Actually serves | Price | Port |
 |---|---|---|---|---|---|
-| `provider1` | Titan Compute | llama-3.3-70b-versatile | same (honest) | 0.10 ℏ | 4021 |
-| `provider2` | Budget Inference Co | llama-3.1-8b-instant | same (honest) | 0.04 ℏ | 4022 |
-| `provider3` | SketchyGPU Labs | llama-3.3-70b-versatile | **8b when `CHEAT_MODE=true`** | 0.08 ℏ | 4023 |
-| `provider4` | NimbusAI | llama-3.3-70b-versatile | same (honest) | 0.06 ℏ | 4024 |
+| `provider1` | Titan Compute | llama-3.3-70b-versatile | same (honest) | $0.10 | 4021 |
+| `provider2` | Budget Inference Co | llama-3.1-8b-instant | same (honest) | $0.04 | 4022 |
+| `provider3` | SketchyGPU Labs | llama-3.3-70b-versatile | **8b when `CHEAT_MODE=true`** | $0.08 | 4023 |
+| `provider4` | NimbusAI | llama-3.3-70b-versatile | same (honest) | $0.06 | 4024 |
 
 `provider4` (NimbusAI) was added to demonstrate **permissionless supply joining live**: it boots,
 stakes, registers, is discovered within seconds, and — being the cheapest *honest* 70b seller —
@@ -73,7 +73,7 @@ pnpm provider1      # :4021  Titan Compute (honest 70b)
 pnpm provider2      # :4022  Budget Inference Co (honest 8b)
 pnpm provider3      # :4023  SketchyGPU Labs (cheater, CHEAT_MODE=true)
 pnpm provider4      # :4024  NimbusAI (honest 70b)
-curl -s localhost:4024/info   # sanity: name, model, priceHbar, wallet
+curl -s localhost:4024/info   # sanity: name, model, price, wallet
 ```
 
 Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) — same flow, same UI.
@@ -83,7 +83,7 @@ Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) �
 | Route | Auth | Purpose |
 |---|---|---|
 | `POST /v1/chat/completions` | **x402 (paid)** | OpenAI-compatible inference; returns `402` unpaid, `200` after HBAR payment |
-| `GET /info` | public | `{ displayName, model, priceHbar, wallet, agentId, url }` — what the exchange sees |
+| `GET /info` | public | `{ displayName, model, price, wallet, agentId, url }` — what the exchange sees |
 | `GET /healthz` | public | `{ ok: true }` |
 
 ## Config (env)
@@ -106,6 +106,9 @@ NimbusAI [`0.0.9746711`](https://hashscan.io/testnet/account/0.0.9746711)
 **Escrow (stake pool):** [`0.0.9746385`](https://hashscan.io/testnet/account/0.0.9746385) ·
 **HCS registry topic:** [`0.0.9744593`](https://hashscan.io/testnet/topic/0.0.9744593) ·
 **HCS verdicts topic:** [`0.0.9744595`](https://hashscan.io/testnet/topic/0.0.9744595)
+
+> Amounts in these receipts are native HBAR — they predate the move to USDC settlement.
+
 
 | Event | Transaction id |
 |---|---|

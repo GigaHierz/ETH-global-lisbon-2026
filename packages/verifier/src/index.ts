@@ -37,14 +37,14 @@ const audited = new Set<string>(); // request ids already checked
 const slashedWallets = new Set<string>(); // payout accounts this verifier has slashed
 let auditInFlight = false; // one audit at a time: replays can outlast INTERVAL_MS
 
-let payFetch: (url: string, init: RequestInit, priceHbar: number) => Promise<Response>;
+let payFetch: (url: string, init: RequestInit, price: number) => Promise<Response>;
 
 async function initPayFetch() {
   if (MOCK_MODE) {
-    payFetch = (url, init, priceHbar) =>
+    payFetch = (url, init, price) =>
       fetch(url, {
         ...init,
-        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(priceHbar) },
+        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(price) },
       });
     return;
   }
@@ -66,7 +66,7 @@ async function ask(
   providerUrl: string,
   model: string,
   prompt: string,
-  priceHbar: number,
+  price: number,
 ): Promise<ReplayOutcome> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS);
@@ -85,7 +85,7 @@ async function ask(
           }),
           signal: controller.signal,
         },
-        priceHbar,
+        price,
       );
     } catch (err) {
       if (controller.signal.aborted) return { kind: "timeout" };
@@ -183,8 +183,8 @@ async function auditOnce() {
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
     const [targetOutcome, witnessOutcome] = await Promise.all([
-      ask(target.url, candidate.model, candidate.promptPreview, target.priceHbar),
-      ask(witness.url, candidate.model, candidate.promptPreview, witness.priceHbar),
+      ask(target.url, candidate.model, candidate.promptPreview, target.price),
+      ask(witness.url, candidate.model, candidate.promptPreview, witness.price),
     ]);
     const result = classifyReplayOutcomes(targetOutcome, witnessOutcome, THRESHOLD);
 

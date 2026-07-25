@@ -14,7 +14,7 @@ export interface Finding {
 
 export interface BuyResult {
   answer: string;
-  costHbar: number;
+  cost: number;
   provider: string;
   paymentRef: string;
 }
@@ -33,31 +33,31 @@ export type AgentEvent =
       type: "bought";
       question: string;
       answer: string;
-      costHbar: number;
+      cost: number;
       provider: string;
       paymentRef: string;
-      remainingHbar: number;
+      remaining: number;
     }
-  | { type: "budget-exhausted"; remainingHbar: number }
+  | { type: "budget-exhausted"; remaining: number }
   | { type: "synthesis"; answer: string }
-  | { type: "done"; spentHbar: number; findings: number };
+  | { type: "done"; spent: number; findings: number };
 
 export interface RunDeps {
   brain: Brain;
   buy: (question: string) => Promise<BuyResult>;
   budget: Budget;
-  askHbar: number; // expected per-request ask, used to check affordability before buying
+  ask: number; // expected per-request ask, used to check affordability before buying
   emit: (event: AgentEvent) => void;
 }
 
 export interface RunResult {
   answer: string;
   findings: Finding[];
-  spentHbar: number;
+  spent: number;
 }
 
 export async function runGoal(goal: string, deps: RunDeps): Promise<RunResult> {
-  const { brain, buy, budget, askHbar, emit } = deps;
+  const { brain, buy, budget, ask, emit } = deps;
 
   emit({ type: "goal", goal });
 
@@ -66,27 +66,27 @@ export async function runGoal(goal: string, deps: RunDeps): Promise<RunResult> {
 
   const findings: Finding[] = [];
   for (const q of questions) {
-    if (!budget.canAfford(askHbar)) {
-      emit({ type: "budget-exhausted", remainingHbar: budget.remaining });
+    if (!budget.canAfford(ask)) {
+      emit({ type: "budget-exhausted", remaining: budget.remaining });
       break;
     }
     const r = await buy(q);
-    budget.record(r.costHbar);
+    budget.record(r.cost);
     findings.push({ q, a: r.answer });
     emit({
       type: "bought",
       question: q,
       answer: r.answer,
-      costHbar: r.costHbar,
+      cost: r.cost,
       provider: r.provider,
       paymentRef: r.paymentRef,
-      remainingHbar: budget.remaining,
+      remaining: budget.remaining,
     });
   }
 
   const answer = await brain.synthesize(goal, findings);
   emit({ type: "synthesis", answer });
-  emit({ type: "done", spentHbar: budget.spent, findings: findings.length });
+  emit({ type: "done", spent: budget.spent, findings: findings.length });
 
-  return { answer, findings, spentHbar: budget.spent };
+  return { answer, findings, spent: budget.spent };
 }

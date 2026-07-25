@@ -27,7 +27,7 @@ export interface ChatCompletionResponse {
 export interface ProviderInfo {
   displayName: string;
   model: string; // advertised model
-  priceHbar: number; // per request
+  price: number; // per request
   wallet: string; // Hedera account id (0.0.x)
   agentId: string | null; // HCS-14 UAID (or mock)
   url: string;
@@ -46,7 +46,7 @@ export interface RequestLogEntry {
   model: string;
   provider: string; // displayName
   providerUrl: string;
-  priceHbar: number;
+  price: number;
   latencyMs: number;
   paymentRef: string; // tx hash or mock ref
   promptPreview: string;

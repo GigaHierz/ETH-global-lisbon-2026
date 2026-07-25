@@ -1,16 +1,58 @@
 // Hedera testnet plumbing: the only chain in this project.
-// Settlement is native HBAR (asset 0.0.0, tinybar amounts).
+// Settlement defaults to USDC (HTS 0.0.429274, 6 dp); SETTLEMENT_ASSET=hbar
+// switches the whole stack back to native HBAR (asset 0.0.0, tinybar amounts).
 
 export const HEDERA_NETWORK = "hedera:testnet";
 export const HBAR_ASSET = "0.0.0";
 export const TINYBAR = 100_000_000; // 1 ℏ
 
+export const USDC_TOKEN_ID = "0.0.429274"; // Hedera testnet USDC (HTS)
+export const USDC_DECIMALS = 6;
+
 export const MIRROR_NODE = "https://testnet.mirrornode.hedera.com";
+
+// Which asset the x402 `exact` scheme settles in. Read once at module load:
+// tests that need the other branch must vi.resetModules() + re-import.
+//
+// Normalised rather than cast: `SETTLEMENT_ASSET=` (empty) is a normal thing to find in
+// a .env, and `??` would let "" through as a live value. Only an explicit "hbar" opts
+// out of USDC — anything unset, empty, or unrecognised settles in USDC.
+export const SETTLEMENT_ASSET: "hbar" | "usdc" =
+  (process.env.SETTLEMENT_ASSET || "").trim().toLowerCase() === "hbar" ? "hbar" : "usdc";
+
+export const ASSET_LABEL = SETTLEMENT_ASSET === "hbar" ? "HBAR" : "USDC";
+export const ASSET_SYMBOL = SETTLEMENT_ASSET === "hbar" ? "ℏ" : "$";
+
+// Amounts for humans. The two assets read the opposite way round — a currency symbol
+// leads ($0.12) while a ticker trails (0.12 ℏ) — so formatting has to branch, not just
+// concatenate a symbol.
+export function money(amount: number | string): string {
+  return SETTLEMENT_ASSET === "hbar" ? `${amount} ℏ` : `$${amount}`;
+}
 
 // x402 price object for a native-HBAR amount, using the explicit AssetAmount form.
 export function hbarPrice(hbar: number): { amount: string; asset: string } {
   return { amount: String(Math.round(hbar * TINYBAR)), asset: HBAR_ASSET };
 }
+
+// The price to hand x402 for a per-request amount, in the active settlement asset.
+//
+// USDC: pass the decimal through untouched. @x402/hedera's ExactHederaScheme maps a
+// bare Money value to the network's default HTS token — which for hedera:testnet is
+// USDC at 6 dp — so the library owns the base-unit conversion and we can't drift from
+// it. HBAR has no such default (defaultMoneyConversion rejects 0.0.0 outright), so it
+// must use the explicit AssetAmount form.
+export function settlementPrice(amount: number): number | { amount: string; asset: string } {
+  return SETTLEMENT_ASSET === "hbar" ? hbarPrice(amount) : amount;
+}
+
+// Server-side scheme config. Pins the HTS token explicitly rather than relying on the
+// library's built-in testnet default, so a library change can never silently redirect
+// payments to a different asset.
+export const SCHEME_CONFIG =
+  SETTLEMENT_ASSET === "usdc"
+    ? { defaultAssets: { [HEDERA_NETWORK]: { asset: USDC_TOKEN_ID, decimals: USDC_DECIMALS } } }
+    : {};
 
 export function hashscanTx(txId: string): string {
   return `https://hashscan.io/testnet/transaction/${txId}`;
@@ -85,5 +127,25 @@ export async function hbarBalance(accountId: string): Promise<number> {
   } finally {
     client.close();
   }
+}
+
+// USDC balance in whole tokens. Returns 0 when the account holds no USDC *and* when it
+// isn't associated with the token at all — the two are indistinguishable here, so callers
+// that care about the difference (settlement pre-flight) must check association separately.
+export async function usdcBalance(accountId: string): Promise<number> {
+  const { Client, AccountBalanceQuery, TokenId } = await import("@hiero-ledger/sdk");
+  const client = Client.forTestnet();
+  try {
+    const b = await new AccountBalanceQuery().setAccountId(accountId).execute(client);
+    const units = b.tokens?.get(TokenId.fromString(USDC_TOKEN_ID));
+    return units ? Number(units.toString()) / 10 ** USDC_DECIMALS : 0;
+  } finally {
+    client.close();
+  }
+}
+
+// Balance in whatever asset we settle in — for wallet/budget displays.
+export async function settlementBalance(accountId: string): Promise<number> {
+  return SETTLEMENT_ASSET === "hbar" ? hbarBalance(accountId) : usdcBalance(accountId);
 }
 /* v8 ignore stop */

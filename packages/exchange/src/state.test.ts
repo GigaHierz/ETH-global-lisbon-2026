@@ -17,7 +17,7 @@ function entry(i: number): RequestLogEntry {
     model: "llama-3.3-70b-versatile",
     provider: "Titan Compute",
     providerUrl: "http://localhost:4021",
-    priceHbar: 0.1,
+    price: 0.1,
     latencyMs: 5,
     paymentRef: `pay-${i}`,
     promptPreview: "q",
@@ -30,7 +30,7 @@ function row(url: string): ProviderRow {
   return {
     displayName: url,
     model: "llama-3.3-70b-versatile",
-    priceHbar: 0.1,
+    price: 0.1,
     wallet: `0.0.${url}`,
     agentId: null,
     url,

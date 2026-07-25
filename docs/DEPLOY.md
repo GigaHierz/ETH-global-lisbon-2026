@@ -43,18 +43,23 @@ service needs, and how to run — and re-arm — the demo on stage.
 - Each service differs only by its **Start Command** and **Variables** (below).
 
 ### Per-service Start Command + Variables
-Shared everywhere: `MOCK_MODE=false`.
+Shared everywhere: `MOCK_MODE=false`, `SETTLEMENT_ASSET=usdc`.
+Migrating an existing deployment? Follow [MIGRATION-USDC.md](MIGRATION-USDC.md) — several
+variables were renamed, and a stale one falls back to an identical default rather than erroring.
 
 | Service | Start Command | Domain | Variables (in addition to shared) |
 |---|---|---|---|
-| **exchange** | `pnpm exchange:prod` | ✅ | `HEDERA_EXCHANGE_ID=0.0.9746267`, `HEDERA_EXCHANGE_KEY`, `EXCHANGE_ASK_HBAR=0.12` |
-| **agent-server** | `pnpm agent-server:prod` | ✅ | `HEDERA_AGENT_ID=0.0.9746264`, `HEDERA_AGENT_KEY`, `GROQ_API_KEY`, `EXCHANGE_URL=<exchange url>`, `AGENT_BUDGET_HBAR=2` |
+| **exchange** | `pnpm exchange:prod` | ✅ | `HEDERA_EXCHANGE_ID=0.0.9746267`, `HEDERA_EXCHANGE_KEY`, `EXCHANGE_ASK=0.12` |
+| **agent-server** | `pnpm agent-server:prod` | ✅ | `HEDERA_AGENT_ID=0.0.9746264`, `HEDERA_AGENT_KEY`, `GROQ_API_KEY`, `EXCHANGE_URL=<exchange url>`, `AGENT_BUDGET=2` |
 | **provider1** (honest 70B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider1`, `PROVIDER_PUBLIC_URL=<provider1 url>`, `HEDERA_PROVIDER1_ID=0.0.9746268`, `HEDERA_PROVIDER1_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
 | **provider2** (honest 8B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider2`, `PROVIDER_PUBLIC_URL=<provider2 url>`, `HEDERA_PROVIDER2_ID=0.0.9746270`, `HEDERA_PROVIDER2_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
 | **provider3** (**CHEATER**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider3`, `CHEAT_MODE=true`, `PROVIDER_PUBLIC_URL=<provider3 url>`, `HEDERA_PROVIDER3_ID=0.0.9746271`, `HEDERA_PROVIDER3_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `GROQ_API_KEY` |
-| **verifier** | `pnpm verifier:prod` | ❌ | `HEDERA_VERIFIER_ID=0.0.9746272`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700468`, `EXCHANGE_URL=<exchange url>` |
+| **verifier** | `pnpm verifier:prod` | ❌ | `HEDERA_VERIFIER_ID=0.0.9746272`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700468`, `EXCHANGE_URL=<exchange url>` — **needs a USDC balance**, it pays for its own audit replays |
 
 Gotchas:
+- Every account must be **associated with USDC** before it can send or receive it, and the
+  verifier needs an actual USDC *balance* (it pays providers to replay). `pnpm setup-hedera`
+  does both — see [FUNDING.md](FUNDING.md).
 - `PROVIDER_PUBLIC_URL` **must be each provider's own domain** — it's what registers on HCS so the
   exchange can reach it. Without it a provider registers `localhost` and shows `down`.
 - Match the account to the profile (`provider3` → `HEDERA_PROVIDER3_*`).
@@ -62,7 +67,7 @@ Gotchas:
   Start Command** or it'll run the agent by mistake.
 
 ## Vercel
-- Root Directory `dashboard`, Production Branch `main`. Auto-deploys on push to `main`.
+- Root Directory `packages/dashboard`, Production Branch `main`. Auto-deploys on push to `main`.
 - No env vars required — the dashboard defaults to the Railway URLs (overridable by
   `NEXT_PUBLIC_AGENT_URL` / `NEXT_PUBLIC_EXCHANGE_URL`, or the `?api=<url>` query param).
 - Use the **canonical** domain (`…dashboard.vercel.app`) for the demo — the `…-git-<branch>-…` preview
