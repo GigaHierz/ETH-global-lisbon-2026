@@ -427,7 +427,7 @@ export default function ExchangeControlRoom() {
         </div>
       </main>
 
-      <Footer tagline="x402 HBAR settlement · HCS-14 identity · escrow staking · Hedera Testnet" />
+      <Footer />
     </div>
   );
 }

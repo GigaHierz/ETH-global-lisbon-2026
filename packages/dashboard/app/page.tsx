@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Icon from "@/components/Icon";
 import Card from "@/components/Card";
-import StatusPill from "@/components/StatusPill";
 import TerminalDots from "@/components/TerminalDots";
+import Footer from "@/components/Footer";
 import { EXCHANGE } from "@/lib/config";
 
 const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
@@ -128,7 +128,7 @@ export default function Landing() {
                 className="w-full md:w-auto bg-accent-cyan text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:glow-cyan transition-all">
                 View the market
               </a>
-              <a href="#list-gpu"
+              <a href="/providers"
                 className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
                 List your GPU
               </a>
@@ -224,9 +224,10 @@ export default function Landing() {
                   className="bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:glow-orange transition-all active:scale-95">
                   Join the Provider Waitlist
                 </a>
-                <span className="font-data text-[11px] text-on-surface-variant">
-                  or start now — the terminal on the right is the whole onboarding
-                </span>
+                <a href="/providers"
+                  className="font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                  Read the provider docs →
+                </a>
               </div>
             </div>
 
@@ -270,44 +271,7 @@ export default function Landing() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="bg-surface-obsidian border-t border-outline-variant w-full py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 px-4 max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4">
-            <span className="font-data text-primary-fixed-dim font-bold text-lg">AgentRouter</span>
-            <p className="font-body text-sm text-on-surface-variant">The decentralized economy for AI intelligence.</p>
-            <StatusPill variant="hero" />
-          </div>
-          <div>
-            <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Protocol</h4>
-            <ul className="space-y-4 font-data text-[11px] font-bold tracking-[0.1em]">
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="/exchange">Exchange Terminal</a></li>
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="/agent-demo">Agent Demo</a></li>
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/topic/0.0.9744594" target="_blank" rel="noreferrer">Trade Log (HCS)</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Developers</h4>
-            <ul className="space-y-4 font-data text-[11px] font-bold tracking-[0.1em]">
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href={REPO} target="_blank" rel="noreferrer">GitHub Repo</a></li>
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href={`${REPO}/blob/main/GUIDE.md`} target="_blank" rel="noreferrer">Docs</a></li>
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href={`${REPO}/blob/main/PROOF.md`} target="_blank" rel="noreferrer">On-chain Proof</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Network</h4>
-            <ul className="space-y-4 font-data text-[11px] font-bold tracking-[0.1em]">
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/topic/0.0.9744593" target="_blank" rel="noreferrer">Registry Topic</a></li>
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/topic/0.0.9744595" target="_blank" rel="noreferrer">Verdicts Topic</a></li>
-              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/account/0.0.9744157" target="_blank" rel="noreferrer">Stake Escrow</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="mt-12 pt-8 border-t border-outline-variant/30 text-center">
-          <p className="font-data text-[11px] tracking-[0.1em] text-on-surface-variant opacity-50 uppercase">
-            © 2026 AgentRouter Protocol. Built on Hedera at ETHGlobal Lisbon. Secured by Hashgraph.
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

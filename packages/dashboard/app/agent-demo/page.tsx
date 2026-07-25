@@ -410,7 +410,7 @@ export default function AgentDemoControlRoom() {
         </div>
       </main>
 
-      <Footer centered tagline="autonomous buyer · x402 HBAR per answer · every payment an on-chain Hedera tx · HCS-14 UAID identity" />
+      <Footer />
     </div>
   );
 }
