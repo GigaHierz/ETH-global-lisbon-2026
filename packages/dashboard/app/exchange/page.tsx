@@ -154,7 +154,8 @@ export default function ExchangeControlRoom() {
             ["VOLUME", `${totalVolume.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
             ["REQUESTS", String(okFeed.length), "text-primary-fixed-dim"],
             ["PROVIDERS", String(liveCount), "text-primary-fixed-dim"],
-            ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-accent-orange"],
+            ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-primary-fixed-dim"],
+            ["EXCHANGE REVENUE", stats ? `${stats.feeRevenueHbar.toFixed(4)} ℏ` : "—", "text-accent-orange"],
           ]}
         />
         <StatusPill

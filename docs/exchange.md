@@ -227,8 +227,35 @@ from public Mirror Node data. That is the point.
 - **Verifier is trusted** — it holds the escrow key and is the sole slash authority.
 - **Optimistic sampling** — verification is replay-and-compare, which a cheater could game
   by fingerprinting audit traffic or only cheating on long prompts.
-- **Exchange-as-taker** — the buyer→exchange leg settles off-band; there is no spread/fee.
+- **Exchange-as-taker** — the agent pays the exchange over x402 (provider price + a 10%
+  taker fee, `EXCHANGE_FEE_BPS`); the provider always receives exactly its listed price.
 - **In-memory exchange state**, cheapest-first routing, Hedera Testnet only.
 
 Hardening and decentralization of the above are tracked as
 [open issues](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues).
+
+## Fee accrual & the dynamic 402 quote flow
+
+```
+agent                exchange                      provider
+  │  POST (unpaid)      │                             │
+  │────────────────────▶│ route model → cheapest      │
+  │                     │ quote: price+fee (pinned 60s)│
+  │  402 {total, quoteId}│                            │
+  │◀────────────────────│                             │
+  │  POST + X-PAYMENT   │ verify (pinned quote)       │
+  │────────────────────▶│──── x402 pay price ────────▶│
+  │                     │◀──── completion ────────────│
+  │  200 + receipt      │ settle inbound (afterSettle:│
+  │◀────────────────────│  accrue fee, HCS w/ both tx)│
+```
+
+- Fee math is integer tinybars: `fee = ceil(price × EXCHANGE_FEE_BPS / 10000)` — rounded UP
+  so the exchange never underquotes. Floats only at the display edge.
+- Quote pinning keys on a hash of `{model, messages}` — the retry recomputes the identical
+  pinned amount, so the signed payment verifies even if the market moved. TTL 60s.
+- Provider failure → the agent's verified payment is canceled (real mode, never charged)
+  or refunded with memo `refund:<quoteId>` (`REFUND_ON_FAILURE`, default true).
+- Fee revenue accrues only on settled inbound payments (`onAfterSettle`) — `GET /stats`
+  serves `{ totalVolumeHbar, requests, feeRevenueHbar, refunds, refundFailures, feeBps }`.
+- HCS trade messages carry `priceHbar`, `feeHbar`, `totalHbar` and both settlement txs.
