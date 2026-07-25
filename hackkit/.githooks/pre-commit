@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Fast staged-only quality check. Full gate runs at push time.
-set -uo pipefail
-ROOT=$(git rev-parse --show-toplevel)
-exec bash "$ROOT/scripts/quality-gate.sh" --staged

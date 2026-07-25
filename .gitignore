@@ -3,9 +3,7 @@ node_modules/
 .next/
 dist/
 out/
-contracts/cache/
-contracts/out/
-contracts/broadcast/
+coverage/
 .registry-cache.json
 *.log
 .DS_Store
