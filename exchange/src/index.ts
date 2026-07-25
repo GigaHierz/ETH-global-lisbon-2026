@@ -26,7 +26,8 @@ import {
 import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
 import { initPayer, paidPost } from "./payer.js";
 
-const PORT = parseInt(process.env.EXCHANGE_PORT || "4100", 10);
+// Hosts (Railway/Render/Fly) inject PORT; fall back to EXCHANGE_PORT locally.
+const PORT = parseInt(process.env.PORT || process.env.EXCHANGE_PORT || "4100", 10);
 // The flat x402 ask the agent pays the exchange per request. The exchange routes
 // to the cheapest live provider and keeps the spread (ask − provider cost); that
 // margin compresses when the verifier slashes a fraudulent low-baller out of routing.
