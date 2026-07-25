@@ -6,8 +6,8 @@ import type { ReactNode } from "react";
 
 // One source of truth for the primary navigation. Each item is a real page
 // route with a `match` so the active underline follows the current route.
+// Home (Protocol) is intentionally omitted — the logo already routes there.
 const NAV_ITEMS: Array<{ label: string; href: string; match: string }> = [
-  { label: "Protocol", href: "/", match: "/" },
   { label: "Exchange", href: "/exchange", match: "/exchange" },
   { label: "Agent", href: "/agent-demo", match: "/agent-demo" },
   { label: "Providers", href: "/providers", match: "/providers" },
