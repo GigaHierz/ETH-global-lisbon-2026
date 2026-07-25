@@ -11,7 +11,7 @@
 
 **Facilitator ladder** (boot-verified, logged): ① `api.testnet.blocky402.com` (feePayer `0.0.7162784`) → ② `x402.org/facilitator` (feePayer `0.0.9185802`) → ③ self-host stub (`SELF_HOST_FACILITATOR=true`, TODO). If one dies, services boot on the next rung; if all die, `MOCK_MODE=true` keeps the full demo alive offline.
 
-## HCS topic map (the audit trail — filled in step 3)
+## HCS topic map (the audit trail — live)
 
 | Topic | Carries | Who writes |
 |---|---|---|
@@ -19,7 +19,7 @@
 | **trades** | one JSON message per paid request: provider, price, latency, payment tx | exchange |
 | **verdicts** | verification results + slashes: similarity score, threshold, slash tx | verifier |
 
-Topic ids + Hashscan links land in [PROOF.md](../PROOF.md) §HCS when step 3 merges. Anyone can replay the whole market from public Mirror Node data — that's the pitch line.
+Topic ids + Hashscan links are live in [PROOF.md](../PROOF.md) §HCS (registry 0.0.9744593 · trades 0.0.9744594 · verdicts 0.0.9744595). Anyone can replay the whole market from public Mirror Node data — that's the pitch line.
 
 ## Hedera bounty checklist → where it's satisfied
 
@@ -27,8 +27,8 @@ Topic ids + Hashscan links land in [PROOF.md](../PROOF.md) §HCS when step 3 mer
 |---|---|
 | x402 payments on hedera:testnet | [provider/src/index.ts](../provider/src/index.ts) (paywall, `ExactHederaScheme`), [exchange/src/payer.ts](../exchange/src/payer.ts) (payer) — proven in [PROOF.md](../PROOF.md) |
 | Native services, no Solidity | **HCS** topics (identity/trades/verdicts) + **Mirror Node** REST (discovery, dashboard audit panel); staking = native HBAR escrow transfers; `contracts/` kept but **not deployed** ([README](../README.md) §Not in this MVP) |
-| Consensus Service usage | provider registration + trade log + verdicts ([shared/src/hcs.ts](../shared/src/hcs.ts) after step 3) |
-| Mirror Node usage | exchange discovery + dashboard audit trail (step 3) |
+| Consensus Service usage | provider registration + trade log + verdicts ([shared/src/hcs.ts](../shared/src/hcs.ts), live — messages on all three topics) |
+| Mirror Node usage | exchange discovery + dashboard audit trail (live) |
 | Testnet accounts + funding story | [FUNDING.md](../FUNDING.md), [scripts/setup-hedera-accounts.ts](../scripts/setup-hedera-accounts.ts) |
 | Fee-sponsored UX | facilitator feePayer — buyer pays zero gas ([PROOF.md](../PROOF.md) point 3) |
 
