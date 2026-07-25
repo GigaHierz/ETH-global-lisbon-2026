@@ -25,9 +25,7 @@
     "setup-hedera": "tsx scripts/setup-hedera-accounts.ts",
     "setup-hcs": "tsx scripts/setup-hcs-topics.ts",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:contracts": "forge test --root contracts",
-    "coverage:contracts": "forge coverage --root contracts"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@agentrouter/shared": "workspace:*",

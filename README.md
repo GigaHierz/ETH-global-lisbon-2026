@@ -61,7 +61,6 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 | [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness, slashes providers whose answers diverge from the advertised model | [verifier.md](docs/verifier.md) |
 | [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | [`packages/shared`](packages/shared) | Shared Hedera plumbing, HCS helpers, chat types, and constants used by every service | — |
-| [`contracts`](contracts) | `Staking.sol` + Foundry tests, kept as future work — staking runs natively via an escrow account (No-Solidity track) | [TRANSACTIONS.md](docs/TRANSACTIONS.md) |
 
 ## Real payments on Hedera Testnet
 
@@ -92,7 +91,6 @@ packages/
   verifier/    fraud auditor
   dashboard/   Next.js trading terminal
   shared/      Hedera + HCS + x402 plumbing
-contracts/     Foundry (Staking.sol) — future work
 scripts/       demo, smoke, and Hedera/HCS setup
 docs/          all documentation
 ```
@@ -101,7 +99,7 @@ docs/          all documentation
 
 - Real GPU supply — providers proxy Groq; the marketplace mechanics are the point
 - TEE / zkML verification — the verifier does optimistic replay-and-compare sampling
-- Trustless staking contract — `Staking.sol` is future work; the MVP escrow is verifier-held
+- Trustless staking contract — the MVP escrow is verifier-held (native HBAR, no Solidity); a contract- or multisig-enforced bond is future work
 - Orderbook / auctions — routing is simple cheapest-first among live claimants
 - Mainnet — Hedera Testnet only
 - Agent-to-exchange settlement — the agent pays the exchange off-band; the exchange pays

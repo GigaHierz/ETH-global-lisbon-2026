@@ -12,8 +12,8 @@ This trips people up, so to be precise: **the "escrow" is a normal Hedera *accou
 
 So the economic guarantees come from **native Hedera services + who holds which key**, not from on-chain contract code.
 
-- `contracts/Staking.sol` exists in the repo as the *contract-enforced* version, kept as **future work — it is not deployed** and not on the critical path. That's why there's nothing to "verify" on Hashscan (contract verification only applies to deployed EVM contracts).
-- **Trust model (honest):** because the escrow is key-held rather than contract-enforced, the verifier is trusted to slash honestly. Production hardening would move the bond into a Staking contract or a multi-sig / threshold escrow — that's the `Staking.sol` future path.
+- There is **no staking contract in this repo** — the stake/slash lifecycle is entirely native HBAR transfers, so there is nothing to "verify" on Hashscan (contract verification only applies to deployed EVM contracts).
+- **Trust model (honest):** because the escrow is key-held rather than contract-enforced, the verifier is trusted to slash honestly. Production hardening would move the bond into a staking contract or a multi-sig / threshold escrow — that is future work (see the security follow-up issue).
 
 This is deliberate: it keeps the whole marketplace on **native Hedera** (HBAR transfers + HCS + the Hedera Agent Kit), which is also why the project fits the "No Solidity" approach.
 

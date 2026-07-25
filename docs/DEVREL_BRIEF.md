@@ -48,7 +48,7 @@ flowchart LR
     D[Dashboard<br/>trading terminal] <-->|SSE| E
 ```
 
-- **TypeScript pnpm monorepo**: `/provider` `/exchange` `/verifier` `/agent` `/dashboard` (Next.js) `/contracts` (Foundry) `/shared`
+- **TypeScript pnpm monorepo**: `packages/` — `provider` `exchange` `verifier` `agent` `dashboard` (Next.js) `shared`
 - Providers expose the **OpenAI-compatible** `POST /v1/chat/completions` — any existing OpenAI SDK client can point at the exchange unchanged
 - Everything in-memory, no DB, no auth — deliberate MVP scope
 

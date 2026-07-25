@@ -23,9 +23,6 @@ jobs:
       - run: pnpm install
       - name: TypeScript unit tests + coverage
         run: pnpm test:coverage
-      - uses: foundry-rs/foundry-toolchain@v1
-      - name: Solidity tests
-        run: pnpm test:contracts
 
   dashboard:
     name: Dashboard build

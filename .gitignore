@@ -4,9 +4,6 @@ node_modules/
 dist/
 out/
 coverage/
-contracts/cache/
-contracts/out/
-contracts/broadcast/
 .registry-cache.json
 *.log
 .DS_Store
