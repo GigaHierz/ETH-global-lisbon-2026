@@ -10,6 +10,7 @@
     "exchange": "tsx --env-file=.env exchange/src/index.ts",
     "verifier": "tsx --env-file=.env verifier/src/index.ts",
     "agent": "tsx --env-file=.env agent/src/index.ts",
+    "agent-server": "tsx --env-file=.env agent/src/server.ts",
     "dashboard": "pnpm --filter @agentrouter/dashboard dev",
     "demo": "tsx --env-file=.env scripts/demo.ts",
     "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts",
