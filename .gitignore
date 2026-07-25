@@ -11,3 +11,4 @@ contracts/broadcast/
 .DS_Store
 .env.local
 *.pdf
+*.tsbuildinfo

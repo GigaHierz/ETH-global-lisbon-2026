@@ -1,14 +1,16 @@
-// Demo agent: an AI agent with a funded wallet buying inference through the
-// exchange. Prints cost per call + remaining balance. --spam N for volume.
+// Demo agent: an AI agent with a funded Hedera wallet buying inference through
+// the exchange. Prints cost per call + remaining balance. --spam N for volume.
 //
-// Note: the agent pays the EXCHANGE (mock: ledger debit; real flow: the exchange
-// pays providers via x402 with its own wallet — exchange-as-taker model, the
-// agent settles with the exchange off-band in this MVP).
+// The agent pays the exchange over x402: its own AGENT account signs the HBAR
+// payment for the exchange's 402 ask (see payer.ts). The exchange routes to the
+// cheapest live provider and settles that leg itself.
 
 import { MOCK_MODE, hbarBalance, hederaAccount, log } from "@agentrouter/shared";
+import { initAgentPayer, paidPost } from "./payer.js";
 
 const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
 const MODEL = process.env.AGENT_MODEL || "llama-3.3-70b-versatile";
+const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || "0.12"); // mock-mode payment amount
 
 const QUESTIONS = [
   "What is the capital of Portugal? One sentence.",
@@ -29,11 +31,11 @@ async function realBalance(): Promise<string> {
 
 async function callOnce(prompt: string, i: number, total: number) {
   const t0 = Date.now();
-  const res = await fetch(`${EXCHANGE}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: MODEL, messages: [{ role: "user", content: prompt }], temperature: 0 }),
-  });
+  const { res } = await paidPost(
+    `${EXCHANGE}/v1/chat/completions`,
+    { model: MODEL, messages: [{ role: "user", content: prompt }], temperature: 0 },
+    ASK,
+  );
   if (!res.ok) {
     log("agent", `[${i}/${total}] FAILED HTTP ${res.status}: ${(await res.text()).slice(0, 120)}`);
     return;
@@ -49,6 +51,7 @@ async function callOnce(prompt: string, i: number, total: number) {
 
 async function main() {
   log("agent", `AgentRouter demo agent → ${EXCHANGE} | model ${MODEL} | MOCK_MODE=${MOCK_MODE}`);
+  await initAgentPayer();
   if (!MOCK_MODE) log("agent", `starting HBAR balance: ${await realBalance()} ℏ`);
   else log("agent", `starting mock balance: ${mockBalance.toFixed(4)} ℏ`);
 

@@ -20,7 +20,7 @@ const TAG = profile.key;
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : profile.port;
 const PUBLIC_URL = process.env.PROVIDER_PUBLIC_URL || `http://localhost:${PORT}`;
 
-const { wallet, agentId } = await ensureRegistered(profile, PUBLIC_URL);
+const { wallet, agentId } = await ensureRegistered(profile);
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));

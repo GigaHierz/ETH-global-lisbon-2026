@@ -28,7 +28,7 @@ export interface ProviderInfo {
   displayName: string;
   model: string; // advertised model
   priceHbar: number; // per request
-  wallet: `0x${string}`;
+  wallet: string; // Hedera account id (0.0.x)
   agentId: string | null; // HCS-14 UAID (or mock)
   url: string;
 }

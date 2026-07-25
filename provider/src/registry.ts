@@ -22,6 +22,7 @@ const STAKE_HBAR = parseFloat(process.env.STAKE_HBAR || "50");
 interface CacheEntry {
   staked?: string; // stake tx id
   registered?: string; // registration HCS tx id
+  endpoint?: string; // endpoint we registered with (re-register if it changes)
 }
 
 function readCache(): Record<string, CacheEntry> {
@@ -55,7 +56,6 @@ async function stakeToEscrow(id: string, key: string): Promise<string> {
 
 export async function ensureRegistered(
   profile: ProviderProfile,
-  publicUrl: string = `http://localhost:${profile.port}`,
 ): Promise<{ wallet: string; agentId: string | null; key: string }> {
   if (MOCK_MODE) {
     const agentId = `mock-${profile.key}`;
@@ -65,8 +65,15 @@ export async function ensureRegistered(
 
   const { id, key } = hederaAccount(profile.hederaRole);
   const agentId = `uaid:aid:hedera:testnet:${id}`; // HCS-14-style universal agent id
+  // Remote boxes MUST set PROVIDER_PUBLIC_URL (tunnel/VPS address) — the exchange
+  // reaches you at the endpoint you register, and localhost only works on its box.
+  const endpoint = process.env.PROVIDER_PUBLIC_URL ?? `http://localhost:${profile.port}`;
   const cache = readCache();
   const entry: CacheEntry = cache[id] ?? {};
+  if (entry.registered && entry.endpoint !== endpoint) {
+    log(profile.key, `endpoint changed (${entry.endpoint} → ${endpoint}) — re-registering on HCS`);
+    entry.registered = undefined;
+  }
 
   if (!entry.staked) {
     try {
@@ -88,7 +95,7 @@ export async function ensureRegistered(
         displayName: profile.displayName,
         model: profile.advertisedModel,
         priceHbar: profile.priceHbar,
-        endpoint: publicUrl,
+        endpoint,
         stakeHbar: STAKE_HBAR,
         stakeTx: entry.staked ?? null,
         hcs14: {
@@ -96,7 +103,8 @@ export async function ensureRegistered(
           profile: `data:application/json,{"name":"${profile.displayName}","model":"${profile.advertisedModel}"}`,
         },
       });
-      log(profile.key, `registered on HCS registry topic: ${hashscanTx(entry.registered)}`);
+      entry.endpoint = endpoint;
+      log(profile.key, `registered on HCS registry topic (${endpoint}): ${hashscanTx(entry.registered)}`);
     } catch (e) {
       log(profile.key, `WARN HCS registration failed (${(e as Error).message.slice(0, 100)}) — exchange will fall back to /info discovery`);
     }
