@@ -1,83 +1,71 @@
-# FUNDING.md — Hedera Testnet money plan
-*Verified 2026-07-25 against the live facilitator, Mirror Node, npm package source, and Circle's faucet. No guessed values.*
+# FUNDING.md — Hedera Testnet money plan (HBAR-default)
+*Verified 2026-07-25 against both live facilitators, Mirror Node, and `@x402/hedera@2.19.0` package source. No guessed values. Supersedes the earlier USDC-default version per team playbook.*
 
-## What the facilitator actually supports
+## Settlement: native HBAR (locked decision)
 
-`GET https://x402.org/facilitator/supported` (probed live today):
+| | |
+|---|---|
+| Asset | **HBAR, `asset: "0.0.0"`** — amounts in **tinybars** (1 ℏ = 10⁸ tb) |
+| Prices | p1 **0.10 ℏ** = 10,000,000 tb · p2 **0.04 ℏ** = 4,000,000 tb · p3 **0.08 ℏ** = 8,000,000 tb |
+| Why | Zero faucet dependency on the critical path — operator's 1000 tHBAR funds everything, fully scripted |
+| USDC path | Stays functional behind `SETTLEMENT_ASSET=usdc` (HTS token `0.0.429274`, 6 dp). Associations remain in the setup script so the switch is flip-only. Circle faucet (20 USDC/2h → operator id) is only needed if you flip. |
 
-```json
-{ "x402Version": 2, "scheme": "exact", "network": "hedera:testnet",
-  "extra": { "feePayer": "0.0.9185802" } }
-```
+## Facilitator ladder (both probed live today, both serve hedera:testnet exact/v2)
 
-- **Scheme:** `exact` (x402 v2) on `hedera:testnet` — same protocol we already built, different network string + signer.
-- **feePayer `0.0.9185802`:** the facilitator **sponsors the settlement transaction fees**. Payer wallets do NOT need tHBAR to pay; they only sign. (Our wallets still get tHBAR for their *own* txs: ERC-8004 registration, staking deploy/slash via Hashio, HCS messages.)
-- **Client/server impl:** `@x402/hedera@2.19.0` (same v2.19 line we use), on `@hiero-ledger/sdk` 2.85.0 (the renamed Hedera SDK — we standardize on this one package for HCS too, not a second `@hashgraph/sdk`).
-
-## Settlement asset (from `@x402/hedera` package source, not docs prose)
-
-| Asset | ID | Decimals | Amount unit |
+| Rung | URL | feePayer | Status |
 |---|---|---|---|
-| **USDC (HTS), testnet default** | **`0.0.429274`** | 6 | token smallest units |
-| HBAR (native, also supported) | `0.0.0` | 8 | tinybars |
+| 1 | `https://api.testnet.blocky402.com` | `0.0.7162784` | ✅ live |
+| 2 | `https://x402.org/facilitator` | `0.0.9185802` | ✅ live |
+| 3 | self-host stub via `@x402/hedera/exact/facilitator` behind `SELF_HOST_FACILITATOR=true` | our operator | fallback |
 
-A `"$0.002"` price string resolves server-side to the network's default HTS USDC (`0.0.429274`). **HTS tokens require every receiving account to be associated with the token before it can hold them** — the setup script does this for all our accounts.
+Boot-time: services walk the ladder, verify `/supported` contains `hedera:testnet`, log which rung answered. `FACILITATOR_URL` env overrides. Fee-payer sponsorship means **payer wallets need no tHBAR to settle** — their tHBAR is for their own txs (HCS messages, stake transfers).
 
-**Decision — USDC is the settlement asset.** It keeps the pitch honest ("agents buy inference with USDC") and matches the existing `"$0.002"` price plumbing unchanged. HBAR settlement (`0.0.0`) stays as a documented break-glass fallback (zero faucet dependency) if Circle's faucet dies on demo day.
+## Operator status (Mirror Node, checked today)
 
-## Operator status (checked on Mirror Node just now)
+`0.0.9695453` — **1000 tHBAR** ✅ · ECDSA · EVM alias `0x24e1…807a` matches .env
 
-- `0.0.9695453` — **1000 tHBAR** ✅ (ECDSA, EVM alias `0x24e1…807a` matches .env)
-- USDC associated: **not yet** (script fixes) · USDC balance: 0
+## 🛒 Human shopping list
 
-## 🛒 Human shopping list (you only, everything else is scripted)
+**Nothing.** HBAR-default removes every manual step: no Circle faucet, no ETH, no Base. Operator refill (only if balance drops below ~150 ℏ): https://portal.hedera.com — testnet, 1000 ℏ/day.
 
-| # | What | Where | Amount | Notes |
-|---|---|---|---|---|
-| 1 | tHBAR | — | **nothing to do** | Operator already holds 1000 tHBAR; script distributes it. Refill only if it drops: https://portal.hedera.com (testnet, 1000 ℏ/day) |
-| 2 | USDC | https://faucet.circle.com → network **Hedera Testnet** → paste **`0.0.9695453`** | **one request = 20 USDC** | Do this **after** running the setup script once (operator must be associated first — the script does that and tells you when to hit the faucet). 20 USDC ≫ demo spend (5 calls × $0.002). |
+## What `pnpm setup-hedera` does (idempotent, roles in .env are skipped)
 
-That's it. No ETH, no Base, no other faucets.
+1. Creates **7 ECDSA accounts** with EVM aliases: agent, exchange, provider1-3, verifier, **escrow**.
+   - **escrow** = verifier-held stake pot (no-Solidity staking): providers transfer `STAKE_HBAR` (default 50 ℏ) there at registration; a slash is an escrow→treasury transfer (treasury = operator) plus a verdict on HCS.
+2. Funds each with **100 tHBAR** (700 total, ~300 stays with operator as buffer).
+3. Associates USDC `0.0.429274` with operator + all accounts (keeps the USDC switch flip-only; costs pennies).
+4. Appends ready-to-paste `HEDERA_<ROLE>_ID/KEY/EVM` lines to `.env`, prints Hashscan links.
 
-## What the script does (`scripts/setup-hedera-accounts.ts`)
-
-Run: `pnpm setup-hedera` (idempotent — safe to re-run; skips roles already in .env)
-
-1. Connects as operator (`HEDERA_OPERATOR_ID`/`KEY` from .env).
-2. Creates 6 ECDSA accounts with EVM aliases (`AccountCreateTransaction().setECDSAKeyWithAlias(...)`): **agent, exchange, provider1, provider2, provider3, verifier**.
-3. Funds each with **100 tHBAR** from the operator (600 total; ~400 stays with operator as buffer). This covers each wallet's own txs: 8004 registration, Staking deploy + slash (EVM gas via Hashio comes out of the same HBAR balance), HCS topic + messages.
-4. **Associates USDC `0.0.429274`** with the operator and all 6 accounts (signed per-account, fees paid by operator).
-5. If the operator holds faucet USDC: distributes **5 USDC each** to **agent** and **exchange** (the only payers: agent → exchange → providers). Otherwise prints the faucet reminder.
-6. Prints ready-to-paste `.env` lines: `HEDERA_<ROLE>_ID`, `HEDERA_<ROLE>_KEY`, `HEDERA_<ROLE>_EVM` for every role, plus Hashscan account links.
-
-## Funding flow at a glance
+## Money flow at a glance
 
 ```
-                    Circle faucet (20 USDC, one manual trip)
-                                 │
-                                 ▼
-   portal.hedera.com ──▶ OPERATOR 0.0.9695453 (1000 tHBAR ✅)
-                                 │ setup script
-        ┌──────────┬─────────┬───┴──────┬──────────┬──────────┐
-        ▼          ▼         ▼          ▼          ▼          ▼
-      agent    exchange  provider1  provider2  provider3  verifier
-     100 ℏ      100 ℏ      100 ℏ      100 ℏ      100 ℏ      100 ℏ
-     +5 USDC    +5 USDC   (receives) (receives) (receives) (slashes)
-        │          │
-        └─ x402 ──▶└─ x402 ──▶ providers   (settlement fees: facilitator feePayer 0.0.9185802)
+   portal.hedera.com ──(only if refill needed)──▶ OPERATOR 0.0.9695453 (1000 ℏ ✅, = treasury)
+                                                       │  pnpm setup-hedera
+        ┌──────────┬──────────┬──────────┬─────────────┼──────────┬──────────┐
+        ▼          ▼          ▼          ▼             ▼          ▼          ▼
+      agent    exchange  provider1  provider2     provider3   verifier    escrow
+      100 ℏ     100 ℏ      100 ℏ      100 ℏ         100 ℏ       100 ℏ      100 ℏ
+        │          │          └──── stake 50 ℏ each at registration ────▶ escrow
+        │x402 HBAR ▼                                                        │
+        └────▶ exchange ──x402 HBAR──▶ providers                            │ slash 25 ℏ
+               (settlement fees sponsored by facilitator feePayer)          ▼
+                                                                        treasury (operator)
 ```
 
 ## Costs sanity check
 
-- Demo spend: 5 calls × $0.002 = **$0.01 USDC** — 5 USDC per payer is 500× headroom, spam-flag proof.
-- tHBAR: account creation ~$0.05 eq each, association ~$0.05 eq, EVM deploys a few ℏ — 100 ℏ/account is deep headroom.
+- Demo spend: 5 calls ≈ 0.4 ℏ agent-side — 100 ℏ is 250× headroom, `--spam`-proof.
+- Stakes: 3 × 50 ℏ out of provider balances (they keep 50 ℏ working capital each).
+- HCS: ~$0.0001/message equivalent. Account creation ~$0.05 eq. All noise against 100 ℏ.
 
 ## Explorer links
 
-- Operator: https://hashscan.io/testnet/account/0.0.9695453
-- USDC token: https://hashscan.io/testnet/token/0.0.429274
-- Facilitator feePayer: https://hashscan.io/testnet/account/0.0.9185802
+- Operator/treasury: https://hashscan.io/testnet/account/0.0.9695453
+- Facilitator feePayers: https://hashscan.io/testnet/account/0.0.7162784 (blocky402) · https://hashscan.io/testnet/account/0.0.9185802 (x402.org)
+- USDC token (optional path): https://hashscan.io/testnet/token/0.0.429274
+- Demo accounts: printed by `pnpm setup-hedera` and appended to `.env`
 
-## Note on tooling
+## Reference
 
-The `SearchHedera` / hedera-docs MCP named in the standing rules is **not connected in this session** (no such tool is available). Compensating by verifying every Hedera API against docs.hedera.com fetches and the published package source (as above). If you can attach that MCP, I'll use it from step 2 on.
+- Facilitator ladder pattern: https://github.com/blockydevs/wad2026-x402-workshop (HBAR-native x402 on hedera:testnet via blocky402)
+- `@x402/hedera` README (package source is the ground truth for asset ids/decimals)

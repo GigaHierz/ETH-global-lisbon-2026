@@ -24,9 +24,12 @@ import { resolve } from "node:path";
 const ENV_PATH = resolve(import.meta.dirname, "../.env");
 const USDC = TokenId.fromString("0.0.429274");
 const USDC_DECIMALS = 6;
-const ROLES = ["AGENT", "EXCHANGE", "PROVIDER1", "PROVIDER2", "PROVIDER3", "VERIFIER"] as const;
+// ESCROW is the verifier-held stake escrow (no-Solidity staking): providers
+// transfer STAKE_HBAR here at registration; a slash moves it to the treasury
+// (= operator). Its key lives in HEDERA_ESCROW_KEY, loaded by the verifier.
+const ROLES = ["AGENT", "EXCHANGE", "PROVIDER1", "PROVIDER2", "PROVIDER3", "VERIFIER", "ESCROW"] as const;
 const HBAR_PER_ACCOUNT = 100;
-const USDC_PER_PAYER = 5; // agent + exchange only
+const USDC_PER_PAYER = 5; // agent + exchange only (USDC path is optional, behind SETTLEMENT_ASSET=usdc)
 const PAYERS = new Set(["AGENT", "EXCHANGE"]);
 
 function env(name: string): string | undefined {
