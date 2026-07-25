@@ -13,12 +13,15 @@
     "agent": "tsx --env-file=.env agent/src/index.ts",
     "dashboard": "pnpm --filter @agentrouter/dashboard dev",
     "demo": "tsx --env-file=.env scripts/demo.ts",
-    "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts"
+    "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts",
+    "setup-hedera": "tsx scripts/setup-hedera-accounts.ts"
   },
   "dependencies": {
     "@agentrouter/shared": "workspace:*",
+    "@hiero-ledger/sdk": "2.85.0",
     "@x402/evm": "^2.19.0",
     "@x402/fetch": "^2.19.0",
+    "@x402/hedera": "2.19.0",
     "viem": "^2.48.11"
   },
   "devDependencies": {
