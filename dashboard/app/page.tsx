@@ -1,389 +1,340 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-// Backend URL priority: ?api=https://… query param → build-time env → localhost.
-// The query param survives tunnel churn without a rebuild.
-const AGENT =
+// Live stats source (same override pattern as /exchange and /agent-demo).
+const EXCHANGE =
   (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
-  process.env.NEXT_PUBLIC_AGENT_URL ||
-  "http://localhost:4200";
+  process.env.NEXT_PUBLIC_EXCHANGE_URL ||
+  "https://agent-router-exchange-production.up.railway.app";
 
-// ---- types mirrored from the agent-server contract (dashboard is standalone) ----
-interface Budget { capHbar: number; spentHbar: number; remainingHbar: number }
-interface Finding { q: string; a: string }
-interface Identity {
-  agentId: string;
-  account: string;
-  hashscan: string;
-  registeredTx?: string;
-}
-interface AgentState {
-  running: boolean;
-  goal: string | null;
-  balanceHbar: number;
-  budget: Budget;
-  findings: Finding[];
-  events: AgentEvent[];
+const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
+
+// Real on-chain receipts (PROOF.md)
+const PROOF_LINKS: Array<{ label: string; href: string; color: "cyan" | "orange" }> = [
+  { label: "Agent Settlement", href: "https://hashscan.io/testnet/transaction/0.0.7162784@1784982277.193217949", color: "cyan" },
+  { label: "Provider Settlement", href: "https://hashscan.io/testnet/transaction/0.0.7162784@1784982283.158991431", color: "cyan" },
+  { label: "Slash: escrow→treasury", href: "https://hashscan.io/testnet/transaction/0.0.9744157@1784983556.547115247", color: "cyan" },
+  { label: "HCS Topic: Registry", href: "https://hashscan.io/testnet/topic/0.0.9744593", color: "orange" },
+  { label: "HCS Topic: Trades", href: "https://hashscan.io/testnet/topic/0.0.9744594", color: "orange" },
+  { label: "HCS Topic: Verdicts", href: "https://hashscan.io/testnet/topic/0.0.9744595", color: "orange" },
+];
+
+function Icon({ name, className = "" }: { name: string; className?: string }) {
+  return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
 
-type AgentEvent =
-  | { type: "goal"; goal: string }
-  | { type: "plan"; questions: string[] }
-  | {
-      type: "bought";
-      question: string;
-      answer: string;
-      costHbar: number;
-      provider: string;
-      paymentRef: string;
-      remainingHbar: number;
-      hashscan: string;
-    }
-  | { type: "budget-exhausted"; remainingHbar: number }
-  | { type: "synthesis"; answer: string }
-  | { type: "done"; spentHbar: number; findings: number }
-  | { type: "balance"; hbar: number }
-  | { type: "identity"; agentId: string; hashscan: string }
-  | { type: "error"; message: string };
-
-type Conn = "connecting" | "live" | "offline";
-
-const DEFAULT_BUDGET: Budget = { capHbar: 0, spentHbar: 0, remainingHbar: 0 };
-
-// stable-ish key for streamed events (index-based, list is append-only)
-function evKey(ev: AgentEvent, i: number) {
-  return `${i}-${ev.type}`;
+function MarqueeRow() {
+  return (
+    <div className="flex gap-12 items-center px-6 shrink-0">
+      <span className="font-data text-[11px] font-bold tracking-[0.1em] text-on-surface-variant uppercase whitespace-nowrap">
+        Network Integrity:
+      </span>
+      {PROOF_LINKS.map((l) => (
+        <a key={l.label} href={l.href} target="_blank" rel="noreferrer"
+          className={`flex items-center gap-2 font-data text-[11px] font-bold tracking-[0.1em] hover:underline whitespace-nowrap ${
+            l.color === "cyan" ? "text-accent-cyan" : "text-accent-orange"
+          }`}>
+          {l.label} <Icon name="open_in_new" className="text-[12px]" />
+        </a>
+      ))}
+    </div>
+  );
 }
 
-export default function AgentPage() {
-  const [identity, setIdentity] = useState<Identity | null>(null);
-  const [conn, setConn] = useState<Conn>("connecting");
-  const [running, setRunning] = useState(false);
-  const [goal, setGoal] = useState<string | null>(null);
-  const [goalInput, setGoalInput] = useState("");
-  const [balance, setBalance] = useState<number | null>(null);
-  const [budget, setBudget] = useState<Budget>(DEFAULT_BUDGET);
-  const [events, setEvents] = useState<AgentEvent[]>([]);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+const STEPS = [
+  {
+    n: "01", icon: "dns", iconBg: "bg-accent-orange", iconColor: "text-on-primary", title: "Providers list",
+    items: [
+      "Run the provider service on your local machine or any cloud box.",
+      "Stake 50 ℏ to the escrow account as a quality bond.",
+      "Registration is automatically posted to the HCS registry topic.",
+    ],
+  },
+  {
+    n: "02", icon: "shopping_cart", iconBg: "bg-accent-cyan", iconColor: "text-on-primary", title: "Agents buy",
+    items: [
+      "Agent requests a specific model from the global exchange.",
+      "Exchange routes the request to the cheapest available provider.",
+      "x402 protocol fires: pay ℏ → receive LLM completion.",
+    ],
+  },
+  {
+    n: "03", icon: "gavel", iconBg: "bg-on-surface", iconColor: "text-surface-obsidian", title: "Verifier enforces",
+    items: [
+      "Random sampling: prompts are replayed against a shadow provider.",
+      "Divergence in output tokens triggers a verification event.",
+      "Escrow stake is seized and the cheater is dropped from routing.",
+    ],
+  },
+];
 
-  const esRef = useRef<EventSource | null>(null);
-  const streamEnd = useRef<HTMLDivElement | null>(null);
+export default function Landing() {
+  const [stats, setStats] = useState<{ volume: string; requests: string; providers: string; avgPrice: string }>({
+    volume: "—", requests: "—", providers: "—", avgPrice: "—",
+  });
 
-  // ---- apply a single event to local state ----
-  function applyEvent(ev: AgentEvent) {
-    switch (ev.type) {
-      case "goal":
-        setGoal(ev.goal);
-        setRunning(true);
-        break;
-      case "bought":
-        setBudget((b) => ({ ...b, remainingHbar: ev.remainingHbar, spentHbar: Math.max(0, b.capHbar - ev.remainingHbar) }));
-        break;
-      case "budget-exhausted":
-        setBudget((b) => ({ ...b, remainingHbar: ev.remainingHbar, spentHbar: b.capHbar }));
-        break;
-      case "done":
-        setRunning(false);
-        setBudget((b) => ({ ...b, spentHbar: ev.spentHbar, remainingHbar: Math.max(0, b.capHbar - ev.spentHbar) }));
-        break;
-      case "balance":
-        setBalance(ev.hbar);
-        break;
-      case "identity":
-        setIdentity((id) =>
-          id
-            ? { ...id, agentId: ev.agentId, hashscan: ev.hashscan }
-            : { agentId: ev.agentId, account: ev.agentId.split(":").pop() || "", hashscan: ev.hashscan }
-        );
-        break;
-      default:
-        break;
-    }
-  }
-
-  // ---- hydrate identity + state, then open SSE ----
   useEffect(() => {
-    let cancelled = false;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-    fetch(`${AGENT}/identity`)
-      .then((r) => r.json())
-      .then((id: Identity) => { if (!cancelled) setIdentity(id); })
-      .catch(() => {});
-
-    fetch(`${AGENT}/state`)
-      .then((r) => r.json())
-      .then((s: AgentState) => {
-        if (cancelled) return;
-        setRunning(s.running);
-        setGoal(s.goal);
-        setBalance(s.balanceHbar);
-        setBudget(s.budget ?? DEFAULT_BUDGET);
-        setEvents(s.events ?? []);
-      })
-      .catch(() => {});
-
-    function connect() {
-      if (cancelled) return;
-      const es = new EventSource(`${AGENT}/events`);
-      esRef.current = es;
-      es.onopen = () => { if (!cancelled) setConn("live"); };
-      es.onmessage = (msg) => {
-        let ev: AgentEvent;
-        try { ev = JSON.parse(msg.data); } catch { return; }
-        setEvents((list) => [...list, ev]);
-        applyEvent(ev);
-      };
-      es.onerror = () => {
-        setConn("offline");
-        es.close();
-        esRef.current = null;
-        // graceful reconnect
-        if (!cancelled) {
-          reconnectTimer = setTimeout(connect, 3000);
-        }
-      };
-    }
-    connect();
-
-    return () => {
-      cancelled = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      esRef.current?.close();
-      esRef.current = null;
-    };
+    Promise.all([
+      fetch(`${EXCHANGE}/providers`).then((r) => r.json()).catch(() => []),
+      fetch(`${EXCHANGE}/log?limit=100`).then((r) => r.json()).catch(() => []),
+    ]).then(([providers, log]: [Array<{ status: string }>, Array<{ status: string; priceHbar: number }>]) => {
+      const ok = (log ?? []).filter((e) => e.status === "ok");
+      const vol = ok.reduce((s, e) => s + e.priceHbar, 0);
+      setStats({
+        volume: `${vol.toFixed(2)} ℏ`,
+        requests: String(ok.length),
+        providers: String((providers ?? []).filter((p) => p.status === "live").length),
+        avgPrice: ok.length ? `${(vol / ok.length).toFixed(3)} ℏ` : "—",
+      });
+    }).catch(() => {});
   }, []);
 
-  // ---- autoscroll the reasoning stream ----
-  useEffect(() => {
-    streamEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [events.length]);
-
-  async function submitGoal(e: React.FormEvent) {
-    e.preventDefault();
-    const g = goalInput.trim();
-    if (!g || running || submitting) return;
-    setSubmitError(null);
-    setSubmitting(true);
-    try {
-      const res = await fetch(`${AGENT}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: g }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setSubmitError(body.error || `run rejected (${res.status})`);
-        return;
-      }
-      // reset the local view for the new run; SSE will repopulate
-      setEvents([]);
-      setGoal(g);
-      setRunning(true);
-      setGoalInput("");
-    } catch {
-      setSubmitError("agent-server unreachable");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const uaid = identity?.agentId || "uaid:aid:hedera:testnet:0.0.9746264";
-  const idHashscan = identity?.hashscan;
-
-  const pct = budget.capHbar > 0 ? Math.min(100, (budget.spentHbar / budget.capHbar) * 100) : 0;
-  const barColor = pct >= 90 ? "var(--danger)" : pct >= 65 ? "#f59e0b" : "var(--accent)";
-
-  const plan = events.find((e): e is Extract<AgentEvent, { type: "plan" }> => e.type === "plan");
-  const synthesis = [...events].reverse().find((e): e is Extract<AgentEvent, { type: "synthesis" }> => e.type === "synthesis");
-  const done = [...events].reverse().find((e): e is Extract<AgentEvent, { type: "done" }> => e.type === "done");
-  const bought = events.filter((e): e is Extract<AgentEvent, { type: "bought" }> => e.type === "bought");
-  const errors = events.filter((e): e is Extract<AgentEvent, { type: "error" }> => e.type === "error");
-
-  const connColor = conn === "live" ? "var(--accent)" : conn === "connecting" ? "#f59e0b" : "var(--danger)";
-  const connLabel = conn === "live" ? "agent live" : conn === "connecting" ? "connecting…" : "agent-server offline";
+  const STAT_CARDS = [
+    { icon: "database", label: "Total Volume", value: stats.volume },
+    { icon: "bolt", label: "Requests Served", value: stats.requests },
+    { icon: "hub", label: "Providers Live", value: stats.providers },
+    { icon: "payments", label: "Avg Price", value: stats.avgPrice },
+  ];
 
   return (
-    <main className="min-h-screen p-4 max-w-[1100px] mx-auto">
-      {/* header */}
-      <header className="flex flex-wrap items-baseline justify-between gap-3 border-b pb-3 mb-4" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--accent)" }}>AGENTROUTER</h1>
-          <span className="text-xs" style={{ color: "var(--ink-muted)" }}>buyer agent · x402 · HCS-14 · hedera testnet</span>
-        </div>
-        <div className="flex items-center gap-4 text-xs" style={{ color: "var(--ink-muted)" }}>
-          <span className="flex items-center gap-1.5">
-            <span className="uppercase tracking-widest text-[10px]">UAID</span>
-            {idHashscan ? (
-              <a href={idHashscan} target="_blank" rel="noreferrer" className="underline decoration-dotted" style={{ color: "var(--ink)" }}>
-                {uaid} ↗
-              </a>
-            ) : (
-              <span style={{ color: "var(--ink)" }}>{uaid}</span>
-            )}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full" style={{ background: connColor }} aria-hidden />
-            {connLabel}
-          </span>
-        </div>
-      </header>
+    <div className="min-h-screen bg-surface-obsidian text-on-surface font-body selection:bg-accent-cyan selection:text-on-primary scroll-smooth">
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
 
-      {/* offline notice */}
-      {conn === "offline" && (
-        <div role="alert" className="mb-4 rounded border px-4 py-2 text-xs" style={{ borderColor: "var(--danger)", color: "var(--danger)", background: "rgb(239 68 68 / 0.08)" }}>
-          Can’t reach the agent-server at {AGENT}. Retrying every 3s… make sure it’s running.
+      {/* ── Top Navigation ── */}
+      <nav className="fixed top-0 w-full z-50 bg-surface-obsidian/80 backdrop-blur-xl border-b border-outline-variant shadow-[0_0_40px_rgba(0,240,255,0.05)]">
+        <div className="flex justify-between items-center h-16 px-6 w-full max-w-[1440px] mx-auto">
+          <div className="flex items-center gap-8">
+            <span className="font-display text-2xl font-bold text-accent-cyan tracking-tighter">AgentRouter</span>
+            <div className="hidden md:flex gap-6 font-data text-sm">
+              <a className="text-primary-fixed-dim border-b-2 border-accent-cyan pb-1" href="/">Protocol</a>
+              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange">Exchange</a>
+              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/agent-demo">Agent</a>
+              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="#list-gpu">Providers</a>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <a href={REPO} target="_blank" rel="noreferrer"
+              className="hidden sm:block font-data text-[11px] tracking-[0.1em] uppercase text-on-surface-variant hover:text-on-surface transition-colors">
+              GitHub
+            </a>
+            <a href="/exchange"
+              className="bg-primary text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:bg-accent-cyan transition-colors active:scale-95">
+              Launch App
+            </a>
+          </div>
         </div>
-      )}
+      </nav>
 
-      {/* controls + meters */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {/* goal input */}
-        <section className="lg:col-span-2 rounded border p-3" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
-          <h2 className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--ink-muted)" }}>Goal</h2>
-          <form onSubmit={submitGoal} className="flex gap-2">
-            <input
-              value={goalInput}
-              onChange={(e) => setGoalInput(e.target.value)}
-              disabled={running}
-              placeholder={running ? "agent is working…" : "e.g. Compare the top 3 L1s by throughput and fees"}
-              className="flex-1 rounded border px-3 py-1.5 text-xs outline-none disabled:opacity-50"
-              style={{ borderColor: "var(--border)", background: "var(--surface)", color: "var(--ink)" }}
-            />
-            <button
-              type="submit"
-              disabled={running || submitting || !goalInput.trim()}
-              className="rounded px-4 py-1.5 text-xs font-bold disabled:opacity-40"
-              style={{ background: "var(--accent)", color: "var(--surface)" }}
-            >
-              {running ? "running…" : submitting ? "…" : "Run"}
-            </button>
-          </form>
-          {submitError && <p className="mt-2 text-xs" style={{ color: "var(--danger)" }}>{submitError}</p>}
-          {goal && (
-            <p className="mt-2 text-xs truncate" style={{ color: "var(--ink-muted)" }}>
-              active goal: <span style={{ color: "var(--ink)" }}>{goal}</span>
+      <main className="relative pt-16 hud-grid-lines">
+        {/* ── Hero ── */}
+        <section className="relative min-h-[85vh] flex flex-col items-center justify-center px-4 py-24 text-center overflow-hidden">
+          <div className="relative z-10 max-w-4xl">
+            <div className="inline-block px-3 py-1 mb-8 border border-outline-variant rounded-full bg-surface-container/50 backdrop-blur-md">
+              <span className="font-data text-[11px] font-bold text-accent-orange uppercase tracking-widest">
+                Protocol Live on Hedera Testnet
+              </span>
+            </div>
+            <h1 className="font-display font-extrabold text-[42px] leading-[48px] md:text-[84px] md:leading-[92px] tracking-[-0.04em] mb-6 text-on-surface">
+              Agent<span className="text-accent-cyan">Router</span>
+            </h1>
+            <p className="font-body text-base md:text-xl text-on-surface-variant mb-12 max-w-2xl mx-auto">
+              A spot market where AI agents buy LLM inference per request in HBAR on Hedera.
+              Low latency. Zero trust. Infinite scale.
             </p>
-          )}
-        </section>
-
-        {/* balance + budget */}
-        <section className="rounded border p-3" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
-          <h2 className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--ink-muted)" }}>Wallet</h2>
-          <div className="flex items-baseline justify-between mb-2">
-            <span className="text-xs" style={{ color: "var(--ink-muted)" }}>balance</span>
-            <span className="text-lg font-bold" style={{ color: "var(--ink)" }}>
-              {balance == null ? "—" : balance.toFixed(4)} <span className="text-xs font-normal">ℏ</span>
-            </span>
+            <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
+              <a href="/exchange"
+                className="w-full md:w-auto bg-accent-cyan text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all">
+                View the market
+              </a>
+              <a href="#list-gpu"
+                className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
+                List your GPU
+              </a>
+            </div>
           </div>
-          <div className="flex items-baseline justify-between text-[11px] mb-1" style={{ color: "var(--ink-muted)" }}>
-            <span>budget</span>
-            <span>
-              <span style={{ color: "var(--ink)" }}>{budget.spentHbar.toFixed(4)}</span> / {budget.capHbar.toFixed(4)} ℏ
-            </span>
-          </div>
-          <div className="h-2 w-full rounded overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} aria-hidden />
-          </div>
-          <p className="mt-1 text-[10px]" style={{ color: "var(--ink-muted)" }}>
-            {budget.remainingHbar.toFixed(4)} ℏ remaining
-          </p>
-        </section>
-      </div>
 
-      {/* live reasoning stream */}
-      <section className="rounded border p-3" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
-        <h2 className="text-xs uppercase tracking-widest mb-3 flex items-center justify-between" style={{ color: "var(--ink-muted)" }}>
-          <span>Live reasoning</span>
-          <span className="normal-case tracking-normal">{bought.length} bought · {events.length} events</span>
-        </h2>
-
-        {events.length === 0 && (
-          <p className="text-xs py-6 text-center" style={{ color: "var(--ink-muted)" }}>
-            {running ? "waiting for the agent to plan…" : "no run yet — set a goal above and hit Run."}
-          </p>
-        )}
-
-        {/* the plan */}
-        {plan && (
-          <div className="row-in mb-4">
-            <div className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "var(--ink-muted)" }}>Plan · {plan.questions.length} sub-questions</div>
-            <ol className="text-xs space-y-1">
-              {plan.questions.map((q, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="shrink-0" style={{ color: "var(--accent)" }}>{String(i + 1).padStart(2, "0")}</span>
-                  <span style={{ color: "var(--ink)" }}>{q}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-        {/* bought steps */}
-        {bought.length > 0 && (
-          <div className="space-y-3 mb-4">
-            {bought.map((b, i) => (
-              <div key={i} className="row-in rounded border p-2.5" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-                <div className="flex items-start justify-between gap-3 mb-1.5">
-                  <div className="text-xs font-bold" style={{ color: "var(--ink)" }}>» {b.question}</div>
-                  <div className="shrink-0 text-[11px] text-right" style={{ color: "var(--ink-muted)" }}>
-                    <div>
-                      <span style={{ color: "var(--accent)" }}>{b.provider}</span> · {b.costHbar.toFixed(4)} ℏ
-                    </div>
-                    {b.hashscan && (
-                      <a href={b.hashscan} target="_blank" rel="noreferrer" className="underline decoration-dotted" style={{ color: "var(--ink-muted)" }}>
-                        payment ↗
-                      </a>
-                    )}
-                  </div>
+          {/* Live stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-24 w-full max-w-6xl">
+            {STAT_CARDS.map((s) => (
+              <div key={s.label}
+                className="bg-surface-container border border-outline-variant p-6 rounded-sm glow-accent hover:border-accent-cyan transition-colors text-left">
+                <div className="flex items-center gap-2 mb-2 text-on-surface-variant">
+                  <Icon name={s.icon} className="text-[18px]" />
+                  <span className="font-data text-[11px] font-bold tracking-[0.1em] uppercase">{s.label}</span>
                 </div>
-                <p className="text-xs whitespace-pre-wrap" style={{ color: "var(--ink-muted)" }}>{b.answer}</p>
+                <div className="font-data text-xl font-medium text-primary-fixed-dim">{s.value}</div>
               </div>
             ))}
           </div>
-        )}
+        </section>
 
-        {/* budget exhausted */}
-        {events.some((e) => e.type === "budget-exhausted") && (
-          <div className="row-in mb-4 rounded border px-3 py-2 text-xs" style={{ borderColor: "#f59e0b", color: "#f59e0b", background: "rgb(245 158 11 / 0.08)" }}>
-            budget exhausted — the agent stopped buying and is synthesizing with what it has.
+        {/* ── Proof marquee ── */}
+        <div className="w-full bg-surface-container-low py-4 border-y border-outline-variant overflow-hidden">
+          <div className="animate-marquee">
+            <MarqueeRow />
+            <MarqueeRow />
           </div>
-        )}
+        </div>
 
-        {/* synthesis */}
-        {synthesis && (
-          <div className="row-in mb-4 rounded border p-3" style={{ borderColor: "var(--accent)", background: "rgb(34 197 94 / 0.06)" }}>
-            <div className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "var(--accent)" }}>Synthesis</div>
-            <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--ink)" }}>{synthesis.answer}</p>
-          </div>
-        )}
-
-        {/* done summary */}
-        {done && (
-          <div className="row-in flex flex-wrap gap-4 text-xs border-t pt-3" style={{ borderColor: "var(--border)", color: "var(--ink-muted)" }}>
-            <span>✓ done</span>
-            <span>total spent <span style={{ color: "var(--ink)" }}>{done.spentHbar.toFixed(4)} ℏ</span></span>
-            <span>findings <span style={{ color: "var(--ink)" }}>{done.findings}</span></span>
-          </div>
-        )}
-
-        {/* errors */}
-        {errors.length > 0 && (
-          <div className="mt-3 space-y-1">
-            {errors.map((e, i) => (
-              <div key={i} className="text-xs" style={{ color: "var(--danger)" }}>⚠ {e.message}</div>
+        {/* ── Protocol Architecture ── */}
+        <section className="py-24 px-4 max-w-[1440px] mx-auto">
+          <h2 className="font-display text-2xl font-semibold text-center mb-16 text-on-surface uppercase tracking-widest">
+            Protocol Architecture
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {STEPS.map((step) => (
+              <div key={step.n} className="relative bg-surface-container border border-outline-variant p-8 group">
+                <span className="absolute top-4 right-6 font-data text-8xl text-outline-variant/30 select-none group-hover:text-accent-cyan/40 transition-colors">
+                  {step.n}
+                </span>
+                <div className="relative z-10">
+                  <div className={`w-12 h-12 ${step.iconBg} flex items-center justify-center rounded-sm mb-6`}>
+                    <Icon name={step.icon} className={step.iconColor} />
+                  </div>
+                  <h3 className="font-display text-2xl font-semibold mb-4 text-on-surface">{step.title}</h3>
+                  <ul className="space-y-4 font-body text-sm text-on-surface-variant">
+                    {step.items.map((item) => (
+                      <li key={item} className="flex items-start gap-3">
+                        <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             ))}
           </div>
-        )}
+        </section>
 
-        <div ref={streamEnd} />
-      </section>
+        {/* ── List your GPU ── */}
+        <section className="bg-surface-container-lowest border-y border-outline-variant py-24" id="list-gpu">
+          <div className="px-4 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+            <div className="flex flex-col h-full justify-center">
+              <h2 className="font-display font-extrabold text-[42px] leading-[48px] md:text-5xl tracking-[-0.04em] mb-6 text-on-surface">
+                Monetize Your Compute.
+              </h2>
+              <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
+                Turn your idle RTX or H100 into a high-yield asset. Join the decentralized backbone
+                of AI inference and earn HBAR for every request served.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 border border-outline-variant p-4 bg-surface-container">
+                  <div className="p-2 bg-surface-variant text-accent-cyan">
+                    <Icon name="memory" />
+                  </div>
+                  <div>
+                    <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Minimum Hardware</div>
+                    <div className="font-data text-sm text-on-surface-variant">Any box — Groq/Ollama backend, 8GB VRAM for local models</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 border border-outline-variant p-4 bg-surface-container">
+                  <div className="p-2 bg-surface-variant text-accent-cyan">
+                    <Icon name="verified_user" />
+                  </div>
+                  <div>
+                    <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Quality Bond</div>
+                    <div className="font-data text-sm text-on-surface-variant">50 ℏ stake — slashed if you serve a cheaper model than advertised</div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <a href="mailto:sahilmarketingid@gmail.com?subject=AgentRouter%20Provider%20Waitlist&body=I%20want%20to%20list%20my%20compute%20on%20AgentRouter.%0A%0AHardware%3A%20%0AModels%20I%20can%20serve%3A%20%0AHedera%20account%20(if%20any)%3A%20"
+                  className="bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
+                  Join the Provider Waitlist
+                </a>
+                <span className="font-data text-[11px] text-on-surface-variant">
+                  or start now — the terminal on the right is the whole onboarding
+                </span>
+              </div>
+            </div>
 
-      <footer className="mt-4 text-[10px]" style={{ color: "var(--ink-muted)" }}>
-        autonomous buyer agent · plans a goal into sub-questions, buys each answer from the exchange in HBAR via x402, then synthesizes · every payment is an on-chain Hedera tx · identity is an HCS-14 UAID
+            {/* Code terminal — the real onboarding */}
+            <div className="bg-surface-obsidian rounded-lg border border-outline/30 shadow-2xl overflow-hidden font-data text-sm">
+              <div className="bg-surface-container px-4 py-3 border-b border-outline-variant flex items-center justify-between">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-hud-error/40" />
+                  <div className="w-3 h-3 rounded-full bg-accent-orange/40" />
+                  <div className="w-3 h-3 rounded-full bg-accent-cyan/40" />
+                </div>
+                <span className="text-on-surface-variant text-[11px] uppercase tracking-widest">provision.sh — bash</span>
+              </div>
+              <div className="p-6 space-y-4 text-[13px]">
+                <div>
+                  <span className="text-accent-orange"># 1. Clone and install</span><br />
+                  <span className="text-on-surface">git clone {REPO.replace("https://", "")} &amp;&amp; pnpm install</span>
+                </div>
+                <div>
+                  <span className="text-accent-orange"># 2. Add your Hedera keys to .env</span><br />
+                  <span className="text-on-surface">HEDERA_PROVIDER1_ID=0.0.xxxxx · HEDERA_PROVIDER1_KEY=0x…</span>
+                </div>
+                <div>
+                  <span className="text-accent-orange"># 3. Make your box reachable</span><br />
+                  <span className="text-on-surface">PROVIDER_PUBLIC_URL=https://your-tunnel-or-vps</span>
+                </div>
+                <div>
+                  <span className="text-accent-orange"># 4. Start — stakes 50 ℏ + registers on HCS automatically</span><br />
+                  <span className="text-on-surface">pnpm provider1</span>
+                </div>
+                <div className="pt-4 mt-4 border-t border-outline-variant">
+                  <span className="text-accent-cyan font-bold italic">{"// unpaid request → the paywall answers"}</span><br />
+                  <span className="text-on-surface">curl -X POST localhost:4021/v1/chat/completions \</span><br />
+                  <span className="text-on-surface ml-4">-d {"'"}{"{"}&quot;model&quot;:&quot;llama-3.3-70b-versatile&quot;,…{"}"}{"'"}</span>
+                </div>
+                <div className="bg-hud-error/10 p-3 border-l-2 border-hud-error">
+                  <span className="text-hud-error font-bold">HTTP/1.1 402 Payment Required</span><br />
+                  <span className="text-on-surface-variant text-[12px]">scheme: exact · network: hedera:testnet</span><br />
+                  <span className="text-on-surface-variant text-[12px]">amount: 10000000 tinybars · payTo: 0.0.9744152</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="bg-surface-obsidian border-t border-outline-variant w-full py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 px-4 max-w-7xl mx-auto">
+          <div className="flex flex-col gap-4">
+            <span className="font-data text-primary-fixed-dim font-bold text-lg">AgentRouter</span>
+            <p className="font-body text-sm text-on-surface-variant">The decentralized economy for AI intelligence.</p>
+            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm w-fit">
+              <div className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
+              <span className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Hedera Testnet Active</span>
+            </div>
+          </div>
+          <div>
+            <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Protocol</h4>
+            <ul className="space-y-4 font-data text-[11px] font-bold tracking-[0.1em]">
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="/exchange">Exchange Terminal</a></li>
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="/agent-demo">Agent Demo</a></li>
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/topic/0.0.9744594" target="_blank" rel="noreferrer">Trade Log (HCS)</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Developers</h4>
+            <ul className="space-y-4 font-data text-[11px] font-bold tracking-[0.1em]">
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href={REPO} target="_blank" rel="noreferrer">GitHub Repo</a></li>
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href={`${REPO}/blob/main/GUIDE.md`} target="_blank" rel="noreferrer">Docs</a></li>
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href={`${REPO}/blob/main/PROOF.md`} target="_blank" rel="noreferrer">On-chain Proof</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">Network</h4>
+            <ul className="space-y-4 font-data text-[11px] font-bold tracking-[0.1em]">
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/topic/0.0.9744593" target="_blank" rel="noreferrer">Registry Topic</a></li>
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/topic/0.0.9744595" target="_blank" rel="noreferrer">Verdicts Topic</a></li>
+              <li><a className="text-on-surface-variant hover:text-accent-orange transition-colors" href="https://hashscan.io/testnet/account/0.0.9744157" target="_blank" rel="noreferrer">Stake Escrow</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-12 pt-8 border-t border-outline-variant/30 text-center">
+          <p className="font-data text-[11px] tracking-[0.1em] text-on-surface-variant opacity-50 uppercase">
+            © 2026 AgentRouter Protocol. Built on Hedera at ETHGlobal Lisbon. Secured by Hashgraph.
+          </p>
+        </div>
       </footer>
-    </main>
+    </div>
   );
 }

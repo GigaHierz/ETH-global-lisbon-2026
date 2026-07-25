@@ -18,6 +18,7 @@
     "agent-server:prod": "tsx agent/src/server.ts",
     "exchange:prod": "tsx exchange/src/index.ts",
     "provider:prod": "tsx provider/src/index.ts",
+    "verifier:prod": "tsx verifier/src/index.ts",
     "dashboard": "pnpm --filter @agentrouter/dashboard dev",
     "demo": "tsx --env-file=.env scripts/demo.ts",
     "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts",
