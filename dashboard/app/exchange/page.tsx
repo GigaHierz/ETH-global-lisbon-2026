@@ -152,8 +152,8 @@ export default function ExchangeControlRoom() {
             <span className="font-display text-2xl font-bold text-accent-cyan tracking-tighter">AgentRouter</span>
             <nav className="hidden lg:flex items-center gap-6 font-data text-sm">
               <a className="text-primary-fixed-dim border-b-2 border-accent-cyan pb-1" href="/exchange">Exchange</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/">Agent</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="#providers">Providers</a>
+              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/agent-demo">Agent</a>
+              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/#list-gpu">Providers</a>
               <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="#audit">Audit</a>
             </nav>
           </div>

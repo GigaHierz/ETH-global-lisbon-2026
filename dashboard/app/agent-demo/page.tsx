@@ -217,7 +217,7 @@ export default function AgentDemoControlRoom() {
             <nav className="hidden lg:flex items-center gap-6 font-data text-sm">
               <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange">Exchange</a>
               <a className="text-primary-fixed-dim border-b-2 border-accent-cyan pb-1" href="/agent-demo">Agent</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange#providers">Providers</a>
+              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/#list-gpu">Providers</a>
               <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange#audit">Audit</a>
             </nav>
           </div>
