@@ -21,7 +21,7 @@ test("throws when the completion has no content", () => {
 
 test("throws when the ask price is missing", () => {
   const bad = { choices: ok.choices, agentrouter: { provider: "X" } };
-  assert.throws(() => parseBuyResult(bad, "tx"), /pricePaidHbar/i);
+  assert.throws(() => parseBuyResult(bad, "tx"), /totalHbar/i);
 });
 
 test("defaults provider to 'unknown' when the exchange omits it", () => {
