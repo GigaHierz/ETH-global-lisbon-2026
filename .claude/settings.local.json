@@ -40,5 +40,8 @@
       "WebFetch(domain:claude.ai)",
       "Bash(git commit -q -m 'DevRel briefing doc: narrative, demo beats, real-vs-mocked, anticipated Q&A, glossary *)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }

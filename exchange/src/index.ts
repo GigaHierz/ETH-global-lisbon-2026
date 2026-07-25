@@ -3,6 +3,10 @@ import cors from "cors";
 import {
   log,
   MOCK_MODE,
+  MOCK_PAYMENT_HEADER,
+  HEDERA_NETWORK,
+  hbarPrice,
+  resolveFacilitator,
   hederaAccount,
   publishToTopic,
   topicLinks,
@@ -23,6 +27,11 @@ import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
 import { initPayer, paidPost } from "./payer.js";
 
 const PORT = parseInt(process.env.EXCHANGE_PORT || "4100", 10);
+// The flat x402 ask the agent pays the exchange per request. The exchange routes
+// to the cheapest live provider and keeps the spread (ask − provider cost); that
+// margin compresses when the verifier slashes a fraudulent low-baller out of routing.
+const EXCHANGE_ASK_HBAR = parseFloat(process.env.EXCHANGE_ASK_HBAR || "0.12");
+const exchangeWallet = MOCK_MODE ? "0.0.mock-exchange" : hederaAccount("EXCHANGE").id;
 
 await initPayer();
 startDiscovery();
@@ -82,6 +91,48 @@ app.post("/verify-report", (req, res) => {
   }
   res.json({ ok: true });
 });
+
+// ---- payment gate: the agent pays the exchange's flat ask via x402 (HBAR) ----
+if (MOCK_MODE) {
+  app.use("/v1/chat/completions", (req, res, next) => {
+    if (req.method !== "POST") return next();
+    const paid = parseFloat(req.header(MOCK_PAYMENT_HEADER) ?? "0");
+    if (paid >= EXCHANGE_ASK_HBAR) return next();
+    return res.status(402).json({
+      error: "Payment Required (mock)",
+      accepts: [{ scheme: "mock", price: `${EXCHANGE_ASK_HBAR} HBAR`, payTo: exchangeWallet }],
+    });
+  });
+  log("exchange", `MOCK paywall: require ${MOCK_PAYMENT_HEADER} >= ${EXCHANGE_ASK_HBAR} ℏ`);
+} else {
+  const { paymentMiddleware, x402ResourceServer } = await import("@x402/express");
+  const { ExactHederaScheme } = await import("@x402/hedera/exact/server");
+  const { HTTPFacilitatorClient } = await import("@x402/core/server");
+  const facilitatorUrl = await resolveFacilitator("exchange");
+  const server = new x402ResourceServer(
+    new HTTPFacilitatorClient({ url: facilitatorUrl }),
+  ).register("hedera:*", new ExactHederaScheme());
+  app.use(
+    paymentMiddleware(
+      {
+        "POST /v1/chat/completions": {
+          accepts: [
+            {
+              scheme: "exact",
+              price: hbarPrice(EXCHANGE_ASK_HBAR),
+              network: HEDERA_NETWORK,
+              payTo: exchangeWallet,
+            },
+          ],
+          description: "AgentRouter exchange — routed LLM inference (cheapest live provider)",
+          mimeType: "application/json",
+        },
+      },
+      server,
+    ),
+  );
+  log("exchange", `x402 paywall: ${EXCHANGE_ASK_HBAR} ℏ/req via ${facilitatorUrl} → ${exchangeWallet}`);
+}
 
 // ---- the router itself ----
 app.post("/v1/chat/completions", async (req, res) => {
@@ -150,9 +201,11 @@ app.post("/v1/chat/completions", async (req, res) => {
         provider: provider.displayName,
         providerWallet: provider.wallet,
         agentId: provider.agentId,
-        pricePaidHbar: provider.priceHbar,
+        pricePaidHbar: EXCHANGE_ASK_HBAR, // what the agent paid the exchange (x402 ask)
+        providerCostHbar: provider.priceHbar, // what the exchange paid the provider
+        marginHbar: Number((EXCHANGE_ASK_HBAR - provider.priceHbar).toFixed(8)),
         latencyMs,
-        paymentRef,
+        paymentRef, // exchange→provider settle tx
       },
     });
   } catch (err) {
