@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Navbar from "@/components/Navbar";
 
 // Backend URL priority: ?api=https://… query param → build-time env → Railway prod.
 // The query param survives tunnel churn without a rebuild.
@@ -210,37 +211,24 @@ export default function AgentDemoControlRoom() {
       <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
 
       {/* ── Top Navigation ── */}
-      <header className="fixed top-0 w-full z-50 bg-surface-obsidian/80 backdrop-blur-xl border-b border-outline-variant shadow-[0_0_40px_rgba(0,240,255,0.05)]">
-        <div className="flex justify-between items-center h-16 px-6 w-full max-w-[1440px] mx-auto">
-          <div className="flex items-center gap-8">
-            <span className="font-display text-2xl font-bold text-accent-cyan tracking-tighter">AgentRouter</span>
-            <nav className="hidden lg:flex items-center gap-6 font-data text-sm">
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange">Exchange</a>
-              <a className="text-primary-fixed-dim border-b-2 border-accent-cyan pb-1" href="/agent-demo">Agent</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/#list-gpu">Providers</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange#audit">Audit</a>
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden xl:flex items-center gap-4 px-4 py-1.5 border border-outline-variant bg-surface-container-low rounded">
-              {[
-                ["BALANCE", balance == null ? "—" : `${balance.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
-                ["SPENT", `${budget.spentHbar.toFixed(2)} ℏ`, "text-accent-orange"],
-                ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
-              ].map(([label, value, color], i) => (
-                <div key={label} className={`flex flex-col ${i > 0 ? "border-l border-outline-variant pl-4" : ""}`}>
-                  <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant">{label}</span>
-                  <span className={`font-data text-base font-medium ${color}`}>{value}</span>
-                </div>
-              ))}
+      <Navbar>
+        <div className="hidden xl:flex items-center gap-4 px-4 py-1.5 border border-outline-variant bg-surface-container-low rounded">
+          {[
+            ["BALANCE", balance == null ? "—" : `${balance.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
+            ["SPENT", `${budget.spentHbar.toFixed(2)} ℏ`, "text-accent-orange"],
+            ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
+          ].map(([label, value, color], i) => (
+            <div key={label} className={`flex flex-col ${i > 0 ? "border-l border-outline-variant pl-4" : ""}`}>
+              <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant">{label}</span>
+              <span className={`font-data text-base font-medium ${color}`}>{value}</span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant">
-              <span className={`w-2 h-2 rounded-full ${connDot} animate-pulse`} />
-              <span className="font-data text-[10px] text-on-surface-variant uppercase tracking-widest">{connLabel}</span>
-            </div>
-          </div>
+          ))}
         </div>
-      </header>
+        <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant">
+          <span className={`w-2 h-2 rounded-full ${connDot} animate-pulse`} />
+          <span className="font-data text-[10px] text-on-surface-variant uppercase tracking-widest">{connLabel}</span>
+        </div>
+      </Navbar>
 
       <main className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto space-y-6">
         {/* offline notice */}
