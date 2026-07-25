@@ -3,7 +3,7 @@
 // liveness + current price. PROVIDER_URLS env stays as seed/fallback (and the
 // only source in mock mode). Slashed providers stay slashed even if live.
 
-import { log, MOCK_MODE, DEFAULT_PROVIDER_URLS, readTopicMessages, type ProviderInfo } from "@agentrouter/shared";
+import { log, MOCK_MODE, DEFAULT_PROVIDER_URLS, BOND_AMOUNT, readTopicMessages, type ProviderInfo } from "@agentrouter/shared";
 import { providers, providerList, broadcast, mockLedger } from "./state.js";
 
 export const PROVIDER_URLS = (process.env.PROVIDER_URLS || DEFAULT_PROVIDER_URLS.join(","))
@@ -53,6 +53,8 @@ export async function refreshProviders(): Promise<void> {
           reputation: existing?.reputation ?? 100,
           stakeHbar: existing?.stakeHbar ?? hcsRegistrations.get(url)?.stakeHbar ?? INITIAL_STAKE_HBAR,
           requestsServed: existing?.requestsServed ?? 0,
+          bondTokens: existing?.bondTokens ?? BOND_AMOUNT,
+          bondStatus: existing?.bondStatus ?? "active",
         });
         if (MOCK_MODE && !mockLedger.has(info.wallet)) mockLedger.set(info.wallet, 0);
       } catch {
@@ -66,6 +68,7 @@ export async function refreshProviders(): Promise<void> {
             displayName: r.displayName ?? url, model: r.model ?? "?", priceHbar: r.priceHbar ?? 0,
             wallet: r.account ?? "?", agentId: r.agentId ?? null, url,
             status: "down", reputation: 100, stakeHbar: r.stakeHbar ?? 0, requestsServed: 0,
+            bondTokens: BOND_AMOUNT, bondStatus: "active",
           });
         }
       }

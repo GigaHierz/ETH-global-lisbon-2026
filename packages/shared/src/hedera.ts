@@ -22,7 +22,7 @@ export function hashscanTopic(id: string): string {
   return `https://hashscan.io/testnet/topic/${id}`;
 }
 
-export type HederaRole = "AGENT" | "EXCHANGE" | "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "PROVIDER" | "VERIFIER" | "ESCROW";
+export type HederaRole = "AGENT" | "EXCHANGE" | "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "PROVIDER" | "VERIFIER" | "ESCROW" | "AUDITOR";
 
 /* v8 ignore start -- reads env + process.exit; exercised only in real mode */
 export function hederaAccount(role: HederaRole): { id: string; key: string } {

@@ -33,11 +33,18 @@ export interface ProviderInfo {
   url: string;
 }
 
+// A provider's HTS ReputationBond standing (fungible ARBOND token balance).
+// "active" → holding its bond; "frozen" → verifier froze it on fraud (compliance
+// control); "wiped" → bond destroyed by the multi-sig scheduled wipe.
+export type BondStatus = "active" | "frozen" | "wiped";
+
 export interface ProviderRow extends ProviderInfo {
   status: "live" | "down" | "slashed";
   reputation: number; // running score, starts 100
   stakeHbar: number;
   requestsServed: number;
+  bondTokens: number; // HTS ReputationBond (ARBOND) balance — on-chain reputation
+  bondStatus: BondStatus;
 }
 
 export interface RequestLogEntry {
@@ -60,4 +67,14 @@ export type ExchangeEvent =
   | { type: "request"; entry: RequestLogEntry }
   | { type: "providers"; providers: ProviderRow[] }
   | { type: "slashed"; provider: string; amountHbar: number; reason: string }
-  | { type: "verify"; provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" };
+  | { type: "verify"; provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
+  | {
+      type: "bond";
+      provider: string; // displayName
+      wallet: string;
+      bondTokens: number;
+      bondStatus: BondStatus;
+      freezeTx?: string | null;
+      scheduleId?: string | null;
+      wipeTx?: string | null;
+    };

@@ -18,6 +18,8 @@ interface ProviderRow {
   displayName: string; model: string; priceHbar: number; wallet: string;
   agentId: string | null; url: string; status: "live" | "down" | "slashed";
   reputation: number; stakeHbar: number; requestsServed: number;
+  // HTS ReputationBond (ARBOND) — on-chain reputation; verifier freezes then wipes on fraud
+  bondTokens: number; bondStatus: "active" | "frozen" | "wiped";
 }
 interface RequestLogEntry {
   id: string; ts: number; model: string; provider: string; priceHbar: number;
@@ -68,6 +70,13 @@ export default function ExchangeControlRoom() {
         slashTimer.current = setTimeout(() => setSlash(null), 30000);
       }
       if (ev.type === "verify") setVerifies((v) => [ev, ...v].slice(0, 10));
+      if (ev.type === "bond") {
+        setProviders((ps) => ps.map((p) =>
+          p.wallet.toLowerCase() === String(ev.wallet).toLowerCase()
+            ? { ...p, bondTokens: ev.bondTokens, bondStatus: ev.bondStatus }
+            : p,
+        ));
+      }
     };
     return () => es.close();
   }, []);
@@ -249,6 +258,7 @@ export default function ExchangeControlRoom() {
                       <th className="px-6 py-3 font-bold text-right">Price</th>
                       <th className="px-6 py-3 font-bold text-right">Stake</th>
                       <th className="px-6 py-3 font-bold text-right">Rep</th>
+                      <th className="px-6 py-3 font-bold text-center">Bond</th>
                       <th className="px-6 py-3 font-bold text-center">Status</th>
                     </tr>
                   </thead>
@@ -276,6 +286,16 @@ export default function ExchangeControlRoom() {
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{p.priceHbar.toFixed(2)} ℏ</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error font-bold" : ""}`}>{p.stakeHbar.toFixed(0)} ℏ</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error" : "text-accent-cyan"}`}>{p.reputation}%</td>
+                        <td className="px-6 py-4 text-center whitespace-nowrap">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`font-bold ${p.bondStatus === "wiped" ? "text-hud-error line-through" : p.bondStatus === "frozen" ? "text-accent-orange" : "text-on-surface"}`}>
+                              {p.bondTokens} ARBOND
+                            </span>
+                            {p.bondStatus === "active" && <span className="px-2 py-0.5 bg-accent-cyan/10 text-primary-fixed-dim text-[9px] rounded-sm">BONDED</span>}
+                            {p.bondStatus === "frozen" && <span className="px-2 py-0.5 bg-accent-orange/20 text-accent-orange text-[9px] rounded-sm">🔒 FROZEN</span>}
+                            {p.bondStatus === "wiped" && <span className="px-2 py-0.5 bg-hud-error text-surface-obsidian font-bold text-[9px] rounded-sm">WIPED</span>}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-center">
                           {p.status === "live" && <span className="px-2 py-1 bg-accent-cyan/20 text-accent-cyan text-[10px] rounded-sm">LIVE</span>}
                           {p.status === "down" && <span className="px-2 py-1 bg-surface-variant text-on-surface-variant text-[10px] rounded-sm">DOWN</span>}
@@ -284,7 +304,7 @@ export default function ExchangeControlRoom() {
                       </tr>
                     ))}
                     {providers.length === 0 && (
-                      <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">scanning HCS registry…</td></tr>
+                      <tr><td colSpan={7} className="px-6 py-8 text-center text-on-surface-variant">scanning HCS registry…</td></tr>
                     )}
                   </tbody>
                 </table>

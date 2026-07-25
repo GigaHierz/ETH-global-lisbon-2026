@@ -15,6 +15,8 @@ function rows(): ProviderRow[] {
       reputation: 100,
       stakeHbar: 50,
       requestsServed: 3,
+      bondTokens: 100,
+      bondStatus: "active",
     },
   ];
 }
