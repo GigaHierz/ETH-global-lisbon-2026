@@ -95,7 +95,7 @@ async function main() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       }).then((r) => r.json());
-      console.log(`  next 70b request now routes to: ${again.agentrouter.provider} ($${again.agentrouter.pricePaidUsd}/req)`);
+      console.log(`  next 70b request now routes to: ${again.agentrouter.provider} ($${again.agentrouter.pricePaidHbar}/req)`);
       banner("DEMO COMPLETE — services stay up for dashboard exploration. Ctrl-C to stop.");
       return; // keep processes alive
     }

@@ -27,7 +27,7 @@ export interface ChatCompletionResponse {
 export interface ProviderInfo {
   displayName: string;
   model: string; // advertised model
-  priceUsd: number; // per request
+  priceHbar: number; // per request
   wallet: `0x${string}`;
   agentId: string | null; // ERC-8004 agentId (or mock)
   url: string;
@@ -36,7 +36,7 @@ export interface ProviderInfo {
 export interface ProviderRow extends ProviderInfo {
   status: "live" | "down" | "slashed";
   reputation: number; // running score, starts 100
-  stakeUsd: number;
+  stakeHbar: number;
   requestsServed: number;
 }
 
@@ -46,7 +46,7 @@ export interface RequestLogEntry {
   model: string;
   provider: string; // displayName
   providerUrl: string;
-  priceUsd: number;
+  priceHbar: number;
   latencyMs: number;
   paymentRef: string; // tx hash or mock ref
   promptPreview: string;
@@ -58,5 +58,5 @@ export interface RequestLogEntry {
 export type ExchangeEvent =
   | { type: "request"; entry: RequestLogEntry }
   | { type: "providers"; providers: ProviderRow[] }
-  | { type: "slashed"; provider: string; amountUsd: number; reason: string }
+  | { type: "slashed"; provider: string; amountHbar: number; reason: string }
   | { type: "verify"; provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" };

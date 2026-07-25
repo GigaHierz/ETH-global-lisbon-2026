@@ -34,7 +34,11 @@
       "Bash(pkill -f \"provider/src/index.ts\")",
       "Bash(pkill -f \"exchange/src/index.ts\")",
       "Bash(pkill -f \"verifier/src/index.ts\")",
-      "Bash(git commit -q -m 'slice 5: agent CLI \\(--spam\\), one-command pnpm demo orchestrator, README \\(quickstart, mermaid, not-in-MVP\\), .env.example *)"
+      "Bash(git commit -q -m 'slice 5: agent CLI \\(--spam\\), one-command pnpm demo orchestrator, README \\(quickstart, mermaid, not-in-MVP\\), .env.example *)",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "WebFetch(domain:claude.ai)",
+      "Bash(git commit -q -m 'DevRel briefing doc: narrative, demo beats, real-vs-mocked, anticipated Q&A, glossary *)"
     ]
   }
 }

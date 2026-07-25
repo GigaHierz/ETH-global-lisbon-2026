@@ -5,16 +5,7 @@
 // pays providers via x402 with its own wallet — exchange-as-taker model, the
 // agent settles with the exchange off-band in this MVP).
 
-import {
-  MOCK_MODE,
-  USDC_ADDRESS,
-  erc20Abi,
-  publicClient,
-  log,
-  requireEnv,
-} from "@agentrouter/shared";
-import { privateKeyToAccount } from "viem/accounts";
-import { formatUnits } from "viem";
+import { MOCK_MODE, hbarBalance, hederaAccount, log } from "@agentrouter/shared";
 
 const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
 const MODEL = process.env.AGENT_MODEL || "llama-3.3-70b-versatile";
@@ -30,14 +21,10 @@ const QUESTIONS = [
 const spamIdx = process.argv.indexOf("--spam");
 const spamN = spamIdx >= 0 ? parseInt(process.argv[spamIdx + 1] || "10", 10) : 0;
 
-let mockBalance = parseFloat(process.env.AGENT_MOCK_BALANCE_USD || "1.00");
+let mockBalance = parseFloat(process.env.AGENT_MOCK_BALANCE_HBAR || "10");
 
 async function realBalance(): Promise<string> {
-  const account = privateKeyToAccount(requireEnv("AGENT_PK") as `0x${string}`);
-  const bal = await publicClient().readContract({
-    address: USDC_ADDRESS, abi: erc20Abi, functionName: "balanceOf", args: [account.address],
-  });
-  return formatUnits(bal, 6);
+  return (await hbarBalance(hederaAccount("AGENT").id)).toFixed(4);
 }
 
 async function callOnce(prompt: string, i: number, total: number) {
@@ -53,17 +40,17 @@ async function callOnce(prompt: string, i: number, total: number) {
   }
   const data = await res.json();
   const m = data.agentrouter;
-  mockBalance -= m.pricePaidUsd;
-  const balanceStr = MOCK_MODE ? `$${mockBalance.toFixed(4)} (mock)` : `$${await realBalance()} USDC`;
+  mockBalance -= m.pricePaidHbar;
+  const balanceStr = MOCK_MODE ? `${mockBalance.toFixed(4)} ℏ (mock)` : `${await realBalance()} ℏ`;
   log("agent", `[${i}/${total}] "${prompt.slice(0, 40)}…"`);
-  log("agent", `    → ${m.provider} | paid $${m.pricePaidUsd} | ${Date.now() - t0}ms | balance ${balanceStr}`);
+  log("agent", `    → ${m.provider} | paid ${m.pricePaidHbar} ℏ | ${Date.now() - t0}ms | balance ${balanceStr}`);
   log("agent", `    ✦ ${data.choices[0].message.content.slice(0, 90)}`);
 }
 
 async function main() {
   log("agent", `AgentRouter demo agent → ${EXCHANGE} | model ${MODEL} | MOCK_MODE=${MOCK_MODE}`);
-  if (!MOCK_MODE) log("agent", `starting USDC balance: $${await realBalance()}`);
-  else log("agent", `starting mock balance: $${mockBalance.toFixed(4)}`);
+  if (!MOCK_MODE) log("agent", `starting HBAR balance: ${await realBalance()} ℏ`);
+  else log("agent", `starting mock balance: ${mockBalance.toFixed(4)} ℏ`);
 
   if (spamN > 0) {
     log("agent", `--spam ${spamN}: firing volume`);
@@ -76,7 +63,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 800));
     }
   }
-  log("agent", `done. total spent: $${(MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE_USD || "1.00") - mockBalance : 0).toFixed(4)}${MOCK_MODE ? " (mock)" : ""}`);
+  log("agent", `done. total spent: ${(MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE_HBAR || "10") - mockBalance : 0).toFixed(4)} ℏ${MOCK_MODE ? " (mock)" : ""}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

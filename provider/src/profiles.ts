@@ -7,8 +7,8 @@ export interface ProviderProfile {
   port: number;
   advertisedModel: string;
   actualModel: string; // what we really send to Groq
-  priceUsd: number;
-  pkEnv: string; // env var holding the private key
+  priceHbar: number;
+  hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3"; // HEDERA_<role>_ID/KEY in .env
   cannedCheat: boolean; // canned-mode: answer like a small model
 }
 
@@ -21,8 +21,8 @@ export const PROFILES: Record<string, ProviderProfile> = {
     port: 4021,
     advertisedModel: "llama-3.3-70b-versatile",
     actualModel: "llama-3.3-70b-versatile",
-    priceUsd: 0.002,
-    pkEnv: "PROVIDER1_PK",
+    priceHbar: 0.10, // 10,000,000 tinybars
+    hederaRole: "PROVIDER1",
     cannedCheat: false,
   },
   provider2: {
@@ -31,8 +31,8 @@ export const PROFILES: Record<string, ProviderProfile> = {
     port: 4022,
     advertisedModel: "llama-3.1-8b-instant",
     actualModel: "llama-3.1-8b-instant",
-    priceUsd: 0.001,
-    pkEnv: "PROVIDER2_PK",
+    priceHbar: 0.04,
+    hederaRole: "PROVIDER2",
     cannedCheat: false,
   },
   provider3: {
@@ -42,8 +42,8 @@ export const PROFILES: Record<string, ProviderProfile> = {
     advertisedModel: "llama-3.3-70b-versatile",
     // The scam: advertise 70b, serve 8b, undercut provider1 on price.
     actualModel: CHEAT ? "llama-3.1-8b-instant" : "llama-3.3-70b-versatile",
-    priceUsd: 0.0015,
-    pkEnv: "PROVIDER3_PK",
+    priceHbar: 0.08,
+    hederaRole: "PROVIDER3",
     cannedCheat: CHEAT,
   },
 };

@@ -2,24 +2,16 @@
 // same prompt (temperature 0) against BOTH the original provider and a witness
 // provider claiming the same model, compare answers, and slash on divergence.
 //
-// Real mode: pays both providers via x402 (VERIFIER_PK), slashes on Staking.sol,
-// files negative feedback in the ERC-8004 Reputation Registry.
+// Real mode: pays both providers via x402 HBAR (verifier Hedera account),
+// slash = escrow→treasury transfer + HCS verdict (playbook steps 3-4).
 // Mock mode: mock payment headers, slash via exchange /slash only.
 
-import fs from "node:fs";
-import path from "node:path";
-import { privateKeyToAccount } from "viem/accounts";
-import { parseEther } from "viem";
 import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
-  REPUTATION_REGISTRY,
-  reputationRegistryAbi,
-  stakingAbi,
-  publicClient,
-  walletClient,
+  HEDERA_NETWORK,
+  hederaAccount,
   log,
-  requireEnv,
   type ProviderRow,
   type ChatCompletionResponse,
 } from "@agentrouter/shared";
@@ -28,31 +20,34 @@ import { similarity } from "./similarity.js";
 const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
 const INTERVAL_MS = parseInt(process.env.VERIFY_INTERVAL_MS || "15000", 10);
 const THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || "0.35");
-const SLASH_USD = parseFloat(process.env.SLASH_USD || "25");
+const SLASH_HBAR = parseFloat(process.env.SLASH_HBAR || "25");
 
 const audited = new Set<string>(); // request ids already checked
 
-let payFetch: (url: string, init: RequestInit, priceUsd: number) => Promise<Response>;
+let payFetch: (url: string, init: RequestInit, priceHbar: number) => Promise<Response>;
 
 async function initPayFetch() {
   if (MOCK_MODE) {
-    payFetch = (url, init, priceUsd) =>
+    payFetch = (url, init, priceHbar) =>
       fetch(url, {
         ...init,
-        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(priceUsd) },
+        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(priceHbar) },
       });
     return;
   }
   const { x402Client, wrapFetchWithPayment } = await import("@x402/fetch");
-  const { ExactEvmScheme } = await import("@x402/evm/exact/client");
-  const account = privateKeyToAccount(requireEnv("VERIFIER_PK") as `0x${string}`);
+  const { ExactHederaScheme } = await import("@x402/hedera/exact/client");
+  const { createClientHederaSigner } = await import("@x402/hedera");
+  const { PrivateKey } = await import("@hiero-ledger/sdk");
+  const { id, key } = hederaAccount("VERIFIER");
+  const signer = createClientHederaSigner(id, PrivateKey.fromStringECDSA(key), { network: HEDERA_NETWORK });
   const client = new x402Client();
-  client.register("eip155:*", new ExactEvmScheme(account));
+  client.register("hedera:*", new ExactHederaScheme(signer));
   const wrapped = wrapFetchWithPayment(fetch, client);
   payFetch = (url, init) => wrapped(url, init as never);
 }
 
-async function ask(providerUrl: string, model: string, prompt: string, priceUsd: number): Promise<string> {
+async function ask(providerUrl: string, model: string, prompt: string, priceHbar: number): Promise<string> {
   const res = await payFetch(
     `${providerUrl}/v1/chat/completions`,
     {
@@ -64,7 +59,7 @@ async function ask(providerUrl: string, model: string, prompt: string, priceUsd:
         temperature: 0,
       }),
     },
-    priceUsd,
+    priceHbar,
   );
   if (!res.ok) throw new Error(`provider ${res.status}`);
   const data = (await res.json()) as ChatCompletionResponse;
@@ -72,56 +67,16 @@ async function ask(providerUrl: string, model: string, prompt: string, priceUsd:
 }
 
 async function slashOnChain(providerWallet: string): Promise<string | null> {
-  try {
-    const deployments = JSON.parse(
-      fs.readFileSync(path.join(process.cwd(), "deployments.json"), "utf8"),
-    );
-    const staking = deployments.baseSepolia?.staking;
-    if (!staking) {
-      log("verifier", "no Staking deployment in deployments.json — skipping on-chain slash");
-      return null;
-    }
-    const account = privateKeyToAccount(requireEnv("VERIFIER_PK") as `0x${string}`);
-    const wc = walletClient(account);
-    const hash = await wc.writeContract({
-      address: staking,
-      abi: stakingAbi,
-      functionName: "slash",
-      args: [providerWallet as `0x${string}`, parseEther("0.01")],
-    });
-    await publicClient().waitForTransactionReceipt({ hash });
-    log("verifier", `on-chain slash tx: ${hash}`);
-    return hash;
-  } catch (err) {
-    log("verifier", `on-chain slash failed: ${(err as Error).message.slice(0, 120)}`);
-    return null;
-  }
+  // TODO(step 4): escrow→treasury HBAR transfer signed by the verifier-held
+  // escrow key (HEDERA_ESCROW_KEY) + verdict message on the HCS verdicts topic.
+  log("verifier", `slash for ${providerWallet}: escrow transfer lands in step 4 (no-Solidity staking)`);
+  return null;
 }
 
 async function fileFeedback(agentId: string | null, providerUrl: string, negative: boolean) {
   if (MOCK_MODE || !agentId || agentId.startsWith("mock-")) return;
-  try {
-    const account = privateKeyToAccount(requireEnv("VERIFIER_PK") as `0x${string}`);
-    const wc = walletClient(account);
-    const hash = await wc.writeContract({
-      address: REPUTATION_REGISTRY,
-      abi: reputationRegistryAbi,
-      functionName: "giveFeedback",
-      args: [
-        BigInt(agentId),
-        negative ? -100n : 100n, // value
-        0, // decimals
-        negative ? "model-fraud" : "verified",
-        "agentrouter",
-        providerUrl,
-        "",
-        "0x0000000000000000000000000000000000000000000000000000000000000000",
-      ],
-    });
-    log("verifier", `ERC-8004 feedback filed (${negative ? "NEGATIVE" : "positive"}): ${hash}`);
-  } catch (err) {
-    log("verifier", `feedback failed: ${(err as Error).message.slice(0, 120)}`);
-  }
+  // TODO(step 3): publish an erc8004_compat feedback JSON to the HCS verdicts topic.
+  log("verifier", `feedback (${negative ? "NEGATIVE" : "positive"}) for ${agentId} → HCS verdict topic in step 3`);
 }
 
 async function auditOnce() {
@@ -153,8 +108,8 @@ async function auditOnce() {
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
     const [a, b] = await Promise.all([
-      ask(target.url, target.model, candidate.promptPreview, target.priceUsd),
-      ask(witness.url, witness.model, candidate.promptPreview, witness.priceUsd),
+      ask(target.url, target.model, candidate.promptPreview, target.priceHbar),
+      ask(witness.url, witness.model, candidate.promptPreview, witness.priceHbar),
     ]);
     const sim = similarity(a, b);
     const divergent = sim < THRESHOLD;
@@ -189,7 +144,7 @@ async function auditOnce() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         wallet: target.wallet,
-        amountUsd: SLASH_USD,
+        amountHbar: SLASH_HBAR,
         reason: `advertised ${target.model}, answers diverge from witness (${(sim * 100).toFixed(0)}% similarity)${tx ? ` · tx ${tx.slice(0, 10)}…` : ""}`,
       }),
     });
@@ -200,6 +155,6 @@ async function auditOnce() {
 }
 
 await initPayFetch();
-log("verifier", `watching ${EXCHANGE} — audit every ${INTERVAL_MS / 1000}s, similarity threshold ${THRESHOLD}, slash $${SLASH_USD} (MOCK_MODE=${MOCK_MODE})`);
+log("verifier", `watching ${EXCHANGE} — audit every ${INTERVAL_MS / 1000}s, similarity threshold ${THRESHOLD}, slash ${SLASH_HBAR} ℏ (MOCK_MODE=${MOCK_MODE})`);
 setInterval(auditOnce, INTERVAL_MS);
 auditOnce();

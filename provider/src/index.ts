@@ -2,10 +2,10 @@ import express from "express";
 import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
-  FACILITATOR_URL,
-  NETWORK_CAIP2,
+  HEDERA_NETWORK,
+  hbarPrice,
+  resolveFacilitator,
   log,
-  requireEnv,
   type ChatCompletionRequest,
 } from "@agentrouter/shared";
 import { resolveProfile } from "./profiles.js";
@@ -14,9 +14,8 @@ import { ensureRegistered } from "./registry.js";
 
 const profile = resolveProfile();
 const TAG = profile.key;
-const pk = requireEnv(profile.pkEnv) as `0x${string}`;
 
-const { wallet, agentId } = await ensureRegistered(profile, pk);
+const { wallet, agentId } = await ensureRegistered(profile);
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -26,7 +25,7 @@ app.get("/info", (_req, res) => {
   res.json({
     displayName: profile.displayName,
     model: profile.advertisedModel,
-    priceUsd: profile.priceUsd,
+    priceHbar: profile.priceHbar,
     wallet,
     agentId,
     url: `http://localhost:${profile.port}`,
@@ -40,20 +39,21 @@ if (MOCK_MODE) {
   // Simulated x402: require the mock payment header with amount >= price.
   app.use("/v1/chat/completions", (req, res, next) => {
     const paid = parseFloat(req.header(MOCK_PAYMENT_HEADER) ?? "0");
-    if (paid >= profile.priceUsd) return next();
+    if (paid >= profile.priceHbar) return next();
     res.status(402).json({
       error: "Payment Required (mock)",
-      accepts: [{ scheme: "mock", price: `$${profile.priceUsd}`, payTo: wallet }],
+      accepts: [{ scheme: "mock", price: `${profile.priceHbar} HBAR`, payTo: wallet }],
     });
   });
-  log(TAG, `MOCK_MODE: accepting ${MOCK_PAYMENT_HEADER} >= ${profile.priceUsd}`);
+  log(TAG, `MOCK_MODE: accepting ${MOCK_PAYMENT_HEADER} >= ${profile.priceHbar}`);
 } else {
   const { paymentMiddleware, x402ResourceServer } = await import("@x402/express");
-  const { ExactEvmScheme } = await import("@x402/evm/exact/server");
+  const { ExactHederaScheme } = await import("@x402/hedera/exact/server");
   const { HTTPFacilitatorClient } = await import("@x402/core/server");
+  const facilitatorUrl = await resolveFacilitator(TAG);
   const server = new x402ResourceServer(
-    new HTTPFacilitatorClient({ url: FACILITATOR_URL }),
-  ).register(NETWORK_CAIP2, new ExactEvmScheme());
+    new HTTPFacilitatorClient({ url: facilitatorUrl }),
+  ).register("hedera:*", new ExactHederaScheme());
   app.use(
     paymentMiddleware(
       {
@@ -61,8 +61,8 @@ if (MOCK_MODE) {
           accepts: [
             {
               scheme: "exact",
-              price: `$${profile.priceUsd}`,
-              network: NETWORK_CAIP2,
+              price: hbarPrice(profile.priceHbar),
+              network: HEDERA_NETWORK,
               payTo: wallet,
             },
           ],
@@ -73,7 +73,7 @@ if (MOCK_MODE) {
       server,
     ),
   );
-  log(TAG, `x402: $${profile.priceUsd}/req via ${FACILITATOR_URL} on ${NETWORK_CAIP2} → ${wallet}`);
+  log(TAG, `x402: ${profile.priceHbar} ℏ/req via ${facilitatorUrl} on ${HEDERA_NETWORK} → ${wallet}`);
 }
 
 // ---- the paid endpoint ----
@@ -98,7 +98,7 @@ app.post("/v1/chat/completions", async (req, res) => {
 app.listen(profile.port, () => {
   log(
     TAG,
-    `${profile.displayName} listening :${profile.port} | advertises ${profile.advertisedModel} @ $${profile.priceUsd}/req` +
+    `${profile.displayName} listening :${profile.port} | advertises ${profile.advertisedModel} @ ${profile.priceHbar} ℏ/req` +
       (profile.actualModel !== profile.advertisedModel ? ` | CHEAT_MODE: serving ${profile.actualModel}` : ""),
   );
 });

@@ -1,6 +1,6 @@
 export * from "./types.js";
 export * from "./canned.js";
-export * from "./chain.js";
+export * from "./hedera.js";
 
 export const MOCK_MODE = process.env.MOCK_MODE === "true";
 

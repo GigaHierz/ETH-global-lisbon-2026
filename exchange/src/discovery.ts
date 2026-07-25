@@ -25,7 +25,7 @@ export async function refreshProviders(): Promise<void> {
           url,
           status: existing?.status === "slashed" ? "slashed" : "live",
           reputation: existing?.reputation ?? 100,
-          stakeUsd: existing?.stakeUsd ?? INITIAL_STAKE_USD,
+          stakeHbar: existing?.stakeHbar ?? INITIAL_STAKE_USD,
           requestsServed: existing?.requestsServed ?? 0,
         });
         if (MOCK_MODE && !mockLedger.has(info.wallet)) mockLedger.set(info.wallet, 0);
@@ -42,7 +42,7 @@ export async function refreshProviders(): Promise<void> {
 export function startDiscovery() {
   refreshProviders().then(() => {
     const live = providerList().filter((p) => p.status === "live");
-    log("exchange", `discovered ${live.length}/${PROVIDER_URLS.length} providers: ${live.map((p) => `${p.displayName} (${p.model} @ $${p.priceUsd})`).join(", ")}`);
+    log("exchange", `discovered ${live.length}/${PROVIDER_URLS.length} providers: ${live.map((p) => `${p.displayName} (${p.model} @ $${p.priceHbar})`).join(", ")}`);
   });
   setInterval(refreshProviders, 5000);
 }
@@ -51,5 +51,5 @@ export function startDiscovery() {
 export function pickProvider(model: string) {
   return providerList()
     .filter((p) => p.status === "live" && p.model === model)
-    .sort((a, b) => a.priceUsd - b.priceUsd)[0];
+    .sort((a, b) => a.priceHbar - b.priceHbar)[0];
 }

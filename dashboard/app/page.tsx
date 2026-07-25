@@ -9,16 +9,16 @@ const EXCHANGE = process.env.NEXT_PUBLIC_EXCHANGE_URL || "http://localhost:4100"
 
 // ---- types mirrored from @agentrouter/shared (kept local: dashboard is standalone) ----
 interface ProviderRow {
-  displayName: string; model: string; priceUsd: number; wallet: string;
+  displayName: string; model: string; priceHbar: number; wallet: string;
   agentId: string | null; url: string; status: "live" | "down" | "slashed";
-  reputation: number; stakeUsd: number; requestsServed: number;
+  reputation: number; stakeHbar: number; requestsServed: number;
 }
 interface RequestLogEntry {
-  id: string; ts: number; model: string; provider: string; priceUsd: number;
+  id: string; ts: number; model: string; provider: string; priceHbar: number;
   latencyMs: number; paymentRef: string; promptPreview: string; answerPreview: string;
   status: "ok" | "error";
 }
-interface SlashEvent { provider: string; amountUsd: number; reason: string }
+interface SlashEvent { provider: string; amountHbar: number; reason: string }
 interface VerifyEvent { provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
 
 const SERIES: Record<string, string> = {
@@ -33,7 +33,7 @@ const SERIES_HEX: Record<string, string> = {
 export default function Home() {
   const [providers, setProviders] = useState<ProviderRow[]>([]);
   const [feed, setFeed] = useState<RequestLogEntry[]>([]);
-  const [prices, setPrices] = useState<Array<{ ts: number; model: string; priceUsd: number }>>([]);
+  const [prices, setPrices] = useState<Array<{ ts: number; model: string; priceHbar: number }>>([]);
   const [slash, setSlash] = useState<SlashEvent | null>(null);
   const [verifies, setVerifies] = useState<VerifyEvent[]>([]);
   const [connected, setConnected] = useState(false);
@@ -52,10 +52,10 @@ export default function Home() {
       if (ev.type === "providers") setProviders(ev.providers);
       if (ev.type === "request") {
         setFeed((f) => [ev.entry, ...f].slice(0, 60));
-        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, priceUsd: ev.entry.priceUsd }]);
+        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, priceHbar: ev.entry.priceHbar }]);
       }
       if (ev.type === "slashed") {
-        setSlash({ provider: ev.provider, amountUsd: ev.amountUsd, reason: ev.reason });
+        setSlash({ provider: ev.provider, amountHbar: ev.amountHbar, reason: ev.reason });
         if (slashTimer.current) clearTimeout(slashTimer.current);
         slashTimer.current = setTimeout(() => setSlash(null), 30000);
       }
@@ -71,7 +71,7 @@ export default function Home() {
       const b = Math.floor(p.ts / 5000) * 5000;
       const row = buckets.get(b) ?? {};
       const cell = row[p.model] ?? { sum: 0, n: 0 };
-      cell.sum += p.priceUsd; cell.n += 1;
+      cell.sum += p.priceHbar; cell.n += 1;
       row[p.model] = cell; buckets.set(b, row);
     }
     return [...buckets.entries()]
@@ -87,7 +87,7 @@ export default function Home() {
   }, [prices]);
 
   const models = useMemo(() => [...new Set(prices.map((p) => p.model))], [prices]);
-  const totalVolume = feed.filter((f) => f.status === "ok").reduce((s, f) => s + f.priceUsd, 0);
+  const totalVolume = feed.filter((f) => f.status === "ok").reduce((s, f) => s + f.priceHbar, 0);
 
   return (
     <main className="min-h-screen p-4 max-w-[1400px] mx-auto">
@@ -110,7 +110,7 @@ export default function Home() {
       {slash && (
         <div role="alert" className="slash-banner w-full mb-4 rounded px-4 py-3 text-white font-bold flex items-center gap-3 text-sm">
           <span className="text-lg" aria-hidden>⚡</span>
-          <span>SLASHED — {slash.provider} lost ${slash.amountUsd.toFixed(2)} stake · {slash.reason} · removed from routing</span>
+          <span>SLASHED — {slash.provider} lost ${slash.amountHbar.toFixed(2)} stake · {slash.reason} · removed from routing</span>
         </div>
       )}
 
@@ -142,8 +142,8 @@ export default function Home() {
                     {p.displayName}
                   </td>
                   <td className="py-1.5 pr-2" style={{ color: "var(--ink-muted)" }}>{p.model}</td>
-                  <td className="py-1.5 pr-2 text-right">${p.priceUsd.toFixed(4)}</td>
-                  <td className="py-1.5 pr-2 text-right">${p.stakeUsd.toFixed(2)}</td>
+                  <td className="py-1.5 pr-2 text-right">${p.priceHbar.toFixed(4)}</td>
+                  <td className="py-1.5 pr-2 text-right">${p.stakeHbar.toFixed(2)}</td>
                   <td className="py-1.5 pr-2 text-right">{p.reputation}</td>
                   <td className="py-1.5 pr-2 text-right">{p.requestsServed}</td>
                   <td className="py-1.5">
@@ -213,7 +213,7 @@ export default function Home() {
                     {r.provider}
                   </span>
                   <span className="shrink-0" style={{ color: "var(--ink-muted)" }}>
-                    ${r.priceUsd.toFixed(4)} · {r.latencyMs}ms
+                    ${r.priceHbar.toFixed(4)} · {r.latencyMs}ms
                   </span>
                 </div>
                 <div className="truncate" style={{ color: "var(--ink-muted)" }}>» {r.promptPreview}</div>

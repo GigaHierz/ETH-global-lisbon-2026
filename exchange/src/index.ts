@@ -52,15 +52,15 @@ app.get("/events", (req, res) => {
 
 // Verifier calls this to take a provider out of rotation after a slash.
 app.post("/slash", (req, res) => {
-  const { wallet, amountUsd, reason } = req.body as { wallet: string; amountUsd: number; reason: string };
+  const { wallet, amountHbar, reason } = req.body as { wallet: string; amountHbar: number; reason: string };
   const row = providerList().find((p) => p.wallet.toLowerCase() === wallet?.toLowerCase());
   if (!row) return res.status(404).json({ error: "unknown provider wallet" });
   row.status = "slashed";
   row.reputation = 0;
-  row.stakeUsd = Math.max(0, row.stakeUsd - amountUsd);
+  row.stakeHbar = Math.max(0, row.stakeHbar - amountHbar);
   providers.set(row.url, row);
-  log("exchange", `💀 SLASHED ${row.displayName}: -$${amountUsd} stake. Reason: ${reason}`);
-  broadcast({ type: "slashed", provider: row.displayName, amountUsd, reason });
+  log("exchange", `💀 SLASHED ${row.displayName}: -$${amountHbar} stake. Reason: ${reason}`);
+  broadcast({ type: "slashed", provider: row.displayName, amountHbar, reason });
   broadcast({ type: "providers", providers: providerList() });
   res.json({ ok: true });
 });
@@ -94,7 +94,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     const { res: upstream, paymentRef } = await paidPost(
       `${provider.url}/v1/chat/completions`,
       body,
-      provider.priceUsd,
+      provider.priceHbar,
       provider.wallet,
     );
     const latencyMs = Date.now() - t0;
@@ -113,7 +113,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       model: body.model,
       provider: provider.displayName,
       providerUrl: provider.url,
-      priceUsd: provider.priceUsd,
+      priceHbar: provider.priceHbar,
       latencyMs,
       paymentRef,
       promptPreview: body.messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, 80) ?? "",
@@ -124,7 +124,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     broadcast({ type: "providers", providers: providerList() });
     log(
       "exchange",
-      `routed → ${provider.displayName} ($${provider.priceUsd}, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
+      `routed → ${provider.displayName} ($${provider.priceHbar}, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
     );
 
     res.json({
@@ -133,7 +133,7 @@ app.post("/v1/chat/completions", async (req, res) => {
         provider: provider.displayName,
         providerWallet: provider.wallet,
         agentId: provider.agentId,
-        pricePaidUsd: provider.priceUsd,
+        pricePaidHbar: provider.priceHbar,
         latencyMs,
         paymentRef,
       },
@@ -146,7 +146,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       model: body.model,
       provider: provider.displayName,
       providerUrl: provider.url,
-      priceUsd: provider.priceUsd,
+      priceHbar: provider.priceHbar,
       latencyMs: Date.now() - t0,
       paymentRef: "-",
       promptPreview: body.messages.at(-1)?.content.slice(0, 80) ?? "",
