@@ -1,13 +1,13 @@
 # TESTING.md — shared test URLs
 
-*Live as of 2026-07-25 (Lisbon). Quick tunnels — see the warning at the bottom.*
+*Live as of 2026-07-25 (Lisbon). Now on durable hosting: dashboard on Vercel, exchange on Railway — the tunnel-lifetime warnings below only apply to optional laptop-local tunnels.*
 
 ## The URLs
 
 | What | URL |
 |---|---|
-| **Dashboard** (the terminal UI) | https://empirical-holds-struct-utc.trycloudflare.com |
-| **Exchange API** (buy inference) | https://provides-jeffrey-bidder-variations.trycloudflare.com |
+| **Dashboard** (the terminal UI) | https://eth-global-lisbon-2026-dashboard.vercel.app |
+| **Exchange API** (buy inference) | https://agent-router-exchange-production.up.railway.app |
 
 Everything behind these is running in **real mode**: HBAR settlements on Hedera Testnet, HCS audit trail, live escrow staking. Topic links + tx receipts: [PROOF.md](PROOF.md).
 
@@ -16,13 +16,13 @@ Everything behind these is running in **real mode**: HBAR settlements on Hedera 
 See the routing table:
 
 ```bash
-curl -s https://provides-jeffrey-bidder-variations.trycloudflare.com/providers | jq
+curl -s https://agent-router-exchange-production.up.railway.app/providers | jq
 ```
 
 Buy an inference call (the exchange pays the provider via x402 — you're the demo agent):
 
 ```bash
-curl -s -X POST https://provides-jeffrey-bidder-variations.trycloudflare.com/v1/chat/completions \
+curl -s -X POST https://agent-router-exchange-production.up.railway.app/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"What is x402? One sentence."}]}' | jq .agentrouter
 ```
