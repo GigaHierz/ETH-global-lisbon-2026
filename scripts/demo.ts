@@ -63,27 +63,27 @@ async function main() {
 
   // 1. providers
   banner("1/5 · booting 3 providers (provider3 is CHEATING: advertises 70b, serves 8b)");
-  boot("provider1", ["provider/src/index.ts", "--profile", "provider1"]);
-  boot("provider2", ["provider/src/index.ts", "--profile", "provider2"]);
-  boot("provider3", ["provider/src/index.ts", "--profile", "provider3"], { CHEAT_MODE: "true" });
+  boot("provider1", ["packages/provider/src/index.ts", "--profile", "provider1"]);
+  boot("provider2", ["packages/provider/src/index.ts", "--profile", "provider2"]);
+  boot("provider3", ["packages/provider/src/index.ts", "--profile", "provider3"], { CHEAT_MODE: "true" });
   await Promise.all([4021, 4022, 4023].map((p) => waitFor(`http://localhost:${p}/healthz`)));
 
   // 2. exchange
   banner("2/5 · booting exchange (routes to cheapest provider per model)");
-  boot("exchange", ["exchange/src/index.ts"]);
+  boot("exchange", ["packages/exchange/src/index.ts"]);
   await waitFor("http://localhost:4100/healthz");
   await new Promise((r) => setTimeout(r, 1500)); // let discovery run
 
   // 3. verifier
   banner("3/5 · booting verifier (samples requests, replays vs witness, slashes)");
-  boot("verifier", ["verifier/src/index.ts"], { VERIFY_INTERVAL_MS: "10000" });
+  boot("verifier", ["packages/verifier/src/index.ts"], { VERIFY_INTERVAL_MS: "10000" });
 
   console.log("\n  📊 dashboard: run `pnpm dashboard` in another terminal → http://localhost:3000\n");
 
   // 4. agent buys inference
   banner("4/5 · agent buys 5 inference calls through the exchange");
   await new Promise((r) => setTimeout(r, 1000));
-  const agent = boot("agent", ["agent/src/index.ts"]);
+  const agent = boot("agent", ["packages/agent/src/index.ts"]);
   await new Promise((res) => agent.on("exit", res));
 
   // 5. wait for the sting

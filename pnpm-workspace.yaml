@@ -1,10 +1,5 @@
 packages:
-  - shared
-  - provider
-  - exchange
-  - verifier
-  - agent
-  - dashboard
+  - packages/*
 allowBuilds:
   esbuild: true
   protobufjs: true
