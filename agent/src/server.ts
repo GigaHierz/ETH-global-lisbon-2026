@@ -13,12 +13,14 @@ import { initAgentPayer } from "./payer.js";
 import { registerIdentity, type Identity } from "./identity.js";
 import { runGoal, type AgentEvent } from "./loop.js";
 
-const PORT = parseInt(process.env.AGENT_PORT || "4200", 10);
+// Hosts (Railway/Render/Fly) inject PORT; fall back to AGENT_PORT locally.
+const PORT = parseInt(process.env.PORT || process.env.AGENT_PORT || "4200", 10);
 const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
 const MODEL = process.env.AGENT_MODEL || "llama-3.3-70b-versatile";
 const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || "0.12");
 const BUDGET_HBAR = parseFloat(process.env.AGENT_BUDGET_HBAR || "2");
-const ENDPOINT = `http://localhost:${PORT}`;
+// Public URL advertised in the HCS-14 registration (set to the host's URL in prod).
+const ENDPOINT = process.env.AGENT_PUBLIC_URL || `http://localhost:${PORT}`;
 
 // ---- boot: identity + payer + starting balance ----
 await initAgentPayer();
