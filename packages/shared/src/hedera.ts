@@ -87,3 +87,24 @@ export async function hbarBalance(accountId: string): Promise<number> {
   }
 }
 /* v8 ignore stop */
+
+// ── exchange fee math: integer tinybars only, no float money ────────────
+// feeTinybar = ceil(priceTinybar * feeBps / 10000). Rounding is always UP so
+// the exchange never underquotes. Floats appear only at the display edge.
+export const EXCHANGE_FEE_BPS = parseInt(process.env.EXCHANGE_FEE_BPS || "1000", 10); // 10%
+
+export function tinybarsOf(hbar: number): number {
+  return Math.round(hbar * TINYBAR);
+}
+
+export function feeForPrice(priceTinybar: number, feeBps: number = EXCHANGE_FEE_BPS): number {
+  return Math.ceil((priceTinybar * feeBps) / 10_000);
+}
+
+export function totalForPrice(priceTinybar: number, feeBps: number = EXCHANGE_FEE_BPS): number {
+  return priceTinybar + feeForPrice(priceTinybar, feeBps);
+}
+
+export function hbarOf(tinybar: number): number {
+  return tinybar / TINYBAR;
+}
