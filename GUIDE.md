@@ -56,7 +56,7 @@ flowchart LR
 | `EXCHANGE_URL` | `http://localhost:4100` | agent, verifier, dashboard |
 | `AGENT_MODEL` / `AGENT_MOCK_BALANCE_HBAR` | 70b / `10` | agent |
 | `PROVIDER_BACKEND` / `OLLAMA_BASE_URL` | `groq` | optional Ollama supply (post-step-3) |
-| `HCS_REGISTRY_TOPIC` / `HCS_TRADES_TOPIC` / `HCS_VERDICTS_TOPIC` | deployments.json | HCS audit trail (step 3) |
+| `HCS_REGISTRY_TOPIC` / `HCS_TRADES_TOPIC` / `HCS_VERDICTS_TOPIC` | deployments.json | HCS audit trail (live) |
 
 ## Demo script
 
@@ -91,4 +91,4 @@ Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` 
 
 ## Proof
 
-All on-chain evidence: [PROOF.md](PROOF.md) — two settled x402 transactions with exact-amount deltas, all account links, HCS topics (after step 3).
+All on-chain evidence: [PROOF.md](PROOF.md) — two settled x402 transactions with exact-amount deltas, all account links, live HCS topics, staking + slash txs.

@@ -15,17 +15,21 @@ export const PROVIDER_URLS = (process.env.PROVIDER_URLS || DEFAULT_URLS.join(","
 const INITIAL_STAKE_HBAR = 50; // display fallback; real entries carry stakeHbar from HCS
 
 // endpoint → registration payload from the HCS registry topic
-const hcsRegistrations = new Map<string, { stakeHbar?: number; agentId?: string }>();
+interface HcsReg { stakeHbar?: number; agentId?: string; displayName?: string; model?: string; priceHbar?: number; account?: string }
+const hcsRegistrations = new Map<string, HcsReg>();
 
 async function refreshHcsRegistry(): Promise<void> {
   if (MOCK_MODE) return;
   try {
     const msgs = await readTopicMessages("registry", 50);
     for (const m of msgs) {
-      const p = m.payload as { type?: string; endpoint?: string; stakeHbar?: number; agentId?: string } | null;
+      const p = m.payload as ({ type?: string; endpoint?: string } & HcsReg) | null;
       if (p?.type === "registration" && p.endpoint) {
         if (!hcsRegistrations.has(p.endpoint)) log("exchange", `HCS registry: discovered ${p.agentId} @ ${p.endpoint}`);
-        hcsRegistrations.set(p.endpoint, { stakeHbar: p.stakeHbar, agentId: p.agentId });
+        hcsRegistrations.set(p.endpoint, {
+          stakeHbar: p.stakeHbar, agentId: p.agentId, displayName: p.displayName,
+          model: p.model, priceHbar: p.priceHbar, account: p.account,
+        });
       }
     }
   } catch (e) {
@@ -54,6 +58,15 @@ export async function refreshProviders(): Promise<void> {
       } catch {
         if (existing && existing.status !== "slashed") {
           providers.set(url, { ...existing, status: "down" });
+        } else if (!existing && hcsRegistrations.has(url)) {
+          // Registered on HCS but unreachable from here (wrong/localhost endpoint,
+          // box offline, no tunnel). Show it as down instead of hiding it.
+          const r = hcsRegistrations.get(url)!;
+          providers.set(url, {
+            displayName: r.displayName ?? url, model: r.model ?? "?", priceHbar: r.priceHbar ?? 0,
+            wallet: r.account ?? "?", agentId: r.agentId ?? null, url,
+            status: "down", reputation: 100, stakeHbar: r.stakeHbar ?? 0, requestsServed: 0,
+          });
         }
       }
     }),

@@ -36,7 +36,7 @@ Single-page Next.js client component, dark terminal aesthetic. Connects to `EXCH
 | Price index chart (per-model avg, recharts) | `request` events bucketed client-side |
 | SLASHED banner | `slashed` event (full-width, flashing) |
 | Verifier panel | `verify` events |
-| **Audit trail (step 3)** | **Mirror Node REST directly**: `GET https://testnet.mirrornode.hedera.com/api/v1/topics/{topicId}/messages?order=desc&limit=25`, decode `message` from base64, JSON.parse; poll every 5s (mirror lag 1-5s); header links the topic on Hashscan |
+| **Audit trail (live)** | **Mirror Node REST directly**: `GET https://testnet.mirrornode.hedera.com/api/v1/topics/{topicId}/messages?order=desc&limit=25`, decode `message` from base64, JSON.parse; poll every 5s (mirror lag 1-5s); header links the topic on Hashscan |
 
 ## Dev loop for UI changes
 

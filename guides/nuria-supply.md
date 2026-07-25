@@ -28,7 +28,17 @@ curl -s localhost:4021/info # sanity: name, model, priceHbar, wallet
 
 All three proxy Groq (set `GROQ_API_KEY`, free at console.groq.com/keys) or fall back to canned deterministic answers with no key — the demo works either way.
 
-## What fires on boot (real mode, after step 3 lands)
+## Running on a remote box (VPS / your laptop ≠ Sahil's laptop) — REQUIRED reading
+
+The endpoint you **register is the endpoint the exchange calls**. On a remote box you MUST:
+
+1. Make your provider publicly reachable — easiest: `cloudflared tunnel --url http://localhost:4024` (prints a `https://….trycloudflare.com` URL), or an open port on your VPS.
+2. Set `PROVIDER_PUBLIC_URL=https://your-tunnel-or-vps-url` in your `.env`.
+3. `rm -f .registry-cache.json` (forces re-registration with the new endpoint) and restart the provider. The exchange re-discovers you within ~10s.
+
+Without `PROVIDER_PUBLIC_URL`, you register `http://localhost:PORT` — the exchange shows you as **○ down** (it's probing its own localhost) and you never receive traffic. This is exactly what happened to NimbusAI's first registration.
+
+## What fires on boot (real mode — live, see PROOF.md for the actual txs)
 
 1. **HCS registration:** the provider publishes a registration JSON (HCS-14 agent id, model, price, endpoint, `hcs14` profile block) to the registry topic. The exchange discovers it from the Mirror Node within ~1-5s.
 2. **Staking:** a one-time 50 ℏ transfer (`STAKE_HBAR` env to change) from the provider account to the escrow account `0.0.9744157`. Cached locally so reboots don't re-stake.
@@ -46,7 +56,7 @@ Prices come from the profile at boot. To demo the reroute: stop provider2, drop 
 
 ## Optional: Ollama backend (real self-hosted supply)
 
-`PROVIDER_BACKEND=ollama` + `OLLAMA_BASE_URL=http://localhost:11434` switches a provider from Groq to a local Ollama (`ollama pull llama3.2:3b` first). If Ollama is unreachable the provider falls back to canned responses rather than dying — a missing backend never blocks the demo. (Wiring behind this flag is the post-step-3 slice; ping Sahil for status.)
+`PROVIDER_BACKEND=ollama` + `OLLAMA_BASE_URL=http://localhost:11434` switches a provider from Groq to a local Ollama (`ollama pull llama3.2:3b` first). If Ollama is unreachable the provider falls back to canned responses rather than dying — a missing backend never blocks the demo. (**Not built yet** — this flag is the one pending item on the supply side; ping Sahil for status.)
 
 ## Health & troubleshooting
 
