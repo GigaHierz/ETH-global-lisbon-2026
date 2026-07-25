@@ -2,7 +2,7 @@
 // Real mode, on boot (idempotent via .registry-cache.json):
 //   1. stake STAKE_HBAR (default 50 ℏ) → the verifier-held escrow account
 //   2. publish an HCS-14-style registration JSON to the HCS registry topic
-//      (universal agent id + erc8004_compat block)
+//      (HCS-14 universal agent id + hcs14 profile block)
 // Mock mode: fabricated identity, no network.
 
 import fs from "node:fs";
@@ -90,9 +90,9 @@ export async function ensureRegistered(
         endpoint: `http://localhost:${profile.port}`,
         stakeHbar: STAKE_HBAR,
         stakeTx: entry.staked ?? null,
-        erc8004_compat: {
-          agentURI: `data:application/json,{"name":"${profile.displayName}","model":"${profile.advertisedModel}"}`,
-          registrations: [{ agentId, agentAddress: id }],
+        hcs14: {
+          uaid: agentId,
+          profile: `data:application/json,{"name":"${profile.displayName}","model":"${profile.advertisedModel}"}`,
         },
       });
       log(profile.key, `registered on HCS registry topic: ${hashscanTx(entry.registered)}`);

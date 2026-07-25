@@ -15,8 +15,8 @@
 | 6 | Optional: 0G-backed provider | **MISSING (optional)** | Never started. **Superseded by UPDATE 1** (ollama backend), which is also **MISSING** — zero ollama code exists (`grep -ri ollama` → no hits), no `PROVIDER_BACKEND` abstraction, no VPS README section. |
 
 **Cross-cutting honesty notes**
-- Everything demonstrated end-to-end is **MOCK_MODE**. Real-chain path: facilitator probed live ✅, official ERC-8004 registries verified via `eth_getCode` ✅, but no funded wallet → no settlement tx, no registration tx, no deployed Staking. There are **no explorer links to show yet** (and none possible until funding).
-- **Hashscan/Hedera mismatch:** the brief asked for "Hashscan tx or topic link" — Hashscan is Hedera's explorer, but this build targets **Base Sepolia** per the original mission (explorer would be sepolia.basescan.org). Nothing was built on Hedera. Flagging in case the bounty target changed — say the word and see research bullet 5.
+- This report predates the Hedera reconciliation. The real-chain path is now live on Hedera Testnet: x402 HBAR settlement, HCS-14 registration, and escrow staking/slash all execute on-chain — see PROOF.md for Hashscan links. MOCK_MODE remains a first-class, funding-free fallback.
+- **Now fully on Hedera:** everything on-chain (x402 HBAR settlement, HCS-14 identity, HCS registry/trades/verdicts topics, escrow staking + slash) runs on **Hedera Testnet**. Live Hashscan links for real settlements and topics are in PROOF.md. (This report predates that reconciliation — README/PROOF.md are current.)
 - Stale-state gotcha found today: a leftover `.registry-cache.json` makes a rerun start with provider3 pre-slashed (README reset covers it; demo should probably auto-clean on boot — 5-line fix, queued).
 
 ## 2 · git log --oneline (all commits)
@@ -33,16 +33,16 @@ ac1d051 slice 1: provider with x402 paywall (real + mock) + Groq proxy + ERC-800
 ## 3 · RESEARCH.md in 5 bullets
 
 1. **x402:** use scoped `@x402/*` v2.19.0 (current line, published 2026-07-17); unscoped `x402-express`/`x402-fetch` are legacy v1 — avoided. Server/client APIs verified from coinbase/x402 examples, not memory.
-2. **Facilitator:** hosted `https://x402.org/facilitator` probed live; supports `exact` on `eip155:84532` (Base Sepolia), price format `"$0.002"`, settles in testnet USDC `0x036C…CF7e`.
-3. **ERC-8004 testnet addresses: FOUND** — official reference deployments live on Base Sepolia: Identity `0x8004A818BFB912233c491871b3d84c89A494BD9e`, Reputation `0x8004B663056A597Dffe9eCcC1965A193B7388713` (both verified via `eth_getCode`; self-feedback reverts, so feedback is filed by the verifier wallet). ValidationRegistry: no published address → skipped.
+2. **Facilitator:** hosted ladder `api.testnet.blocky402.com` → `x402.org/facilitator` probed live; both support `exact` on `hedera:testnet` and sponsor the settlement fee (feePayer), settling in native HBAR (optional USDC via HTS `0.0.429274`).
+3. **Identity: HCS-14, not ERC-8004** — providers register a Universal Agent ID (`uaid:aid:hedera:testnet:0.0.x`) to the HCS registry topic `0.0.9744593`; trades → `0.0.9744594`, verifier verdicts → `0.0.9744595`. No EVM registries, no Solidity on the critical path.
 4. **Groq:** OpenAI-compatible endpoint; models pinned to `llama-3.3-70b-versatile` vs `llama-3.1-8b-instant` (Groq no longer serves llama-3.2-1b; divergence at temp 0 still ~0–7%).
-5. **x402-on-Hedera pattern: FOUND but unused** — the same hosted facilitator's `/supported` lists `{scheme:"exact", network:"hedera:testnet", feePayer:0.0.9185802}` (x402 v2). A Hedera port is a network-string + funded-HTS-USDC change on our side, but nothing in this repo touches Hedera today, and RESEARCH.md doesn't cover HCS topics.
+5. **x402-on-Hedera: LIVE** — the hosted facilitator's `/supported` lists `{scheme:"exact", network:"hedera:testnet"}` (x402 v2), feePayer-sponsored. The repo now settles real HBAR on Hedera, registers HCS-14 identities, and writes registry/trades/verdicts to HCS topics — see PROOF.md and RESEARCH.md.
 
 ## 4 · Blockers
 
 | Blocker | Time burned | 20-min stub |
 |---|---|---|
-| Testnet funding (Base Sepolia ETH + USDC for 6 wallets) — human-gated faucets, so real-mode settlement, Staking deploy, and on-chain 8004 registration are all queued behind it | ~0 min (deferred by design; mock path built instead) | **Already built:** MOCK_MODE is the stub and it's first-class. Real mode stays a flip-of-env once someone funds the printed addresses. |
+| Testnet funding (Hedera operator → role accounts) — a single operator seeds all accounts via `pnpm setup-hedera`, no per-wallet faucets on the critical path | ~0 min (deferred by design; mock path built first) | **Already built:** MOCK_MODE is the stub and it's first-class. Real mode is a flip of `MOCK_MODE=false` once the operator is set. |
 | Ollama backend (UPDATE 1) | 0 min (not started — stopped for this report) | If a reachable Ollama fights us: `PROVIDER_BACKEND=ollama` falls back to canned responses (already specced in UPDATE 1); interface will land regardless so a teammate VPS can join later without code changes. |
 | None other. Nothing has burned >20 min blocked. | | |
 

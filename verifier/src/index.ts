@@ -99,7 +99,7 @@ async function slashOnChain(providerWallet: string): Promise<string | null> {
   }
 }
 
-// Verdict + erc8004-compatible feedback onto the HCS verdicts topic.
+// Verdict + HCS-14 reputation feedback onto the HCS verdicts topic.
 async function publishVerdict(v: Record<string, unknown>) {
   if (MOCK_MODE) return;
   try {
@@ -162,7 +162,7 @@ async function auditOnce() {
         type: "verdict", verdict: "ok", provider: target.displayName, account: target.wallet,
         agentId: target.agentId, witness: witness.displayName, model: target.model,
         similarity: Number(sim.toFixed(3)), threshold: THRESHOLD,
-        erc8004_compat: { feedback: { value: 100, tag1: "verified", tag2: "agentrouter" } },
+        hcs14: { feedback: { value: 100, tag1: "verified", tag2: "agentrouter" } },
       });
       return;
     }
@@ -180,7 +180,7 @@ async function auditOnce() {
       agentId: target.agentId, witness: witness.displayName, model: target.model,
       similarity: Number(sim.toFixed(3)), threshold: THRESHOLD,
       slashHbar: SLASH_HBAR, slashTx: tx,
-      erc8004_compat: { feedback: { value: -100, tag1: "model-fraud", tag2: "agentrouter" } },
+      hcs14: { feedback: { value: -100, tag1: "model-fraud", tag2: "agentrouter" } },
     });
     await fetch(`${EXCHANGE}/slash`, {
       method: "POST",
