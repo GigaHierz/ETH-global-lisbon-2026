@@ -4,15 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-// One source of truth for the primary navigation. Page routes carry a `match`
-// so the active underline follows the current route; section anchors
-// (Providers, Audit) are absolute so they work from any page.
-const NAV_ITEMS: Array<{ label: string; href: string; match?: string }> = [
-  { label: "Protocol", href: "/", match: "/" },
+// One source of truth for the primary navigation. Each item is a real page
+// route with a `match` so the active underline follows the current route.
+// Home (Protocol) is intentionally omitted — the logo already routes there.
+const NAV_ITEMS: Array<{ label: string; href: string; match: string }> = [
   { label: "Exchange", href: "/exchange", match: "/exchange" },
   { label: "Agent", href: "/agent-demo", match: "/agent-demo" },
-  { label: "Providers", href: "/#list-gpu" },
-  { label: "Audit", href: "/exchange#audit" },
+  { label: "Providers", href: "/providers", match: "/providers" },
 ];
 
 /**
@@ -36,7 +34,7 @@ export default function Navbar({ children }: { children?: ReactNode }) {
           </Link>
           <nav className="hidden lg:flex items-center gap-6 font-data text-sm">
             {NAV_ITEMS.map((item) => {
-              const active = item.match != null && pathname === item.match;
+              const active = pathname === item.match;
               return (
                 <Link
                   key={item.label}
