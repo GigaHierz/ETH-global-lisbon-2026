@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@agentrouter/shared": "workspace:*",
+    "@hashgraph/sdk": "2.80.0",
     "@hiero-ledger/sdk": "2.85.0",
     "@x402/fetch": "^2.19.0",
     "@x402/hedera": "2.19.0",
