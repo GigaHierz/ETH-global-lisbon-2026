@@ -1,7 +1,7 @@
 // In-memory exchange state: provider table, request log, reputation, mock ledger.
 // No DB by design — hackathon MVP.
 
-import type { ProviderRow, RequestLogEntry, ExchangeEvent } from "@agentrouter/shared";
+import { REQUEST_LOG_LIMIT, type ProviderRow, type RequestLogEntry, type ExchangeEvent } from "@agentrouter/shared";
 
 export const providers = new Map<string, ProviderRow>(); // key: provider url
 export const requestLog: RequestLogEntry[] = [];
@@ -38,7 +38,7 @@ export function providerList(): ProviderRow[] {
 
 export function pushRequest(entry: RequestLogEntry) {
   requestLog.push(entry);
-  if (requestLog.length > 500) requestLog.shift();
+  if (requestLog.length > REQUEST_LOG_LIMIT) requestLog.shift();
   priceIndex.push({ ts: entry.ts, model: entry.model, priceHbar: entry.priceHbar });
   if (priceIndex.length > 2000) priceIndex.shift();
   broadcast({ type: "request", entry });

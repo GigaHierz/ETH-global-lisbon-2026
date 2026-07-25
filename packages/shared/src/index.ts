@@ -10,9 +10,11 @@ export const MOCK_MODE = process.env.MOCK_MODE === "true";
 export const MOCK_PAYMENT_HEADER = "x-mock-payment";
 export const MOCK_PAYMENT_REF_HEADER = "x-mock-payment-ref";
 
-// Set on every replay the verifier issues. Anything served under this header is
-// verifier traffic, so it is logged as isAudit and can never be picked as a
-// future audit candidate (an audit of an audit proves nothing).
+// Marks audit traffic routed *through the exchange*: anything served under this
+// header is logged as isAudit and can never be picked as a future audit candidate
+// (an audit of an audit proves nothing). The verifier's own replays go straight to
+// the provider and deliberately carry no marker — one would let a provider spot an
+// audit and serve the honest model only while being watched.
 export const AUDIT_REQUEST_HEADER = "x-agentrouter-audit";
 
 export function log(tag: string, ...args: unknown[]) {

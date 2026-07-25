@@ -4,6 +4,7 @@ import {
   SMALL_MODEL,
   DEFAULT_EXCHANGE_ASK_HBAR,
   DEFAULT_EXCHANGE_URL,
+  REQUEST_LOG_LIMIT,
   PROVIDER_PORTS,
   localhostUrl,
   DEFAULT_PROVIDER_URLS,
@@ -15,6 +16,10 @@ describe("shared constants", () => {
     expect(SMALL_MODEL).toBe("llama-3.1-8b-instant");
     expect(DEFAULT_EXCHANGE_ASK_HBAR).toBe(0.12);
     expect(DEFAULT_EXCHANGE_URL).toBe("http://localhost:4100");
+  });
+
+  it("bounds the request log, and therefore the audit window", () => {
+    expect(REQUEST_LOG_LIMIT).toBe(500);
   });
 
   it("defines the four provider ports", () => {

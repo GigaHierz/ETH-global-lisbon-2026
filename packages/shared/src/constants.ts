@@ -10,6 +10,11 @@ export const DEFAULT_EXCHANGE_ASK_HBAR = 0.12;
 // Where the agent, verifier, and dashboard reach the exchange by default.
 export const DEFAULT_EXCHANGE_URL = "http://localhost:4100";
 
+// How many served requests the exchange keeps in memory — and therefore the most
+// the verifier can ever audit. Both sides read this so the audit window cannot
+// silently end up smaller than the log it samples from.
+export const REQUEST_LOG_LIMIT = 500;
+
 // Local ports for the four provider personalities (provider1..provider4).
 export const PROVIDER_PORTS = [4021, 4022, 4023, 4024] as const;
 
