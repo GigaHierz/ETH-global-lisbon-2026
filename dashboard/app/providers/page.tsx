@@ -1,4 +1,5 @@
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 export const metadata = {
   title: "AgentRouter — Become a Provider",
@@ -372,18 +373,7 @@ export default function ProvidersPage() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="bg-surface-obsidian border-t border-outline-variant w-full py-12">
-        <div className="px-4 max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <span className="font-data text-primary-fixed-dim font-bold">AgentRouter Protocol</span>
-          <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant uppercase text-center">
-            stake HBAR · register on HCS · serve inference · settle over x402 · Hedera Testnet
-          </span>
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm">
-            <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            <span className="font-data text-[10px] uppercase text-on-surface">Hedera Testnet Active</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

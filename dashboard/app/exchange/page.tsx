@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 // Backend URL priority: ?api=https://… query param → build-time env → Railway prod.
 // The query param survives tunnel/host churn without a rebuild.
@@ -445,18 +446,7 @@ export default function ExchangeControlRoom() {
         </div>
       </main>
 
-      <footer className="w-full py-8 bg-surface-obsidian border-t border-outline-variant">
-        <div className="px-6 max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <span className="font-data text-primary-fixed-dim">AgentRouter Protocol</span>
-          <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant uppercase">
-            x402 HBAR settlement · HCS-14 identity · escrow staking · Hedera Testnet
-          </span>
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm">
-            <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            <span className="font-data text-[10px] uppercase text-on-surface">Hedera Testnet Active</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
