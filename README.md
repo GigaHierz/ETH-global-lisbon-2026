@@ -66,9 +66,9 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 Put operator credentials in `.env`, run `pnpm setup-hedera` to create and fund the demo
 accounts, set `MOCK_MODE=false`, then run `pnpm demo`. Payments are native HBAR via x402 v2
-`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas);
-USDC over HTS is available behind `SETTLEMENT_ASSET=usdc`. Live settlement transactions and
-account links: [docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
+`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas).
+Live settlement transactions and account links: [docs/PROOF.md](docs/PROOF.md). Funding
+decisions: [docs/FUNDING.md](docs/FUNDING.md).
 
 ## Documentation
 

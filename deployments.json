@@ -3,7 +3,6 @@
     "network": "hedera:testnet",
     "explorer": "https://hashscan.io/testnet",
     "settlementAsset": "hbar",
-    "usdcTokenId": "0.0.429274",
     "topics": {
       "registry": "0.0.9744593",
       "trades": "0.0.9744594",

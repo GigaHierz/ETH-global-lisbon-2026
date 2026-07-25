@@ -92,7 +92,7 @@ Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) �
 `HEDERA_PROVIDERn_ID` / `HEDERA_PROVIDERn_KEY` · `HEDERA_ESCROW_ID`
 **Hosting:** `PORT` (injected by Railway) · `PROVIDER_PUBLIC_URL` (public address to register)
 **Optional:** `GROQ_API_KEY` (real inference; canned otherwise) · `CHEAT_MODE` (cheater only) ·
-`STAKE_HBAR` (50) · `SETTLEMENT_ASSET` (hbar) · `FACILITATOR_URL` (override the ladder)
+`STAKE_HBAR` (50) · `FACILITATOR_URL` (override the ladder)
 
 ## On-chain transactions (live, verifiable on Hashscan)
 

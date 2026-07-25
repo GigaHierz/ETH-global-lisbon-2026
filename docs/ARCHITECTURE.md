@@ -58,7 +58,6 @@ verifier ─▶ sample log ─▶ replay accused vs witness ─▶ divergent? �
 | **Hedera Agent Kit** (`hedera-agent-kit` v3) | The buyer agent registers its HCS-14 identity via the kit's `HederaLangchainToolkit` + `coreConsensusPlugin` → `submit_topic_message_tool` (autonomous mode) |
 | **HCS-14 (Universal Agent IDs)** | Every actor's on-chain identity: `uaid:aid:hedera:testnet:0.0.x` |
 | **x402 + `@x402/hedera`** | `ExactHederaScheme` + `createClientHederaSigner` for HBAR settlement on `hedera:testnet`; hosted facilitator ladder (fee-sponsored) |
-| **Hedera Token Service (HTS)** | Optional USDC settlement path (token `0.0.429274`); accounts associate it in setup |
 | **Mirror Node REST API** | Reading topic messages, balances, and tx history (dashboard audit panel + verifier + our proofs) |
 | **Hashscan** | Explorer links for every payment, stake, slash, and topic |
 | **Hedera Portal / Testnet** | Operator account + funding |
