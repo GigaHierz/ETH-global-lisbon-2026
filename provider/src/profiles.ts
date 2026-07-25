@@ -2,13 +2,13 @@
 // provider3 is the cheater: advertises 70b, secretly serves 8b when CHEAT_MODE=true.
 
 export interface ProviderProfile {
-  key: "provider1" | "provider2" | "provider3";
+  key: "provider1" | "provider2" | "provider3" | "provider4";
   displayName: string;
   port: number;
   advertisedModel: string;
   actualModel: string; // what we really send to Groq
   priceHbar: number;
-  hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3"; // HEDERA_<role>_ID/KEY in .env
+  hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4"; // HEDERA_<role>_ID/KEY in .env
   cannedCheat: boolean; // canned-mode: answer like a small model
 }
 
@@ -45,6 +45,16 @@ export const PROFILES: Record<string, ProviderProfile> = {
     priceHbar: 0.08,
     hederaRole: "PROVIDER3",
     cannedCheat: CHEAT,
+  },
+  provider4: {
+    key: "provider4",
+    displayName: "NimbusAI",
+    port: 4024,
+    advertisedModel: "llama-3.3-70b-versatile",
+    actualModel: "llama-3.3-70b-versatile", // honest: serves exactly what it advertises
+    priceHbar: 0.06, // undercuts Titan's 0.10 on 70b, but plays fair — survives verification
+    hederaRole: "PROVIDER4",
+    cannedCheat: false,
   },
 };
 

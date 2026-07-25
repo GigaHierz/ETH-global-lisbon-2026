@@ -7,6 +7,7 @@
     "provider1": "tsx --env-file=.env provider/src/index.ts --profile provider1",
     "provider2": "tsx --env-file=.env provider/src/index.ts --profile provider2",
     "provider3": "tsx --env-file=.env provider/src/index.ts --profile provider3",
+    "provider4": "tsx --env-file=.env provider/src/index.ts --profile provider4",
     "exchange": "tsx --env-file=.env exchange/src/index.ts",
     "verifier": "tsx --env-file=.env verifier/src/index.ts",
     "agent": "tsx --env-file=.env agent/src/index.ts",

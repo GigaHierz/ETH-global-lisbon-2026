@@ -20,6 +20,7 @@ function boot(name: string, args: string[], env: Record<string, string> = {}): C
     cwd: ROOT,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"],
+    shell: true, // Windows: resolve npx.cmd shim (no behavior change to the demo)
   });
   p.stdout!.on("data", (d) => process.stdout.write(d));
   p.stderr!.on("data", (d) => process.stderr.write(d));
