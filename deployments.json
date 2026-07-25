@@ -6,9 +6,9 @@
     "usdcTokenId": "0.0.429274",
     "usdcDecimals": 6,
     "topics": {
-      "registry": "0.0.9744593",
-      "trades": "0.0.9744594",
-      "verdicts": "0.0.9744595"
+      "registry": "0.0.9756362",
+      "trades": "0.0.9756366",
+      "verdicts": "0.0.9756367"
     },
     "note": "Requests settle in HTS USDC (0.0.429274, 6 dp); SETTLEMENT_ASSET=hbar switches back to native HBAR. Staking/slash is always native-HBAR escrow via the Hedera SDK. Agent identity is HCS-14 (uaid:aid:hedera:testnet:0.0.x) published to the registry topic. No Solidity on the critical path.",
     "topicsNote": "These topics predate USDC settlement, so their history is HBAR-denominated. Run `pnpm setup-hcs` for a clean set and replace the ids above — see docs/MIGRATION-USDC.md."
