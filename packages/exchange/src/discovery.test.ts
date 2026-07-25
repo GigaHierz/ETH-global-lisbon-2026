@@ -20,6 +20,8 @@ function seed(rows: Array<Partial<ProviderRow> & { url: string }>) {
       reputation: 100,
       stakeHbar: 50,
       requestsServed: 0,
+      bondTokens: r.bondTokens ?? 100,
+      bondStatus: r.bondStatus ?? "active",
     });
   }
 }

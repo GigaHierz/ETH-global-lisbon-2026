@@ -95,7 +95,7 @@ async function main() {
     const providers = await fetch(`${EXCHANGE_URL}/providers`).then((r) => r.json());
     const slashed = providers.find((p: { status: string }) => p.status === "slashed");
     if (slashed) {
-      banner(`⚡ SLASHED: ${slashed.displayName} — stake cut, reputation zeroed, OUT of routing`);
+      banner(`⚡ SLASHED: ${slashed.displayName} — HBAR stake cut, HTS bond frozen → multi-sig scheduled wipe, OUT of routing`);
       // Same paywall as every other buyer call: in mock mode the exchange wants
       // the mock payment header, in real mode the caller must settle over x402.
       const res = await fetch(`${EXCHANGE_URL}/v1/chat/completions`, {
@@ -107,12 +107,12 @@ async function main() {
         body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       });
       const raw = await res.text();
-      let routed: { provider: string; pricePaidHbar: number } | undefined;
+      let routed: { provider: string; totalHbar: number } | undefined;
       try {
-        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; pricePaidHbar: number } }).agentrouter;
+        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; totalHbar: number } }).agentrouter;
       } catch { /* non-JSON error body — reported below */ }
       if (res.ok && routed) {
-        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.pricePaidHbar} ℏ/req)`);
+        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.totalHbar} ℏ/req incl. fee)`);
       } else {
         console.log(`  reroute check failed: exchange answered HTTP ${res.status} — ${raw.slice(0, 120)}`);
       }

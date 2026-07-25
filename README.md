@@ -1,11 +1,18 @@
 # AgentRouter — the on-chain OpenRouter
 
-An inference exchange where AI agents buy LLM inference per request with HBAR over x402, from
-providers identity- and reputation-tracked on Hedera Consensus Service — with a verifier that
-catches providers serving cheaper models than advertised and slashes their staked HBAR.
+AgentRouter is an on-chain OpenRouter for **agentic payments**: autonomous AI agents buy LLM
+inference per request with **native HBAR over x402**, settled with Hedera's **sub-second
+finality and low, predictable fees**. Providers carry an **HCS-14-style** on-chain identity
+registered through the **Hedera Agent Kit**, stake HBAR collateral, and hold an **HTS
+ReputationBond** — and a verifier that catches providers serving cheaper models than advertised
+**freezes their bond and executes a multi-sig scheduled wipe** (Hedera Schedule Service) on top
+of slashing their staked HBAR.
 
-Built at ETHGlobal Lisbon 2026. Everything on-chain runs on Hedera Testnet: payments,
-identity, staking, and the audit trail.
+Built at ETHGlobal Lisbon 2026 — **no Solidity anywhere**. Everything on-chain runs on Hedera
+Testnet through the Hedera SDKs: agentic x402 payments, Agent-Kit identity, an HCS audit trail,
+HTS reputation with **custom fee schedules + freeze/pause/wipe compliance controls**, and
+Schedule-Service enforcement. See [docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md) for how
+this maps to each Hedera prize track.
 
 ## Quickstart
 
@@ -55,20 +62,37 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 | Package | What it does | Docs |
 |---|---|---|
-| [`packages/agent`](packages/agent) | Autonomous buyer: plans a goal into questions, buys each answer through the exchange, budget-capped | [agent.md](docs/agent.md) |
-| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; registers on HCS and stakes to escrow on boot; four env-driven personalities | [provider.md](docs/provider.md) |
+| [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: plans a goal into questions, buys each answer through the exchange, budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
+| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK); four env-driven personalities | [provider.md](docs/provider.md) |
 | [`packages/exchange`](packages/exchange) | Discovers supply from HCS, routes each request to the cheapest live provider claiming the model, pays via x402, publishes trades | [exchange.md](docs/exchange.md) |
-| [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness, slashes providers whose answers diverge from the advertised model | [verifier.md](docs/verifier.md) |
+| [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness; on divergence slashes staked HBAR, **freezes the HTS bond, and multi-sig scheduled-wipes it** (Schedule Service) | [verifier.md](docs/verifier.md) |
 | [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | [`packages/shared`](packages/shared) | Shared Hedera plumbing, HCS helpers, chat types, and constants used by every service | — |
 
 ## Real payments on Hedera Testnet
 
-Put operator credentials in `.env`, run `pnpm setup-hedera` to create and fund the demo
-accounts, set `MOCK_MODE=false`, then run `pnpm demo`. Payments are native HBAR via x402 v2
-`exact` on `hedera:testnet`, settled through a fee-sponsored facilitator (payers need no gas).
-Live settlement transactions and account links: [docs/PROOF.md](docs/PROOF.md). Funding
-decisions: [docs/FUNDING.md](docs/FUNDING.md).
+Put operator credentials in `.env`, run `pnpm setup-hedera` (create + fund the role accounts),
+`pnpm setup-hcs` (audit topics), and `pnpm setup-hts` (create the **HTS ReputationBond** token
++ grant each provider its bond), set `MOCK_MODE=false`, then run `pnpm demo`. Payments are
+native HBAR via x402 v2 `exact` on `hedera:testnet`, settled through a fee-sponsored facilitator
+(payers need no gas). On fraud, the verifier freezes the cheater's ARBOND bond and executes a
+**2-of-2 multi-sig scheduled wipe** via the Hedera Schedule Service — all SDK-native, no
+Solidity. Live settlement + token/freeze/schedule/wipe transactions and account links:
+[docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
+
+## Hedera track alignment
+
+Everything on-chain is SDK-native across four Hedera services — **HCS, HTS, Schedule Service,
+Mirror Node** — with **zero Solidity**. Full per-bounty mapping (with `file:line` + Hashscan
+proof): [docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md).
+
+| Hedera prize track | Fit | What AgentRouter uses |
+|---|---|---|
+| **AI & Agentic Payments** | **Implemented** | Autonomous AI agent making per-request **x402** payments in **native HBAR**; **Hedera Agent Kit** identity; HCS-14-style UAIDs; HCS audit trails |
+| **"No Solidity Allowed"** | **Implemented** | Whole economic loop — identity, stake, slash, HTS bond, scheduled wipe — via **Hedera SDKs** across HCS + HTS + Schedule + Mirror Node, no contracts |
+| **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** |
+| **Cross-Chain Automation (Schedule Service)** | Implemented core + roadmap | **Schedule Service** multi-sig wipe live today; Axelar GMP cross-chain dispatch is the natural extension |
+| **Autonomous On-Chain Automation** | Implemented core | Multi-sig **scheduled transactions** with no keepers/bots (verifier + auditor co-sign) |
 
 ## Documentation
 

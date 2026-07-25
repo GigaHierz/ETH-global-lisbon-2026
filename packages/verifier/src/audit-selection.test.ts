@@ -16,6 +16,8 @@ function provider(overrides: Partial<ProviderRow> = {}): ProviderRow {
     reputation: 100,
     stakeHbar: 50,
     requestsServed: 0,
+    bondTokens: 100,
+    bondStatus: "active",
     ...overrides,
   };
 }
@@ -28,6 +30,8 @@ function request(served: ProviderRow, overrides: Partial<RequestLogEntry> = {}):
     provider: served.displayName,
     providerUrl: served.url,
     priceHbar: served.priceHbar,
+    feeHbar: served.priceHbar * 0.1,
+    totalHbar: served.priceHbar * 1.1,
     latencyMs: 120,
     paymentRef: "mock-ref",
     promptPreview: "what is the capital of portugal?",

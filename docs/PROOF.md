@@ -49,3 +49,22 @@
 | Fraud verdict on HCS (verdicts topic, seq 1) | https://hashscan.io/testnet/transaction/0.0.9744156@1784983558.700345790 |
 
 The full sting ran on-chain on 2026-07-25: the agent's calls 1–4 routed to the cheapest 70b claimant (SketchyGPU, 0.08 ℏ); the verifier replayed a sampled prompt against witness Titan Compute at temperature 0, measured 10% similarity (threshold 35%), slashed 25 ℏ from escrow, published the fraud verdict to HCS — and call 5 rerouted to honest Titan at 0.10 ℏ.
+
+## HTS ReputationBond + multi-sig scheduled wipe (SDK-native, no Solidity)
+
+The reputation/compliance layer is additive to the proven HBAR slash above. It is created by
+`pnpm setup-hts` and enforced by the verifier on fraud. **Verified end-to-end in MOCK_MODE**
+(the demo prints `BOND … frozen (100 ARBOND)` → `BOND … wiped (0 ARBOND)` right after the slash);
+the on-chain Hashscan links below are captured on the next funded real-mode run
+(`pnpm setup-hedera && pnpm setup-hcs && pnpm setup-hts`, `MOCK_MODE=false pnpm demo`).
+
+| Event | Hashscan | Status |
+|---|---|---|
+| `TokenCreate` — ARBOND bond (custom fractional fee + freeze/pause/wipe keys, wipe = 2-of-2 KeyList) | `hashscan.io/testnet/token/<bondToken>` | _pending real-mode capture_ |
+| Grant 100 ARBOND → each provider (associate + transfer) | _tx id_ | _pending_ |
+| `TokenFreeze` — verifier freezes the cheater's bond | _tx id_ | _pending_ |
+| `ScheduleCreate` — scheduled `TokenWipe` (verifier signature 1) | `hashscan.io/testnet/schedule/<id>` | _pending_ |
+| `ScheduleSign` — auditor signature 2 → wipe executes | _tx id_ | _pending_ |
+
+The `bondToken` id lands in `deployments.json` after `pnpm setup-hts`. Keys: freezeKey = verifier;
+wipeKey = 2-of-2 `KeyList` [verifier, auditor]; treasury/admin/supply/pause/feeSchedule = operator.

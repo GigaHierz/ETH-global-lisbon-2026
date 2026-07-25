@@ -1,8 +1,10 @@
 # Hedera Developer Feedback — AgentRouter (ETHGlobal Lisbon 2026)
 
 Feedback from building **AgentRouter** — an inference marketplace where AI agents pay per LLM
-request in native HBAR over x402, providers stake collateral and register HCS-14 identities on the
-Hedera Consensus Service, and a verifier slashes providers that lie about their model.
+request in native HBAR over x402, providers stake collateral, register HCS-14-style identities on
+the Hedera Consensus Service (via the Hedera Agent Kit), and hold an **HTS ReputationBond**, and a
+verifier slashes providers that lie about their model — freezing the bond and destroying it with a
+**multi-sig scheduled wipe** (Schedule Service).
 
 **Our setup:** TypeScript pnpm monorepo, `@hiero-ledger/sdk` 2.85, `@x402/hedera` 2.19,
 Hedera Agent Kit, Hedera Testnet. We took it from mock mode to real on-chain settlement in one
@@ -71,6 +73,37 @@ time you submit a registration and don't see it immediately, it *looks* like a b
 "poll, don't assume failure — consensus messages appear within a few seconds" note in the HCS/Mirror
 Node quickstarts would prevent a phantom debugging session.
 
+### HTS ReputationBond + multi-sig scheduled wipe: a few sharp edges (docs)
+Extending the no-Solidity path to **HTS + Schedule Service** for a reputation bond surfaced small
+ordering/signature gotchas worth a canonical example:
+- **Associate-before-grant ordering.** An account must be associated (`TokenAssociateTransaction`,
+  signed by that account) *before* the treasury can transfer the bond to it — obvious in hindsight,
+  but a runnable "create → associate → grant" snippet would save a round-trip.
+- **Threshold `KeyList` as a `wipeKey`.** Making the wipe key a **2-of-2** `KeyList`
+  [verifier, auditor] is exactly the "multi-sig enforcement, no keeper" pattern Hedera pitches, yet
+  there's no end-to-end example wiring it to the **Schedule Service** (`ScheduleCreate` collects
+  signature 1, `ScheduleSign` collects signature 2, then the inner `TokenWipe` executes).
+- **Treasury fee exemption.** That the treasury/fee-collector is exempt from a token's own
+  `CustomFractionalFee` (so grants are fee-free while peer transfers pay) is correct but easy to
+  second-guess without a note in the custom-fee docs.
+
+> **Candidate issue to file** (complements #17 on `hedera-dev/hedera-skills`): a canonical,
+> runnable **"multi-sig, keeper-less token enforcement"** skill/example — create an HTS token
+> whose compliance key is a threshold `KeyList`, then freeze + `ScheduleCreate`/`ScheduleSign`
+> the wipe so it executes with no off-chain relayer. This is the reputation/compliance pattern
+> for the agent economy and the one thing we had to assemble from SDK source + Schedule-Service
+> docs. (Filing it after the real-mode run — [issue #51](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues/51)
+> — confirms exact reproduction steps.)
+
+### Agent Kit single-tool invocation also bites the token / schedule plugins (extends #1031)
+Issue #1031 (undocumented programmatic single-tool invocation) is not consensus-specific: the
+same gap applies to the Agent Kit's **account/token plugins** — if you want an agent to run a
+single HTS operation (create/associate/transfer/freeze) or drive the Schedule Service without an
+LLM in the loop, there's no documented `tool.invoke(...)` path. We used the Hiero SDK directly
+for the bond rather than route it through the kit, partly for this reason (and partly for the
+dual-SDK issue #1030 — our bond/schedule code is `@hiero-ledger/sdk`, the kit path is
+`@hashgraph/sdk`).
+
 ### Testnet HBAR is tight for multi-account demos (portal/faucet)
 Our demo fans out into 8 accounts (agent, exchange, 4 providers, verifier, escrow) at ~100 ℏ each
 plus stakes; the operator dropped from 1000 → ~315 ℏ. The `portal.hedera.com` allowance is workable
@@ -97,10 +130,15 @@ Hedera itself was the smooth part of this build — SDK-native staking, HCS, and
 worked first try. The highest-leverage improvements are **developer experience and docs**, not the
 platform:
 
-1. **Agent Kit should adopt `@hiero-ledger/sdk`** (issue #1030) and the rename should be signposted
-   everywhere, including for AI coding assistants that still emit `@hashgraph/sdk`.
+1. **Agent Kit should adopt `@hiero-ledger/sdk`** (issue #1030) and document **single-tool
+   invocation across all plugins** (issue #1031 — not just consensus; token/schedule bite too),
+   and the rename should be signposted everywhere, including for AI coding assistants that still
+   emit `@hashgraph/sdk`.
 2. **Ship one canonical, runnable HCS-14 identity + x402 HBAR example** (relates to #17) — the exact
    agent-economy use case Hedera is pitching, and the one thing we had to assemble ourselves.
-3. **Clearer SDK error messages** for key mismatches (issue #4287).
+3. **Ship a "multi-sig, keeper-less token enforcement" example** — threshold-`KeyList` HTS key +
+   freeze + Schedule-Service wipe (candidate issue above). The reputation/compliance primitive for
+   agent marketplaces, currently un-exampled.
+4. **Clearer SDK error messages** for key mismatches (issue #4287).
 
 *— The AgentRouter team, ETHGlobal Lisbon 2026*
