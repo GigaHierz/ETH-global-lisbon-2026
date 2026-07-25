@@ -14,7 +14,8 @@
     "dashboard": "pnpm --filter @agentrouter/dashboard dev",
     "demo": "tsx --env-file=.env scripts/demo.ts",
     "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts",
-    "setup-hedera": "tsx scripts/setup-hedera-accounts.ts"
+    "setup-hedera": "tsx scripts/setup-hedera-accounts.ts",
+    "setup-hcs": "tsx scripts/setup-hcs-topics.ts"
   },
   "dependencies": {
     "@agentrouter/shared": "workspace:*",

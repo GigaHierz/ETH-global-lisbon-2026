@@ -30,12 +30,22 @@
 | Verifier | `0.0.9744156` | https://hashscan.io/testnet/account/0.0.9744156 |
 | Stake escrow (verifier-held) | `0.0.9744157` | https://hashscan.io/testnet/account/0.0.9744157 |
 
-## HCS audit trail (step 3 — placeholder, filled when topics go live)
+## HCS audit trail (live — step 3 complete)
 
 | Topic | Id | Hashscan |
 |---|---|---|
-| Registry (provider registrations) | _pending_ | _pending_ |
-| Trades (one message per paid request) | _pending_ | _pending_ |
-| Verdicts (verification results + slashes) | _pending_ | _pending_ |
+| Registry (provider registrations) | `0.0.9744593` | https://hashscan.io/testnet/topic/0.0.9744593 |
+| Trades (one message per paid request) | `0.0.9744594` | https://hashscan.io/testnet/topic/0.0.9744594 |
+| Verdicts (verification results + slashes) | `0.0.9744595` | https://hashscan.io/testnet/topic/0.0.9744595 |
 
-Stake transfers (50 ℏ per provider → escrow `0.0.9744157`) and the slash transfer (escrow → treasury) will also appear here once step 4 lands.
+## Staking + slash (no-Solidity, live)
+
+| Event | Transaction |
+|---|---|
+| Provider1 stakes 50 ℏ → escrow | https://hashscan.io/testnet/transaction/0.0.9744152@1784983507.494541568 |
+| Provider2 stakes 50 ℏ → escrow | https://hashscan.io/testnet/transaction/0.0.9744153@1784983509.819605060 |
+| Provider3 stakes 50 ℏ → escrow | https://hashscan.io/testnet/transaction/0.0.9744154@1784983506.692571633 |
+| **SLASH: 25 ℏ escrow → treasury** (SketchyGPU caught at 10% similarity) | https://hashscan.io/testnet/transaction/0.0.9744157@1784983556.547115247 |
+| Fraud verdict on HCS (verdicts topic, seq 1) | https://hashscan.io/testnet/transaction/0.0.9744156@1784983558.700345790 |
+
+The full sting ran on-chain on 2026-07-25: the agent's calls 1–4 routed to the cheapest 70b claimant (SketchyGPU, 0.08 ℏ); the verifier replayed a sampled prompt against witness Titan Compute at temperature 0, measured 10% similarity (threshold 35%), slashed 25 ℏ from escrow, published the fraud verdict to HCS — and call 5 rerouted to honest Titan at 0.10 ℏ.

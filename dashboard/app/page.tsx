@@ -19,6 +19,8 @@ interface RequestLogEntry {
   status: "ok" | "error";
 }
 interface SlashEvent { provider: string; amountHbar: number; reason: string }
+interface AuditMsg { topic: string; consensusTs: string; sequence: number; payload: Record<string, unknown> | null }
+interface TopicInfo { id: string | null; hashscan: string | null }
 interface VerifyEvent { provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
 
 const SERIES: Record<string, string> = {
@@ -37,6 +39,9 @@ export default function Home() {
   const [slash, setSlash] = useState<SlashEvent | null>(null);
   const [verifies, setVerifies] = useState<VerifyEvent[]>([]);
   const [connected, setConnected] = useState(false);
+  const [topics, setTopics] = useState<Record<string, TopicInfo> | null>(null);
+  const [auditMock, setAuditMock] = useState(true);
+  const [audit, setAudit] = useState<AuditMsg[]>([]);
   const slashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -64,6 +69,37 @@ export default function Home() {
     return () => es.close();
   }, []);
 
+  // ---- HCS audit trail: topic ids from the exchange, messages straight from Mirror Node ----
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    fetch(`${EXCHANGE}/topics`).then((r) => r.json()).then((t) => {
+      setAuditMock(t.mock);
+      setTopics(t.topics);
+      if (t.mock) return;
+      const poll = async () => {
+        const out: AuditMsg[] = [];
+        for (const name of ["trades", "verdicts", "registry"]) {
+          const id = t.topics[name]?.id;
+          if (!id) continue;
+          try {
+            const res = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/topics/${id}/messages?order=desc&limit=8`);
+            const body = await res.json();
+            for (const m of body.messages ?? []) {
+              let payload = null;
+              try { payload = JSON.parse(atob(m.message)); } catch {}
+              out.push({ topic: name, consensusTs: m.consensus_timestamp, sequence: m.sequence_number, payload });
+            }
+          } catch {}
+        }
+        out.sort((a, b) => parseFloat(b.consensusTs) - parseFloat(a.consensusTs));
+        setAudit(out.slice(0, 14));
+      };
+      poll();
+      timer = setInterval(poll, 5000); // mirror lag is 1-5s; 5s poll is honest
+    }).catch(() => {});
+    return () => { if (timer) clearInterval(timer); };
+  }, []);
+
   // Bucket price points into 5s windows, avg per model → chart rows
   const chartData = useMemo(() => {
     const buckets = new Map<number, Record<string, { sum: number; n: number }>>();
@@ -81,7 +117,7 @@ export default function Home() {
         const out: Record<string, number | string> = {
           t: new Date(ts).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }),
         };
-        for (const [model, { sum, n }] of Object.entries(row)) out[model] = +(sum / n * 1000).toFixed(3);
+        for (const [model, { sum, n }] of Object.entries(row)) out[model] = +(sum / n * 100).toFixed(2);
         return out;
       });
   }, [prices]);
@@ -95,10 +131,10 @@ export default function Home() {
       <header className="flex items-baseline justify-between border-b pb-3 mb-4" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-baseline gap-3">
           <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--accent)" }}>AGENTROUTER</h1>
-          <span className="text-xs" style={{ color: "var(--ink-muted)" }}>inference exchange · x402 · ERC-8004 · base sepolia</span>
+          <span className="text-xs" style={{ color: "var(--ink-muted)" }}>inference exchange · x402 · HCS · hedera testnet</span>
         </div>
         <div className="text-xs flex gap-4" style={{ color: "var(--ink-muted)" }}>
-          <span>session vol <span style={{ color: "var(--ink)" }}>${totalVolume.toFixed(4)}</span></span>
+          <span>session vol <span style={{ color: "var(--ink)" }}>{totalVolume.toFixed(2)} ℏ</span></span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: connected ? "var(--accent)" : "var(--danger)" }} aria-hidden />
             {connected ? "feed live" : "feed down"}
@@ -110,7 +146,7 @@ export default function Home() {
       {slash && (
         <div role="alert" className="slash-banner w-full mb-4 rounded px-4 py-3 text-white font-bold flex items-center gap-3 text-sm">
           <span className="text-lg" aria-hidden>⚡</span>
-          <span>SLASHED — {slash.provider} lost ${slash.amountHbar.toFixed(2)} stake · {slash.reason} · removed from routing</span>
+          <span>SLASHED — {slash.provider} lost {slash.amountHbar.toFixed(0)} ℏ stake · {slash.reason} · removed from routing</span>
         </div>
       )}
 
@@ -123,7 +159,7 @@ export default function Home() {
               <tr className="text-left" style={{ color: "var(--ink-muted)" }}>
                 <th className="py-1 pr-2 font-normal">name</th>
                 <th className="py-1 pr-2 font-normal">model</th>
-                <th className="py-1 pr-2 font-normal text-right">$/req</th>
+                <th className="py-1 pr-2 font-normal text-right">ℏ/req</th>
                 <th className="py-1 pr-2 font-normal text-right">stake</th>
                 <th className="py-1 pr-2 font-normal text-right">rep</th>
                 <th className="py-1 pr-2 font-normal text-right">served</th>
@@ -142,8 +178,8 @@ export default function Home() {
                     {p.displayName}
                   </td>
                   <td className="py-1.5 pr-2" style={{ color: "var(--ink-muted)" }}>{p.model}</td>
-                  <td className="py-1.5 pr-2 text-right">${p.priceHbar.toFixed(4)}</td>
-                  <td className="py-1.5 pr-2 text-right">${p.stakeHbar.toFixed(2)}</td>
+                  <td className="py-1.5 pr-2 text-right">{p.priceHbar.toFixed(2)}</td>
+                  <td className="py-1.5 pr-2 text-right">{p.stakeHbar.toFixed(0)} ℏ</td>
                   <td className="py-1.5 pr-2 text-right">{p.reputation}</td>
                   <td className="py-1.5 pr-2 text-right">{p.requestsServed}</td>
                   <td className="py-1.5">
@@ -179,7 +215,7 @@ export default function Home() {
         {/* price index chart */}
         <section className="lg:col-span-2 rounded border p-3" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
           <h2 className="text-xs uppercase tracking-widest mb-2" style={{ color: "var(--ink-muted)" }}>
-            Price index <span className="normal-case">(avg paid, m$/req, 5s buckets)</span>
+            Price index <span className="normal-case">(avg paid, centi-ℏ/req, 5s buckets)</span>
           </h2>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -190,7 +226,7 @@ export default function Home() {
                 <Tooltip
                   contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)", fontSize: 11, fontFamily: "inherit" }}
                   labelStyle={{ color: "var(--ink-muted)" }}
-                  formatter={(v: number, name: string) => [`${v} m$/req`, name]}
+                  formatter={(v: number, name: string) => [`${v} cℏ/req`, name]}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} iconType="plainline" />
                 {models.map((m) => (
@@ -213,7 +249,7 @@ export default function Home() {
                     {r.provider}
                   </span>
                   <span className="shrink-0" style={{ color: "var(--ink-muted)" }}>
-                    ${r.priceHbar.toFixed(4)} · {r.latencyMs}ms
+                    {r.priceHbar.toFixed(2)} ℏ · {r.latencyMs}ms
                   </span>
                 </div>
                 <div className="truncate" style={{ color: "var(--ink-muted)" }}>» {r.promptPreview}</div>
@@ -222,10 +258,47 @@ export default function Home() {
             {feed.length === 0 && <li style={{ color: "var(--ink-muted)" }}>no requests yet</li>}
           </ul>
         </section>
+        {/* HCS audit trail */}
+        <section className="lg:col-span-3 rounded border p-3" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
+          <h2 className="text-xs uppercase tracking-widest mb-2 flex items-center justify-between" style={{ color: "var(--ink-muted)" }}>
+            <span>HCS audit trail · mirror node</span>
+            {topics && !auditMock && (
+              <span className="flex gap-3 normal-case tracking-normal">
+                {(["registry", "trades", "verdicts"] as const).map((n) => topics[n]?.hashscan && (
+                  <a key={n} href={topics[n]!.hashscan!} target="_blank" rel="noreferrer"
+                     className="underline decoration-dotted" style={{ color: "var(--accent)" }}>{n} ↗</a>
+                ))}
+              </span>
+            )}
+          </h2>
+          {auditMock ? (
+            <p className="text-xs" style={{ color: "var(--ink-muted)" }}>mock mode — no chain. Flip MOCK_MODE=false for the live consensus log.</p>
+          ) : (
+            <ul className="text-[11px] space-y-1 max-h-48 overflow-y-auto">
+              {audit.map((m) => (
+                <li key={`${m.topic}-${m.sequence}`} className="row-in flex gap-2 items-baseline border-b pb-1" style={{ borderColor: "var(--border)" }}>
+                  <span className="shrink-0 w-16 uppercase text-[10px]" style={{
+                    color: m.topic === "verdicts" ? (m.payload?.verdict === "fraud" ? "var(--danger)" : "var(--accent)") : "var(--ink-muted)",
+                  }}>{m.topic}</span>
+                  <span className="truncate" style={{ color: "var(--ink)" }}>
+                    {m.topic === "trades" && m.payload && `${m.payload.provider} · ${m.payload.model} · ${m.payload.priceHbar} ℏ · ${m.payload.latencyMs}ms`}
+                    {m.topic === "verdicts" && m.payload && `${String(m.payload.verdict).toUpperCase()} — ${m.payload.provider} vs ${m.payload.witness} · sim ${((m.payload.similarity as number) * 100).toFixed(0)}%${m.payload.slashTx ? ` · slashed ${m.payload.slashHbar} ℏ` : ""}`}
+                    {m.topic === "registry" && m.payload && `${m.payload.displayName} registered · ${m.payload.model} @ ${m.payload.priceHbar} ℏ · stake ${m.payload.stakeHbar} ℏ`}
+                    {!m.payload && "(non-JSON message)"}
+                  </span>
+                  <span className="ml-auto shrink-0 text-[10px]" style={{ color: "var(--ink-muted)" }}>
+                    {new Date(parseFloat(m.consensusTs) * 1000).toLocaleTimeString()}
+                  </span>
+                </li>
+              ))}
+              {audit.length === 0 && <li style={{ color: "var(--ink-muted)" }}>waiting for consensus messages… (mirror lag 1-5s)</li>}
+            </ul>
+          )}
+        </section>
       </div>
 
       <footer className="mt-4 text-[10px]" style={{ color: "var(--ink-muted)" }}>
-        agents pay per request in USDC via x402 · providers registered in ERC-8004 identity registry · verifier replays sampled prompts and slashes divergent providers
+        agents pay per request in HBAR via x402 · providers registered + staked on Hedera (HCS registry, escrow) · verifier replays sampled prompts, slashes divergent providers, verdicts on HCS
       </footer>
     </main>
   );

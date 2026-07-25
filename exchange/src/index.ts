@@ -3,6 +3,9 @@ import cors from "cors";
 import {
   log,
   MOCK_MODE,
+  hederaAccount,
+  publishToTopic,
+  topicLinks,
   type ChatCompletionRequest,
   type ChatCompletionResponse,
 } from "@agentrouter/shared";
@@ -32,6 +35,9 @@ app.get("/healthz", (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
 
 app.get("/providers", (_req, res) => res.json(providerList()));
 
+// HCS audit-trail topic ids + Hashscan links (dashboard reads Mirror Node itself)
+app.get("/topics", (_req, res) => res.json({ mock: MOCK_MODE, topics: topicLinks() }));
+
 app.get("/log", (req, res) => {
   const limit = parseInt(String(req.query.limit || "100"), 10);
   res.json(requestLog.slice(-limit));
@@ -59,7 +65,7 @@ app.post("/slash", (req, res) => {
   row.reputation = 0;
   row.stakeHbar = Math.max(0, row.stakeHbar - amountHbar);
   providers.set(row.url, row);
-  log("exchange", `💀 SLASHED ${row.displayName}: -$${amountHbar} stake. Reason: ${reason}`);
+  log("exchange", `💀 SLASHED ${row.displayName}: -${amountHbar} ℏ stake. Reason: ${reason}`);
   broadcast({ type: "slashed", provider: row.displayName, amountHbar, reason });
   broadcast({ type: "providers", providers: providerList() });
   res.json({ ok: true });
@@ -124,8 +130,19 @@ app.post("/v1/chat/completions", async (req, res) => {
     broadcast({ type: "providers", providers: providerList() });
     log(
       "exchange",
-      `routed → ${provider.displayName} ($${provider.priceHbar}, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
+      `routed → ${provider.displayName} (${provider.priceHbar} ℏ, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
     );
+    if (!MOCK_MODE) {
+      publishToTopic("trades", hederaAccount("EXCHANGE"), {
+        type: "trade",
+        model: body.model,
+        provider: provider.displayName,
+        providerAccount: provider.wallet,
+        priceHbar: provider.priceHbar,
+        latencyMs,
+        paymentTx: paymentRef,
+      }).catch((e) => log("exchange", `HCS trade publish failed: ${(e as Error).message.slice(0, 80)}`));
+    }
 
     res.json({
       ...data,

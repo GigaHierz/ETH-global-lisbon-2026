@@ -11,6 +11,7 @@ import {
   MOCK_PAYMENT_HEADER,
   HEDERA_NETWORK,
   hederaAccount,
+  publishToTopic,
   log,
   type ProviderRow,
   type ChatCompletionResponse,
@@ -66,17 +67,47 @@ async function ask(providerUrl: string, model: string, prompt: string, priceHbar
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+// No-Solidity slash: move SLASH_HBAR from the verifier-held escrow account to
+// the treasury (= operator). Returns the transfer tx id.
 async function slashOnChain(providerWallet: string): Promise<string | null> {
-  // TODO(step 4): escrow→treasury HBAR transfer signed by the verifier-held
-  // escrow key (HEDERA_ESCROW_KEY) + verdict message on the HCS verdicts topic.
-  log("verifier", `slash for ${providerWallet}: escrow transfer lands in step 4 (no-Solidity staking)`);
-  return null;
+  if (MOCK_MODE) return null;
+  try {
+    const { Client, AccountId, PrivateKey, Hbar, TransferTransaction } = await import("@hiero-ledger/sdk");
+    const escrow = hederaAccount("ESCROW");
+    const treasury = process.env.HEDERA_OPERATOR_ID;
+    if (!treasury) throw new Error("HEDERA_OPERATOR_ID missing");
+    const client = Client.forTestnet().setOperator(
+      AccountId.fromString(escrow.id),
+      PrivateKey.fromStringECDSA(escrow.key),
+    );
+    try {
+      const tx = await new TransferTransaction()
+        .addHbarTransfer(AccountId.fromString(escrow.id), new Hbar(-SLASH_HBAR))
+        .addHbarTransfer(AccountId.fromString(treasury), new Hbar(SLASH_HBAR))
+        .execute(client);
+      await tx.getReceipt(client);
+      const id = tx.transactionId!.toString();
+      log("verifier", `⛓ SLASH on-chain: ${SLASH_HBAR} ℏ escrow→treasury (stake of ${providerWallet})`);
+      log("verifier", `⛓ https://hashscan.io/testnet/transaction/${id}`);
+      return id;
+    } finally {
+      client.close();
+    }
+  } catch (err) {
+    log("verifier", `on-chain slash failed: ${(err as Error).message.slice(0, 120)}`);
+    return null;
+  }
 }
 
-async function fileFeedback(agentId: string | null, providerUrl: string, negative: boolean) {
-  if (MOCK_MODE || !agentId || agentId.startsWith("mock-")) return;
-  // TODO(step 3): publish an erc8004_compat feedback JSON to the HCS verdicts topic.
-  log("verifier", `feedback (${negative ? "NEGATIVE" : "positive"}) for ${agentId} → HCS verdict topic in step 3`);
+// Verdict + erc8004-compatible feedback onto the HCS verdicts topic.
+async function publishVerdict(v: Record<string, unknown>) {
+  if (MOCK_MODE) return;
+  try {
+    const tx = await publishToTopic("verdicts", hederaAccount("VERIFIER"), v);
+    log("verifier", `verdict on HCS: https://hashscan.io/testnet/transaction/${tx}`);
+  } catch (err) {
+    log("verifier", `HCS verdict publish failed: ${(err as Error).message.slice(0, 100)}`);
+  }
 }
 
 async function auditOnce() {
@@ -127,6 +158,12 @@ async function auditOnce() {
 
     if (!divergent) {
       log("verifier", `✅ ${target.displayName} verified (similarity ${(sim * 100).toFixed(0)}% ≥ ${THRESHOLD * 100}%)`);
+      await publishVerdict({
+        type: "verdict", verdict: "ok", provider: target.displayName, account: target.wallet,
+        agentId: target.agentId, witness: witness.displayName, model: target.model,
+        similarity: Number(sim.toFixed(3)), threshold: THRESHOLD,
+        erc8004_compat: { feedback: { value: 100, tag1: "verified", tag2: "agentrouter" } },
+      });
       return;
     }
 
@@ -138,7 +175,13 @@ async function auditOnce() {
     log("verifier", `   SLASHING ${target.displayName} (${target.wallet})`);
 
     const tx = await slashOnChain(target.wallet);
-    await fileFeedback(target.agentId, target.url, true);
+    await publishVerdict({
+      type: "verdict", verdict: "fraud", provider: target.displayName, account: target.wallet,
+      agentId: target.agentId, witness: witness.displayName, model: target.model,
+      similarity: Number(sim.toFixed(3)), threshold: THRESHOLD,
+      slashHbar: SLASH_HBAR, slashTx: tx,
+      erc8004_compat: { feedback: { value: -100, tag1: "model-fraud", tag2: "agentrouter" } },
+    });
     await fetch(`${EXCHANGE}/slash`, {
       method: "POST",
       headers: { "content-type": "application/json" },

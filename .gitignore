@@ -9,3 +9,4 @@ contracts/broadcast/
 .registry-cache.json
 *.log
 .DS_Store
+.env.local

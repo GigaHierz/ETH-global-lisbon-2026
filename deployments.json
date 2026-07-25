@@ -6,5 +6,12 @@
     "staking": null,
     "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     "note": "identity/reputation are the official ERC-8004 reference deployments; staking is deployed by scripts/deploy-staking.sh once EXCHANGE_PK is funded with Base Sepolia ETH"
+  },
+  "hederaTestnet": {
+    "topics": {
+      "registry": "0.0.9744593",
+      "trades": "0.0.9744594",
+      "verdicts": "0.0.9744595"
+    }
   }
 }
