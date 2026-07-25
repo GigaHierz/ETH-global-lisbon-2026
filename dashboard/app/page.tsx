@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 const AGENT =
   (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
   process.env.NEXT_PUBLIC_AGENT_URL ||
-  "http://localhost:4200";
+  "https://agent-router-agent-server-production.up.railway.app";
 
 // ---- types mirrored from the agent-server contract (dashboard is standalone) ----
 interface Budget { capHbar: number; spentHbar: number; remainingHbar: number }
