@@ -8,28 +8,28 @@ Testnet**, native (no smart contract).
 
 There are three kinds of autonomous actors, each with its own Hedera account + HCS-14 identity:
 
-### 🤖 The buyer agent (`agent/`)
+### The buyer agent (`packages/agent/`)
 An autonomous agent with its own wallet that **accomplishes a goal by buying inference**:
 - Registers an **HCS-14 identity** (`uaid:aid:hedera:testnet:0.0.9746264`) on-chain.
 - Given a goal, **plans** sub-questions, **buys** an answer to each through the exchange (paying
   real HBAR via x402 from its own account), and **synthesizes** a result.
 - **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET_HBAR`.
 
-### 🏭 The provider agents (`provider/`, supply side)
+### The provider agents (`packages/provider/`, supply side)
 One codebase, four "personalities" (Titan, Budget, NimbusAI, SketchyGPU):
 - Register an HCS-14 identity + advertised model/price to the registry topic.
 - **Stake 50 ℏ** to an escrow account as a quality bond.
 - Serve inference (proxying Groq) behind an x402 paywall.
 - One of them (**SketchyGPU**) is a **cheater**: it advertises a 70B model but secretly serves 8B.
 
-### ⚖️ The verifier agent (`verifier/`)
+### The verifier agent (`packages/verifier/`)
 An autonomous auditor:
 - Samples routed requests from the exchange log, **replays** a prompt (temperature 0) against the
   accused provider **and an honest witness** on the same model.
 - Measures answer divergence (unicode-safe bigram-Jaccard); below threshold ⇒ **fraud**.
 - **Slashes** the cheater's stake on-chain (escrow → treasury) and publishes the verdict to HCS.
 
-*(The `exchange/` is the marketplace hub — routing + x402 paywall — not an autonomous agent.)*
+*(The `packages/exchange/` is the marketplace hub — routing + x402 paywall — not an autonomous agent.)*
 
 ## 2. How they work — the flow
 
@@ -79,4 +79,4 @@ verifier ─▶ sample log ─▶ replay accused vs witness ─▶ divergent? �
 ## See also
 - [`DEPLOY.md`](DEPLOY.md) — production URLs, per-service config, demo runbook
 - [`TRANSACTIONS.md`](TRANSACTIONS.md) — on-chain receipts + how staking works (no contract)
-- [`agent/README.md`](agent/README.md) — the buyer agent in depth
+- [`agent.md`](agent.md) — the buyer agent in depth

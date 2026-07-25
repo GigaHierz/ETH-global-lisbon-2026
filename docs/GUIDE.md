@@ -50,7 +50,7 @@ flowchart LR
 | `HEDERA_<ROLE>_ID/KEY/EVM` | from `pnpm setup-hedera` | AGENT, EXCHANGE, PROVIDER1-3, VERIFIER, ESCROW |
 | `STAKE_HBAR` | `50` | provider boot-time stake to escrow |
 | `SLASH_HBAR` | `25` | verifier slash amount |
-| `SIMILARITY_THRESHOLD` | `0.35` | fraud line (see [guides/jean-agent.md](guides/jean-agent.md)) |
+| `SIMILARITY_THRESHOLD` | `0.35` | fraud line |
 | `VERIFY_INTERVAL_MS` | `15000` | audit cadence |
 | `PROVIDER_URLS` | 3 localhosts | exchange discovery list |
 | `EXCHANGE_URL` | `http://localhost:4100` | agent, verifier, dashboard |
@@ -68,14 +68,20 @@ pnpm dashboard     # second terminal → localhost:3000
 
 Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` → same commands. Gate proof: `MOCK_MODE=false pnpm smoke`.
 
-## Who does what
+> **Demo note:** `pnpm demo` intentionally boots only providers 1–3. A fourth profile,
+> `provider4` (NimbusAI), is an *honest* 70b provider priced at 0.06 ℏ — cheaper than the
+> cheater's 0.08 ℏ. If you boot it, cheapest-first routing sends 70b traffic to NimbusAI, the
+> cheater never wins traffic, and the slash sting won't fire. Boot `provider4` only to
+> demonstrate honest permissionless supply joining, not during the fraud demo.
 
-| Person | Owns | Guide |
-|---|---|---|
-| Núria | Supply: providers, Ollama, VPS | [guides/nuria-supply.md](guides/nuria-supply.md) |
-| Jean | Buyer agent + verifier + test matrix | [guides/jean-agent.md](guides/jean-agent.md) |
-| Lena | Payments story, HCS map, bounty submission | [guides/lena-devrel.md](guides/lena-devrel.md) |
-| Sahil | Exchange + dashboard | [guides/sahil-exchange.md](guides/sahil-exchange.md) |
+## Components
+
+| Component | Owns |
+|---|---|
+| Supply | Providers, optional Ollama backend, VPS hosting |
+| Agent + verifier | Buyer agent, audit loop, test matrix |
+| DevRel | Payments story, HCS map, submission |
+| Exchange | Routing core + dashboard |
 
 ## Troubleshooting
 

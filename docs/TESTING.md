@@ -42,7 +42,7 @@ The dashboard accepts the exchange URL as a query param — no rebuild needed:
 
 ## ⚠️ Tunnel lifetime
 
-These are cloudflared **quick tunnels running on Sahil's laptop** — they die when the laptop sleeps or the process stops, and the random URLs change on every restart. If a URL is dead, ping Sahil to re-run the tunnels (`cloudflared tunnel --url http://localhost:3000` / `:4100`) and update this file. **A VPS is the durable home** — when VPS SSH details land in `.env` (`VPS_HOST/VPS_USER/VPS_KEY_PATH`), a `scripts/deploy-vps.sh` (rsync + pm2) replaces this section with stable URLs.
+These are cloudflared **quick tunnels running on a team laptop** — they die when the laptop sleeps or the process stops, and the random URLs change on every restart. If a URL is dead, re-run the tunnels (`cloudflared tunnel --url http://localhost:3000` / `:4100`) and update this file. **A VPS is the durable home** — when VPS SSH details land in `.env` (`VPS_HOST/VPS_USER/VPS_KEY_PATH`), a `scripts/deploy-vps.sh` (rsync + pm2) replaces this section with stable URLs.
 
 ## What is NOT exposed
 

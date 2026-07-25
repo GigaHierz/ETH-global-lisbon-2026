@@ -36,7 +36,7 @@ app.use(paymentMiddleware({
 }, server));
 ```
 
-### Client (paying fetch — `@x402/fetch` + `@x402/hedera`, see `exchange/src/payer.ts`)
+### Client (paying fetch — `@x402/fetch` + `@x402/hedera`, see `packages/exchange/src/payer.ts`)
 ```ts
 import { x402Client, wrapFetchWithPayment, x402HTTPClient } from "@x402/fetch";
 import { ExactHederaScheme } from "@x402/hedera/exact/client";
@@ -57,7 +57,7 @@ Links: https://github.com/coinbase/x402 · https://docs.cdp.coinbase.com/x402 ·
 Identity is **native to Hedera** — no EVM registries. Each agent/provider gets an HCS-14-style
 Universal Agent ID and publishes a registration record to the HCS registry topic.
 
-- **UAID:** `uaid:aid:hedera:testnet:0.0.<account>` (see `provider/src/registry.ts`).
+- **UAID:** `uaid:aid:hedera:testnet:0.0.<account>` (see `packages/provider/src/registry.ts`).
 - **Registration:** a signed JSON message to the HCS registry topic (`0.0.9744593`) carrying
   `{agentId, account, displayName, model, priceHbar, stakeHbar, stakeTx}` — the on-chain,
   Mirror-Node-readable directory the exchange discovers providers from.

@@ -109,13 +109,13 @@ Real payments: set a Hedera testnet operator in `.env`, run `pnpm setup-hedera` 
 
 | File | What it is |
 |---|---|
-| [README.md](README.md) | Quickstart, architecture diagram, run order, reset instructions, "Not in this MVP" |
+| [README.md](../README.md) | Quickstart, architecture diagram, run order, reset instructions, "Not in this MVP" |
 | **DEVREL_BRIEF.md** (this file) | The narrative, demo beats, Q&A, real-vs-mocked |
 | [RESEARCH.md](RESEARCH.md) | Verified integration research: exact x402 package APIs, HCS-14 identity, Groq model IDs — with sources and dates |
-| [.env.example](.env.example) | Every env var + Hedera setup |
-| [deployments.json](deployments.json) | Hedera network + HCS topics in use |
+| [.env.example](../.env.example) | Every env var + Hedera setup |
+| [deployments.json](../deployments.json) | Hedera network + HCS topics in use |
 | [PROOF.md](PROOF.md) | Live Hashscan links for real x402 settlements, demo accounts, and HCS topics |
-| [verifier/src/index.ts](verifier/src/index.ts) | The audit loop — the most interesting code to walk through |
+| [verifier/src/index.ts](../packages/verifier/src/index.ts) | The audit loop — the most interesting code to walk through |
 
 ## Glossary (for non-crypto audiences)
 
