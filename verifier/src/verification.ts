@@ -88,3 +88,14 @@ export function classifyReplayOutcomes(
   // the score is never null — classifySimilarity yields passed or divergent.
   return { verdict: classifySimilarity(similarity, threshold), similarity, threshold };
 }
+
+// The single gate in front of stake movement: nothing but a divergent verdict
+// enforces, and a payout account already slashed is never slashed twice (audit
+// ticks can overlap the exchange's provider-table refresh).
+export function shouldEnforceSlash(
+  result: VerificationResult,
+  accusedWallet: string,
+  alreadySlashedWallets: ReadonlySet<string>,
+): boolean {
+  return result.verdict === "divergent" && !alreadySlashedWallets.has(accusedWallet);
+}

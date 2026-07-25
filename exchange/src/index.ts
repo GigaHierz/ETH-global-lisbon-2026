@@ -3,6 +3,7 @@ import cors from "cors";
 import {
   log,
   MOCK_MODE,
+  AUDIT_REQUEST_HEADER,
   MOCK_PAYMENT_HEADER,
   HEDERA_NETWORK,
   hbarPrice,
@@ -146,6 +147,9 @@ app.post("/v1/chat/completions", async (req, res) => {
     return res.status(503).json({ error: `no live provider for model ${body.model}` });
   }
 
+  // Verifier replays normally hit providers directly, but anything routed while
+  // carrying the audit header is tagged so it stays out of the audit pool.
+  const isAudit = req.header(AUDIT_REQUEST_HEADER) === "1";
   const t0 = Date.now();
   try {
     const { res: upstream, paymentRef } = await paidPost(
@@ -176,6 +180,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       promptPreview: body.messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, 80) ?? "",
       answerPreview: data.choices?.[0]?.message?.content?.slice(0, 80) ?? "",
       status: "ok" as const,
+      isAudit,
     };
     pushRequest(entry);
     broadcast({ type: "providers", providers: providerList() });
@@ -222,6 +227,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       promptPreview: body.messages.at(-1)?.content.slice(0, 80) ?? "",
       answerPreview: (err as Error).message.slice(0, 80),
       status: "error",
+      isAudit,
     });
     res.status(502).json({ error: (err as Error).message });
   }

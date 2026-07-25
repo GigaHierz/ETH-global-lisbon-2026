@@ -13,15 +13,18 @@
 import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
+  AUDIT_REQUEST_HEADER,
   HEDERA_NETWORK,
   hederaAccount,
   publishToTopic,
   log,
   type ProviderRow,
+  type RequestLogEntry,
   type ChatCompletionResponse,
 } from "@agentrouter/shared";
+import { selectAuditCandidate } from "./audit-selection.js";
 import { DEFAULT_SIMILARITY_THRESHOLD } from "./similarity.js";
-import { classifyReplayOutcomes, type ReplayOutcome } from "./verification.js";
+import { classifyReplayOutcomes, shouldEnforceSlash, type ReplayOutcome } from "./verification.js";
 
 const EXCHANGE = process.env.EXCHANGE_URL || "http://localhost:4100";
 const INTERVAL_MS = parseInt(process.env.VERIFY_INTERVAL_MS || "15000", 10);
@@ -30,6 +33,8 @@ const SLASH_HBAR = parseFloat(process.env.SLASH_HBAR || "25");
 const REPLAY_TIMEOUT_MS = parseInt(process.env.REPLAY_TIMEOUT_MS || "20000", 10);
 
 const audited = new Set<string>(); // request ids already checked
+const slashedWallets = new Set<string>(); // payout accounts this verifier has slashed
+let auditInFlight = false; // one audit at a time: replays can outlast INTERVAL_MS
 
 let payFetch: (url: string, init: RequestInit, priceHbar: number) => Promise<Response>;
 
@@ -71,7 +76,7 @@ async function ask(
         `${providerUrl}/v1/chat/completions`,
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", [AUDIT_REQUEST_HEADER]: "1" },
           body: JSON.stringify({
             model,
             messages: [{ role: "user", content: prompt }],
@@ -148,36 +153,37 @@ async function publishVerdict(v: Record<string, unknown>) {
 }
 
 async function auditOnce() {
+  if (auditInFlight) return;
+  auditInFlight = true;
   try {
     const [logEntries, providers] = await Promise.all([
-      fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()),
+      fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()) as Promise<RequestLogEntry[]>,
       fetch(`${EXCHANGE}/providers`).then((r) => r.json()) as Promise<ProviderRow[]>,
     ]);
 
-    // Newest un-audited successful request whose provider is still live
-    const candidate = [...logEntries].reverse().find(
-      (e: { id: string; status: string; provider: string }) =>
-        e.status === "ok" &&
-        !audited.has(e.id) &&
-        providers.some((p) => p.displayName === e.provider && p.status === "live"),
-    );
-    if (!candidate) return;
-    audited.add(candidate.id);
-
-    const target = providers.find((p) => p.displayName === candidate.provider)!;
-    const witness = providers.find(
-      (p) => p.status === "live" && p.model === target.model && p.url !== target.url,
-    );
-    if (!witness) {
-      log("verifier", `no witness for ${target.model} — skipping audit of ${target.displayName}`);
+    const selection = selectAuditCandidate({
+      requestLog: logEntries,
+      providers,
+      auditedRequestIds: audited,
+      slashedWallets,
+    });
+    if (selection.outcome === "skipped") {
+      // A witness-less candidate is left un-audited on purpose: it becomes
+      // auditable the moment a second provider for that model comes up.
+      if (selection.reason === "no_witness") {
+        log("verifier", `no witness for ${selection.request.model} — skipping audit of ${selection.accused.displayName}`);
+      }
       return;
     }
+
+    const { request: candidate, accused: target, witness } = selection;
+    audited.add(candidate.id); // claim it before the replays, so a slow audit is never re-run
 
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
     const [targetOutcome, witnessOutcome] = await Promise.all([
-      ask(target.url, target.model, candidate.promptPreview, target.priceHbar),
-      ask(witness.url, witness.model, candidate.promptPreview, witness.priceHbar),
+      ask(target.url, candidate.model, candidate.promptPreview, target.priceHbar),
+      ask(witness.url, candidate.model, candidate.promptPreview, witness.priceHbar),
     ]);
     const result = classifyReplayOutcomes(targetOutcome, witnessOutcome, THRESHOLD);
 
@@ -215,6 +221,14 @@ async function auditOnce() {
       return;
     }
 
+    // Divergence is necessary but not sufficient: a provider already slashed keeps
+    // its verdict on the dashboard and loses no second stake.
+    if (!shouldEnforceSlash(result, target.wallet, slashedWallets)) {
+      log("verifier", `${target.displayName} (${target.wallet}) already slashed — divergence recorded, no second slash`);
+      return;
+    }
+    slashedWallets.add(target.wallet); // claimed before the awaits below settle
+
     // ---- busted ----
     log("verifier", `🚨🚨🚨 DIVERGENCE DETECTED 🚨🚨🚨`);
     log("verifier", `   ${target.displayName} claims ${target.model} but its answer diverges from witness ${witness.displayName} (similarity ${(sim * 100).toFixed(0)}% < ${THRESHOLD * 100}%)`);
@@ -242,6 +256,8 @@ async function auditOnce() {
     log("verifier", `⚡ ${target.displayName} slashed and removed from routing`);
   } catch (err) {
     log("verifier", `audit error: ${(err as Error).message.slice(0, 150)}`);
+  } finally {
+    auditInFlight = false;
   }
 }
 

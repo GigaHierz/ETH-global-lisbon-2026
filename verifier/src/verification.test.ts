@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SIMILARITY_THRESHOLD } from "./similarity.js";
-import { classifyReplayOutcomes, type ReplayOutcome } from "./verification.js";
+import {
+  classifyReplayOutcomes,
+  shouldEnforceSlash,
+  type ReplayOutcome,
+  type VerificationResult,
+  type VerificationVerdict,
+} from "./verification.js";
 
 const VALID: ReplayOutcome = { kind: "ok", text: "a b c d e f" };
 
@@ -243,5 +249,28 @@ describe("classifyReplayOutcomes: two valid responses", () => {
       DEFAULT_SIMILARITY_THRESHOLD,
     );
     expect(forward).toEqual(backward);
+  });
+});
+
+describe("shouldEnforceSlash", () => {
+  const WALLET = "0.0.1003";
+  const result = (verdict: VerificationVerdict): VerificationResult => ({
+    verdict,
+    similarity: verdict === "divergent" ? 0.1 : 0.9,
+    threshold: DEFAULT_SIMILARITY_THRESHOLD,
+  });
+
+  it("enforces on a divergent verdict against a provider not yet slashed", () => {
+    expect(shouldEnforceSlash(result("divergent"), WALLET, new Set())).toBe(true);
+  });
+
+  it("never enforces on any verdict other than divergent", () => {
+    for (const verdict of ["passed", "inconclusive", "skipped"] as const) {
+      expect(shouldEnforceSlash(result(verdict), WALLET, new Set())).toBe(false);
+    }
+  });
+
+  it("never slashes the same payout account twice", () => {
+    expect(shouldEnforceSlash(result("divergent"), WALLET, new Set([WALLET]))).toBe(false);
   });
 });
