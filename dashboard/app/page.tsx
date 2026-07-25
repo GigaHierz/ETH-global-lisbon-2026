@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Navbar from "@/components/Navbar";
 
 // Live stats source (same override pattern as /exchange and /agent-demo).
 const EXCHANGE =
@@ -103,29 +104,16 @@ export default function Landing() {
       <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
 
       {/* ── Top Navigation ── */}
-      <nav className="fixed top-0 w-full z-50 bg-surface-obsidian/80 backdrop-blur-xl border-b border-outline-variant shadow-[0_0_40px_rgba(0,240,255,0.05)]">
-        <div className="flex justify-between items-center h-16 px-6 w-full max-w-[1440px] mx-auto">
-          <div className="flex items-center gap-8">
-            <span className="font-display text-2xl font-bold text-accent-cyan tracking-tighter">AgentRouter</span>
-            <div className="hidden md:flex gap-6 font-data text-sm">
-              <a className="text-primary-fixed-dim border-b-2 border-accent-cyan pb-1" href="/">Protocol</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/exchange">Exchange</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="/agent-demo">Agent</a>
-              <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="#list-gpu">Providers</a>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <a href={REPO} target="_blank" rel="noreferrer"
-              className="hidden sm:block font-data text-[11px] tracking-[0.1em] uppercase text-on-surface-variant hover:text-on-surface transition-colors">
-              GitHub
-            </a>
-            <a href="/exchange"
-              className="bg-primary text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:bg-accent-cyan transition-colors active:scale-95">
-              Launch App
-            </a>
-          </div>
-        </div>
-      </nav>
+      <Navbar>
+        <a href={REPO} target="_blank" rel="noreferrer"
+          className="hidden sm:block font-data text-[11px] tracking-[0.1em] uppercase text-on-surface-variant hover:text-on-surface transition-colors">
+          GitHub
+        </a>
+        <a href="/exchange"
+          className="bg-primary text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:bg-accent-cyan transition-colors active:scale-95">
+          Launch App
+        </a>
+      </Navbar>
 
       <main className="relative pt-16 hud-grid-lines">
         {/* ── Hero ── */}
