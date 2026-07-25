@@ -28,6 +28,16 @@ curl -s localhost:4021/info # sanity: name, model, priceHbar, wallet
 
 All three proxy Groq (set `GROQ_API_KEY`, free at console.groq.com/keys) or fall back to canned deterministic answers with no key — the demo works either way.
 
+## Running on a remote box (VPS / your laptop ≠ Sahil's laptop) — REQUIRED reading
+
+The endpoint you **register is the endpoint the exchange calls**. On a remote box you MUST:
+
+1. Make your provider publicly reachable — easiest: `cloudflared tunnel --url http://localhost:4024` (prints a `https://….trycloudflare.com` URL), or an open port on your VPS.
+2. Set `PROVIDER_PUBLIC_URL=https://your-tunnel-or-vps-url` in your `.env`.
+3. `rm -f .registry-cache.json` (forces re-registration with the new endpoint) and restart the provider. The exchange re-discovers you within ~10s.
+
+Without `PROVIDER_PUBLIC_URL`, you register `http://localhost:PORT` — the exchange shows you as **○ down** (it's probing its own localhost) and you never receive traffic. This is exactly what happened to NimbusAI's first registration.
+
 ## What fires on boot (real mode — live, see PROOF.md for the actual txs)
 
 1. **HCS registration:** the provider publishes a registration JSON (HCS-14 agent id, model, price, endpoint, `hcs14` profile block) to the registry topic. The exchange discovers it from the Mirror Node within ~1-5s.
