@@ -9,6 +9,7 @@ import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_E
 import { Budget } from "./budget.js";
 import { groqBrain } from "./brain.js";
 import { makeBuy } from "./buy.js";
+import { routeModel } from "./route-model.js";
 import { initAgentPayer } from "./payer.js";
 import { registerIdentity, type Identity } from "./identity.js";
 import { runGoal, type AgentEvent } from "./loop.js";
@@ -49,7 +50,23 @@ const state = {
   events: [] as unknown[],
 };
 
+// Default buy (fallback model); per-run buys are routed against the live market.
 const buy = makeBuy(EXCHANGE, ASK, MODEL);
+
+/** Route the goal to a model tier using the exchange's live provider market. */
+async function routedBuyFor(goal: string) {
+  try {
+    const providers = (await (await fetch(`${EXCHANGE}/providers`)).json()) as Array<{
+      model: string; price?: number; priceHbar?: number; status: string;
+    }>;
+    const market = providers.map((p) => ({ model: p.model, price: p.price ?? p.priceHbar ?? 0, status: p.status }));
+    const route = routeModel(goal, market, MODEL);
+    log("agent", `router: "${goal.slice(0, 48)}…" → ${route.tier} tier → ${route.model} (${route.reason})`);
+    return { buy: makeBuy(EXCHANGE, ASK, route.model), route };
+  } catch {
+    return { buy, route: { model: MODEL, tier: "medium" as const, reason: "market unreachable — fallback" } };
+  }
+}
 
 // Everything that touches the network, off the critical path to listening.
 async function boot() {
@@ -123,7 +140,7 @@ app.get("/events", (req, res) => {
   req.on("close", () => clients.delete(write));
 });
 
-app.post("/run", (req, res) => {
+app.post("/run", async (req, res) => {
   if (!ready) return res.status(503).json({ error: bootError ?? "agent is still starting up" });
   if (state.running) return res.status(409).json({ error: "a run is already in progress" });
   const goal = (req.body as { goal?: string })?.goal?.trim();
@@ -137,9 +154,13 @@ app.post("/run", (req, res) => {
   state.budget = { cap: BUDGET, spent: 0, remaining: BUDGET };
   res.json({ ok: true });
 
+  const routed = await routedBuyFor(goal);
+  broadcast({ type: "route", model: routed.route.model, tier: routed.route.tier, reason: routed.route.reason });
+  state.events.push({ type: "route", model: routed.route.model, tier: routed.route.tier, reason: routed.route.reason });
+
   runGoal(goal, {
     brain: groqBrain,
-    buy,
+    buy: routed.buy,
     budget,
     ask: ASK,
     emit: (ev) => {

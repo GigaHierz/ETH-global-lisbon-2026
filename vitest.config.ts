@@ -27,6 +27,7 @@ export default defineConfig({
         "packages/agent/src/buy.ts",
         "packages/agent/src/identity.ts",
         "packages/agent/src/loop.ts",
+        "packages/agent/src/route-model.ts",
         "packages/verifier/src/similarity.ts",
         "packages/verifier/src/audit-selection.ts",
         "packages/verifier/src/verification.ts",
