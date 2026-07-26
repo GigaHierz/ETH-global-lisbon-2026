@@ -1,7 +1,8 @@
 // Provider instance profiles. One codebase, four personalities.
 // provider3 is the cheater: advertises 70b, secretly serves 8b when CHEAT_MODE=true.
 
-import { DEFAULT_MODEL, SMALL_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
+import { DEFAULT_MODEL, SMALL_MODEL, ZEROG_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
+import { DEFAULT_BACKEND, type ProviderBackend } from "./backends/index.js";
 
 export interface ProviderProfile {
   key: "provider1" | "provider2" | "provider3" | "provider4" | "custom";
@@ -11,6 +12,7 @@ export interface ProviderProfile {
   actualModel: string; // what we really send to Groq
   priceHbar: number;
   hederaRole: "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "PROVIDER"; // HEDERA_<role>_ID/KEY in .env
+  backend: ProviderBackend; // where compute comes from; p1-p3 pin groq (frozen demo arc)
   cannedCheat: boolean; // canned-mode: answer like a small model
 }
 
@@ -25,6 +27,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
     actualModel: DEFAULT_MODEL,
     priceHbar: 0.10, // 10,000,000 tinybars
     hederaRole: "PROVIDER1",
+    backend: "groq", // FROZEN: slash arc depends on deterministic Groq — do not change
     cannedCheat: false,
   },
   provider2: {
@@ -35,6 +38,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
     actualModel: SMALL_MODEL,
     priceHbar: 0.04,
     hederaRole: "PROVIDER2",
+    backend: "groq", // FROZEN: slash arc depends on deterministic Groq — do not change
     cannedCheat: false,
   },
   provider3: {
@@ -46,16 +50,21 @@ export const PROFILES: Record<string, ProviderProfile> = {
     actualModel: CHEAT ? SMALL_MODEL : DEFAULT_MODEL,
     priceHbar: 0.08,
     hederaRole: "PROVIDER3",
+    backend: "groq", // FROZEN: slash arc depends on deterministic Groq — do not change
     cannedCheat: CHEAT,
   },
   provider4: {
     key: "provider4",
     displayName: "NimbusAI",
     port: PROVIDER_PORTS[3],
-    advertisedModel: DEFAULT_MODEL,
-    actualModel: DEFAULT_MODEL, // honest: serves exactly what it advertises
-    priceHbar: 0.06, // undercuts Titan's 0.10 on 70b, but plays fair — survives verification
+    // 0G Compute personality: honest reseller of 0G's decentralized GPU network.
+    // Unique model id on the exchange → competes only for its own model, so the
+    // p1/p3 llama-70b slash arc is untouched.
+    advertisedModel: ZEROG_MODEL,
+    actualModel: ZEROG_MODEL,
+    priceHbar: 0.06,
     hederaRole: "PROVIDER4",
+    backend: "0g",
     cannedCheat: false,
   },
 };
@@ -64,7 +73,7 @@ export const PROFILES: Record<string, ProviderProfile> = {
 // without editing this file. Advertise = serve (honest); the account is HEDERA_PROVIDER_ID/KEY.
 //   PROVIDER_NAME, PROVIDER_MODEL, PROVIDER_PRICE_HBAR, PROVIDER_PORT
 function customProfile(): ProviderProfile {
-  const model = process.env.PROVIDER_MODEL || "llama-3.3-70b-versatile";
+  const model = process.env.PROVIDER_MODEL || (process.env.PROVIDER_BACKEND === "groq" ? DEFAULT_MODEL : ZEROG_MODEL);
   return {
     key: "custom",
     displayName: process.env.PROVIDER_NAME || "Custom Provider",
@@ -73,6 +82,9 @@ function customProfile(): ProviderProfile {
     actualModel: model, // honest: serve exactly what you advertise (the verifier checks this)
     priceHbar: parseFloat(process.env.PROVIDER_PRICE_HBAR || "0.10"),
     hederaRole: "PROVIDER",
+    // Bring-your-own supply defaults to the 0G Compute network; override with
+    // PROVIDER_BACKEND=groq|canned (ollama: planned).
+    backend: (process.env.PROVIDER_BACKEND as ProviderBackend) || DEFAULT_BACKEND,
     cannedCheat: false,
   };
 }
