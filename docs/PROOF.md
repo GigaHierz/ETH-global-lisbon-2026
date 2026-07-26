@@ -68,3 +68,21 @@ the on-chain Hashscan links below are captured on the next funded real-mode run
 
 The `bondToken` id lands in `deployments.json` after `pnpm setup-hts`. Keys: freezeKey = verifier;
 wipeKey = 2-of-2 `KeyList` [verifier, auditor]; treasury/admin/supply/pause/feeSchedule = operator.
+
+## 0G Compute integration (provider4 / NimbusAI — 2026-07-26)
+
+Provider4 resells compute from the 0G decentralized GPU network (0G Compute Router,
+model `0gm-1.0-35b-a3b`) on the Hedera exchange. All legs on-chain:
+
+| Event | Link |
+|---|---|
+| Provider4 account (created + funded) | https://hashscan.io/testnet/account/0.0.9757757 |
+| Stake 50 ℏ → escrow | https://hashscan.io/testnet/transaction/0.0.9757757@1785025020.196653655 |
+| HCS registration (0G model id) | https://hashscan.io/testnet/transaction/0.0.9757757@1785025020.949095076 |
+| Trade: agent→exchange (0.066 ℏ = 0.06 + 0.006 fee) | https://hashscan.io/testnet/transaction/0.0.7162784@1785025050.185579079 |
+| Trade: exchange→provider4 (0.06 ℏ exact) | https://hashscan.io/testnet/transaction/0.0.7162784@1785025055.187574206 |
+| HCS trades message seq 35 (carries `"model":"0gm-1.0-35b-a3b"` + both txs) | https://hashscan.io/testnet/topic/0.0.9744594 |
+
+Completion content currently uses the canned fallback pending `ZEROG_API_KEY`
+(pc.0g.ai signup + 0G token deposit — human-gated); with the key in `.env`, the same
+trade sources live 0G GPU output with zero code change.
