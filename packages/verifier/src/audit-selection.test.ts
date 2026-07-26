@@ -217,3 +217,29 @@ describe("selectAuditCandidate: who witnesses", () => {
     expect(result).toEqual({ outcome: "skipped", reason: "no_witness", request: newest, accused: lonely });
   });
 });
+
+describe("random sampling", () => {
+  // The claim on the marketing page is "random sampling" — this is what makes it
+  // true. A predictable target (always the newest trade) is a schedule a cheater
+  // can serve honestly against.
+  const accused = provider({ url: "http://a", wallet: "0.0.1" });
+  const witness = provider({ url: "http://b", wallet: "0.0.2", displayName: "Witness" });
+  const providers = [accused, witness];
+  const requestLog = [
+    request(accused, { id: "older", ts: 1_000 }),
+    request(accused, { id: "newest", ts: 2_000 }),
+  ];
+  const base = { requestLog, providers, auditedRequestIds: [], slashedWallets: [] };
+
+  it("keeps the deterministic newest-first order when no RNG is supplied", () => {
+    const picked = selectAuditCandidate(base);
+    expect(picked.outcome).toBe("selected");
+    if (picked.outcome === "selected") expect(picked.request.id).toBe("newest");
+  });
+
+  it("samples a different eligible request once an RNG is supplied", () => {
+    const picked = selectAuditCandidate({ ...base, random: () => 0 });
+    expect(picked.outcome).toBe("selected");
+    if (picked.outcome === "selected") expect(picked.request.id).toBe("older");
+  });
+});

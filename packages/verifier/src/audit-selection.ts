@@ -18,6 +18,12 @@ export interface AuditSelectionInput {
   auditedRequestIds: Iterable<string>;
   /** Payout accounts this verifier has already slashed — may lead /providers. */
   slashedWallets: Iterable<string>;
+  /**
+   * RNG used to sample which eligible request gets audited. Supplied in
+   * production (`Math.random`) so the choice is unpredictable; omitted in tests
+   * to keep selection deterministic (newest eligible first).
+   */
+  random?: () => number;
 }
 
 export type AuditSelection =
@@ -30,6 +36,16 @@ function compareStrings(a: string, b: string): number {
   if (a > b) return 1;
   /* v8 ignore next -- providers are keyed by unique url, so the tie is unreachable in sorts */
   return 0;
+}
+
+/** Fisher-Yates using an injected RNG, so "random" stays reproducible in tests. */
+function shuffled<T>(items: T[], random: () => number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 export function selectAuditCandidate(input: AuditSelectionInput): AuditSelection {
@@ -55,8 +71,15 @@ export function selectAuditCandidate(input: AuditSelectionInput): AuditSelection
 
   if (eligible.length === 0) return { outcome: "skipped", reason: "no_eligible_request" };
 
+  // Sampling is random, not "newest first": auditing the freshest trade every
+  // tick is a schedule a cheater can predict — serve honestly for a beat after
+  // each request and never be caught. With an RNG supplied, every un-audited
+  // request in the window is equally likely, so there is no safe moment to cheat.
+  // Without one (tests) the deterministic newest-first order is preserved.
+  const candidates = input.random ? shuffled(eligible, input.random) : eligible;
+
   let witnessless: { request: RequestLogEntry; accused: ProviderRow } | null = null;
-  for (const { request, accused } of eligible) {
+  for (const { request, accused } of candidates) {
     const witness = input.providers
       .filter(
         (p) =>
@@ -74,7 +97,7 @@ export function selectAuditCandidate(input: AuditSelectionInput): AuditSelection
     witnessless ??= { request, accused };
   }
 
-  // eligible is non-empty and every entry failed to find a witness, so the
-  // newest witness-less candidate was recorded above.
+  // candidates is non-empty and every entry failed to find a witness, so a
+  // witness-less candidate was recorded above.
   return { outcome: "skipped", reason: "no_witness", ...witnessless! };
 }

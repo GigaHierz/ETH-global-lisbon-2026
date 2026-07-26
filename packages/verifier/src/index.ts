@@ -33,7 +33,13 @@ import { DEFAULT_SIMILARITY_THRESHOLD } from "./similarity.js";
 import { classifyReplayOutcomes, shouldEnforceSlash, type ReplayOutcome } from "./verification.js";
 
 const EXCHANGE = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
+// Audits are sampled on a jittered schedule, not a metronome: a fixed period is
+// a published timetable, and anything predictable is gameable — serve the real
+// model for the second after each tick and a cheater is never caught. Each delay
+// is drawn uniformly from ±VERIFY_JITTER around the base interval.
 const INTERVAL_MS = parseInt(process.env.VERIFY_INTERVAL_MS || "15000", 10);
+const JITTER = Math.min(0.9, Math.max(0, parseFloat(process.env.VERIFY_JITTER || "0.6")));
+const nextDelayMs = () => Math.round(INTERVAL_MS * (1 - JITTER + Math.random() * 2 * JITTER));
 const THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || String(DEFAULT_SIMILARITY_THRESHOLD));
 const SLASH_HBAR = parseFloat(process.env.SLASH_HBAR || "25");
 const REPLAY_TIMEOUT_MS = parseInt(process.env.REPLAY_TIMEOUT_MS || "20000", 10);
@@ -242,6 +248,7 @@ async function auditOnce() {
       providers,
       auditedRequestIds: audited,
       slashedWallets,
+      random: Math.random, // sample a random eligible request, not the newest
     });
     if (selection.outcome === "skipped") {
       // A witness-less candidate is left un-audited on purpose: it becomes
@@ -379,6 +386,17 @@ async function auditOnce() {
 }
 
 await initPayFetch();
-log("verifier", `watching ${EXCHANGE} — audit every ${INTERVAL_MS / 1000}s, similarity threshold ${THRESHOLD}, slash ${SLASH_HBAR} ℏ (MOCK_MODE=${MOCK_MODE})`);
-setInterval(auditOnce, INTERVAL_MS);
-auditOnce();
+log(
+  "verifier",
+  `watching ${EXCHANGE} — random audits every ${(INTERVAL_MS * (1 - JITTER) / 1000).toFixed(1)}-${(INTERVAL_MS * (1 + JITTER) / 1000).toFixed(1)}s, ` +
+    `similarity threshold ${THRESHOLD}, slash ${SLASH_HBAR} ℏ (MOCK_MODE=${MOCK_MODE})`,
+);
+// Self-scheduling rather than setInterval: the next draw happens after the audit
+// completes, so a slow replay can never stack overlapping runs.
+function scheduleNextAudit() {
+  const delay = nextDelayMs();
+  setTimeout(() => {
+    void auditOnce().finally(scheduleNextAudit);
+  }, delay);
+}
+void auditOnce().finally(scheduleNextAudit);
