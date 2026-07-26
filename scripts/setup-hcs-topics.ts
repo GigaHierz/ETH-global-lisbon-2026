@@ -1,4 +1,4 @@
-// Creates the three HCS audit topics (registry / trades / verdicts) as the
+// Creates the HCS audit topics (registry / trades / verdicts / agentCalls) as the
 // operator and records them in deployments.json. Idempotent: existing ids are
 // kept. Run: pnpm setup-hcs
 
@@ -30,7 +30,7 @@ async function main() {
     PrivateKey.fromStringECDSA(operatorKey),
   );
 
-  for (const name of ["registry", "trades", "verdicts"]) {
+  for (const name of ["registry", "trades", "verdicts", "agentCalls"]) {
     if (topics[name]) {
       console.log(`= ${name}: ${topics[name]} (exists)`);
       continue;

@@ -1,4 +1,4 @@
-// HCS audit trail: three consensus topics (registry / trades / verdicts).
+// HCS audit trail: four consensus topics (registry / trades / verdicts / agentCalls).
 // Real mode: TopicMessageSubmitTransaction per event; readers use Mirror Node
 // REST (1-5s lag, messages arrive base64-encoded). Mock mode: no-ops.
 
@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { MIRROR_NODE, hashscanTopic } from "./hedera.js";
 
-export type TopicName = "registry" | "trades" | "verdicts";
+export type TopicName = "registry" | "trades" | "verdicts" | "agentCalls";
 
 function deploymentsPath(): string {
   // repo root: shared/src → ../..
@@ -26,7 +26,7 @@ export function getTopicId(name: TopicName): string | null {
 
 export function topicLinks(): Record<TopicName, { id: string | null; hashscan: string | null }> {
   const out = {} as Record<TopicName, { id: string | null; hashscan: string | null }>;
-  for (const name of ["registry", "trades", "verdicts"] as TopicName[]) {
+  for (const name of ["registry", "trades", "verdicts", "agentCalls"] as TopicName[]) {
     const id = getTopicId(name);
     out[name] = { id, hashscan: id ? hashscanTopic(id) : null };
   }

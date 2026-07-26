@@ -14,7 +14,7 @@ bond with a 2-of-2 multi-sig `TokenWipe`.**
 
 The stack, verified against code (not docs): x402 (`@x402/*` 2.19, `exact` on `hedera:testnet`,
 fee-sponsored facilitator ladder), **Hedera Agent Kit** (`hedera-agent-kit`), **Hiero SDK**
-(`@hiero-ledger/sdk`), **HCS** (registry/trades/verdicts topics), **HTS** (ReputationBond
+(`@hiero-ledger/sdk`), **HCS** (registry/trades/verdicts/agentCalls topics), **HTS** (ReputationBond
 `ARBOND` with custom fee + 2-of-2 multi-sig wipe), **Mirror Node REST**, LangChain, Hashscan.
 
 ---
@@ -28,6 +28,10 @@ standard.
 **What we implement**
 - **Autonomous AI agent making agentic payments** — the buyer plans a goal into questions and
   pays for each answer per request. `packages/agent/src/loop.ts`, `packages/agent/src/buy.ts`.
+- **Durable per-agent on-chain purchase history** — the agent publishes every paid inference call
+  to its **own HCS topic** (`agentCalls`) and reads it back through the Mirror Node, giving a
+  verifiable record of every x402 purchase that survives restarts. Surfaced as "Previous Calls" on
+  the Agent page. `packages/agent/src/server.ts` (`recordCall`, `GET /calls`).
 - **x402 payment standard, USDC (native HBAR behind a flag), per request** — official `@x402/*` 2.19,
   `ExactHederaScheme` on `hedera:testnet`, signed with the agent's own key; the exchange/provider run
   the x402 paywall. `packages/agent/src/payer.ts:25-53`, `packages/exchange/src/index.ts` (x402
@@ -42,7 +46,8 @@ standard.
 - **Optional enhancements, also implemented:** multi-agent system (buyer agent + provider
   agents + verifier), **x402 pay-per-request APIs**, **ERC-8004 / HCS-14-style agent identity**,
   **token creation + custom fee schedules via HTS** (see track 2), **2-of-2 multi-sig HTS
-  compliance controls** (see track 2), and **HCS audit trails** (registry/trades/verdicts).
+  compliance controls** (see track 2), and **HCS audit trails**
+  (registry/trades/verdicts + a per-agent `agentCalls` purchase log).
 
 **Natural extension** — adopt OpenClaw / Virtuals **Agent Commerce Protocol (ACP)** job-lifecycle
 schema on the HCS trades topic (our exchange is already an ACP-style marketplace; ACP itself is
@@ -93,7 +98,9 @@ Applications using only the Hedera SDK, no smart contracts.
 
 **What we implement** — **the entire economic loop is SDK-native with zero Solidity**, spanning
 **three native Hedera services** (the bounty asks for two):
-- **HCS** — identity registry + trade + verdict topics. `packages/shared/src/hcs.ts`,
+- **HCS** — identity registry + trade + verdict topics, plus a per-agent `agentCalls` topic that
+  is the buyer agent's own durable purchase log (read back via Mirror Node to power the Agent
+  page's "Previous Calls" view). `packages/shared/src/hcs.ts`, `packages/agent/src/server.ts`,
   `deployments.json`.
 - **HTS** — the ReputationBond token, custom fee, freeze/pause/wipe keys, and the 2-of-2 multi-sig
   wipe. `scripts/setup-hts-token.ts`, `packages/shared/src/hts.ts`.
