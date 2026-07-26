@@ -152,18 +152,6 @@ structured. Suggestions:
 
 ---
 
-## ⚪ Not 0G's fault (for credibility)
-
-So the signal above stays honest — most of these were our environment / our code:
-
-- Default **Node 20** silently broke `pnpm`/`tsx` on the dev machine; Node 22 fixed it.
-- Firing several `viem` contract writes back-to-back, one Agentic-ID mint failed on a **nonce race** —
-  our tooling, not 0G (a note in docs that rapid sequential txs need nonce management would still be kind).
-- Our initial `invalid_auth` confusion was partly self-inflicted: we linked `pc.0g.ai` (mainnet)
-  while doing testnet work (see friction #2 for the part that *is* a DX ask).
-
----
-
 ## TL;DR for 0G DevRel
 
 0G's core primitives are strong — OpenAI-compatible + TEE-header inference, auto-detected contracts,

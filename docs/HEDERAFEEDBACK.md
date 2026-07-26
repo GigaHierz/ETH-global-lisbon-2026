@@ -122,18 +122,6 @@ that need many funded accounts, would help.
 
 ---
 
-## ⚪ Not Hedera's fault (for credibility)
-
-Most of our *actual* blockers were environment / our own code, not Hedera. Listed so the signal
-above stays honest:
-
-- Node.js/pnpm weren't installed on the dev machine.
-- Our own `scripts/demo.ts` used `spawn("npx", …)` without `shell:true`, which fails on Windows.
-- Windows PowerShell execution policy blocked `pnpm.ps1` (worked around with `pnpm.cmd`).
-- `@x402/*` vs legacy unscoped `x402-*` package confusion — that's **Coinbase's x402**, not Hedera.
-
----
-
 ## TL;DR for Hedera DevRel
 
 Hedera itself was the smooth part of this build — SDK-native staking, HCS, and x402/HBAR settlement
