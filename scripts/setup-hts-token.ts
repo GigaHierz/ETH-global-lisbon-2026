@@ -37,7 +37,7 @@ async function main() {
   const {
     Client, AccountId, PrivateKey, KeyList, TokenType, TokenSupplyType,
     TokenCreateTransaction, TokenAssociateTransaction, TransferTransaction,
-    AccountBalanceQuery, TokenId, CustomFractionalFee,
+    TokenUpdateTransaction, AccountBalanceQuery, TokenId, CustomFractionalFee,
   } = await import("@hiero-ledger/sdk");
 
   const opKey = PrivateKey.fromStringECDSA(operatorKey);
@@ -59,7 +59,35 @@ async function main() {
   // provider whose bond was wiped (or one added later) can be topped back up.
   let tokenId: string = deployments.hederaTestnet.bondToken ?? "";
   if (tokenId) {
-    console.log(`= bondToken: ${tokenId} (exists) — checking provider bonds`);
+    console.log(`= bondToken: ${tokenId} (exists) — checking keys and provider bonds`);
+    // Reconcile the enforcement keys with the accounts currently in .env. The token
+    // pins verifier/auditor public keys at creation, so a token minted before this
+    // AUDITOR account existed carries a stale wipe key — every wipe then fails with
+    // INVALID_SIGNATURE, which reads like a signing bug rather than a config drift.
+    // The operator holds the admin key, so this is repairable in place.
+    try {
+      const info = await (await fetch(`https://testnet.mirrornode.hedera.com/api/v1/tokens/${tokenId}`)).json();
+      const onChainWipe = JSON.stringify((info as { wipe_key?: unknown }).wipe_key ?? "");
+      const stale = !onChainWipe.includes(auditorPub.toStringRaw());
+      if (stale) {
+        console.log("  ⚠ wipe key does not include the current AUDITOR — updating it");
+        await (
+          await (
+            await new TokenUpdateTransaction()
+              .setTokenId(TokenId.fromString(tokenId))
+              .setWipeKey(wipeKey)
+              .setFreezeKey(verifierPub)
+              .freezeWith(client)
+              .sign(opKey)
+          ).execute(client)
+        ).getReceipt(client);
+        console.log("  ✓ wipe key is now 2-of-2 [verifier, auditor] for the current accounts");
+      } else {
+        console.log("  = wipe key already matches the current verifier + auditor");
+      }
+    } catch (e) {
+      console.warn(`  ⚠ could not reconcile token keys: ${(e as Error).message.slice(0, 100)}`);
+    }
   } else {
   console.log("creating ARBOND ReputationBond token…");
   const createReceipt = await (

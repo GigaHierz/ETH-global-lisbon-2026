@@ -43,14 +43,16 @@ Hedera Consensus Service.
 ```mermaid
 flowchart LR
     A[Agent<br/>Hedera account] -->|"POST /v1/chat/completions"| E[Exchange :4100<br/>route to cheapest<br/>SSE feed + price index]
-    E -->|"x402 HBAR payment"| P1[Provider 1 · Titan<br/>70b @ 0.10 ℏ]
-    E -->|"x402 HBAR payment"| P2[Provider 2 · Budget<br/>8b @ 0.04 ℏ]
-    E -->|"x402 HBAR payment"| P3[Provider 3 · Sketchy<br/>claims 70b @ 0.08 ℏ<br/>serves 8b]
+    E -->|"x402 USDC payment"| P1[Provider 1 · Titan<br/>70b @ $0.10]
+    E -->|"x402 USDC payment"| P2[Provider 2 · Budget<br/>8b @ $0.04]
+    E -->|"x402 USDC payment"| P3[Provider 3 · Sketchy<br/>claims 70b @ $0.08<br/>serves 8b]
+    E -->|"x402 USDC payment"| P4[Provider 4 · NimbusAI<br/>0gm-1.0-35b-a3b @ $0.06]
     P1 & P2 & P3 -->|proxy| G[Groq API]
-    P1 & P2 & P3 -->|"registration JSON<br/>+ 50 ℏ stake to escrow"| HCS[HCS topics<br/>registry · trades · verdicts]
+    P4 -->|proxy| Z[0G Compute Router]
+    P1 & P2 & P3 & P4 -->|"registration JSON<br/>+ 50 ℏ stake to escrow"| HCS[HCS topics<br/>registry · trades · verdicts]
     E -->|"trade messages"| HCS
     V[Verifier] -->|"replay temp-0 prompt<br/>vs witness · compare"| P1 & P3
-    V -->|"slash: escrow to treasury<br/>+ verdict message"| HCS
+    V -->|"slash 25 ℏ escrow→treasury<br/>+ 2-of-2 ARBOND wipe<br/>+ verdict message"| HCS
     V -->|"POST /slash"| E
     M[Mirror Node REST] -.->|"1-5s lag"| E & D
     D[Dashboard :3000<br/>trading terminal<br/>+ audit trail panel] <-->|SSE| E

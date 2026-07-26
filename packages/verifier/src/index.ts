@@ -20,6 +20,7 @@ import {
   hederaAccount,
   publishToTopic,
   bondTokenId,
+  freezeBond,
   multiSigWipeBond,
   log,
   type ProviderRow,
@@ -184,11 +185,32 @@ async function enforceBond(wallet: string, displayName: string) {
   if (!MOCK_MODE && !onChain) return;
 
   let wipeTx: string | null = null;
+  let freezeTx: string | null = null;
   if (onChain) {
+    // Destroy, then contain — in that order. Hedera rejects TokenWipe against a
+    // frozen balance (ACCOUNT_FROZEN_FOR_TOKEN), so freezing first would block the
+    // very wipe it was meant to protect. Freezing afterwards still does the useful
+    // work: the account cannot receive a replacement bond.
     wipeTx = await multiSigWipeBond(wallet, BOND_AMOUNT);
     if (wipeTx) log("verifier", `⚖️ 2-of-2 multi-sig bond wipe (${displayName}): https://hashscan.io/testnet/transaction/${wipeTx}`);
+    freezeTx = await freezeBond(wallet);
+    if (freezeTx) log("verifier", `🧊 bond frozen (${displayName}): https://hashscan.io/testnet/transaction/${freezeTx}`);
   }
-  await postBondEvent({ wallet, bondStatus: "wiped", bondTokens: 0, wipeTx });
+
+  // Report what actually happened. Announcing "wiped, 0 tokens" regardless of the
+  // outcome meant a failed wipe still showed the bond as destroyed — the dashboard
+  // claiming an enforcement action the chain never performed, which is worse than
+  // showing nothing at all.
+  const bondStatus = wipeTx ? "wiped" : freezeTx ? "frozen" : "active";
+  if (onChain && !wipeTx) {
+    log("verifier", `🚨 bond NOT wiped for ${displayName} — reporting "${bondStatus}" rather than a wipe that did not happen`);
+  }
+  await postBondEvent({
+    wallet,
+    bondStatus,
+    bondTokens: wipeTx ? 0 : BOND_AMOUNT,
+    wipeTx,
+  });
 }
 
 async function auditOnce() {
