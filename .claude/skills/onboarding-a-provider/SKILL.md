@@ -70,7 +70,7 @@ Set these in `.env` (the `custom` profile reads them — no code edits):
 - `PROVIDER_MODEL` — a model id you can actually serve on your backend. **You must serve what you advertise** (see Guardrails).
 - `PROVIDER_PRICE` — your price per request, denominated in the settlement asset (**USDC** by default; `SETTLEMENT_ASSET=hbar` switches the whole system to HBAR). The exchange routes the *cheapest* live provider for a model, so price to win the traffic you want.
 - `PROVIDER_PUBLIC_URL` — your step-1 URL.
-- `PROVIDER_BACKEND` — where inference actually comes from: `0g` (0G Compute, the default for bring-your-own supply, needs `ZEROG_API_KEY`), `groq` (needs `GROQ_API_KEY`), or `canned`. Omit the backend's key and you fall back to deterministic **canned** answers — fine for testing, and still honest about the advertised model.
+- `PROVIDER_BACKEND` — where inference actually comes from: `0g` (0G Compute, the **recommended default** for bring-your-own supply — get a key at [pc.0g.ai](https://pc.0g.ai) and fund it with 0G testnet tokens, then set `ZEROG_API_KEY`), `groq` (needs `GROQ_API_KEY` from [console.groq.com/keys](https://console.groq.com/keys)), or `canned`. Omit the backend's key and you fall back to deterministic **canned** answers — fine for testing, and still honest about the advertised model. If you set `PROVIDER_BACKEND=0g` but leave `PROVIDER_MODEL` unset, you serve the default 0G model (`0gm-1.0-35b-a3b`).
 
 **`PROVIDER_PUBLIC_URL` must be in `.env`** — not just exported in your shell, and not just known to the MCP server. `pnpm provider` reads `.env` at process start, in whatever shell you launch it from. If it's missing there, the service falls back to `http://localhost:4025` and the exchange can't reach you.
 
@@ -195,12 +195,14 @@ The verifier samples routed requests, replays the prompt at temperature 0 agains
 | Var | Default | Purpose |
 |---|---|---|
 | `PROVIDER_NAME` | Custom Provider | Display name in the routing table |
-| `PROVIDER_MODEL` | llama-3.3-70b-versatile | Model you advertise **and serve** |
+| `PROVIDER_MODEL` | 0gm-1.0-35b-a3b | Model you advertise **and serve** (default is the 0G model; `llama-3.3-70b-versatile` on the groq backend) |
 | `PROVIDER_PRICE` | 0.10 | Your price per request in the settlement asset (cheapest wins routing) |
 | `PROVIDER_PORT` | 4025 | Local listen port |
 | `PROVIDER_PUBLIC_URL` | `http://localhost:<port>` | Address the exchange routes to (tunnel/VPS). **Set it in `.env`** — the default makes you unreachable |
 | `HEDERA_PROVIDER_ID` / `_KEY` | from `pnpm setup-hedera` | Account that stakes, registers, earns |
-| `GROQ_API_KEY` | — | Real inference; omit → canned answers |
+| `PROVIDER_BACKEND` | 0g | Supply backend: `0g` (recommended) \| `groq` \| `canned` |
+| `ZEROG_API_KEY` | — | 0G Compute inference (recommended backend; get one at pc.0g.ai); omit → canned answers |
+| `GROQ_API_KEY` | — | Alternative backend (`PROVIDER_BACKEND=groq`); omit → canned answers |
 | `STAKE_HBAR` | 50 | Boot-time stake to escrow |
 | `MOCK_MODE` | false | `true` fakes identity and payment entirely — must be `false` to earn real HBAR |
 

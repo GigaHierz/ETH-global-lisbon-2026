@@ -18,12 +18,13 @@ import { ENV_PATH, REPO_ROOT, loadEnv, readEnvVar, appendEnvLines, upsertEnvVar 
 import { toErrorShape, ProvisionError } from "./errors.js";
 import { getOperator, createAndFundAccount, stakeToEscrow } from "./hedera.js";
 import { getCacheEntry, setStaked, setRegistered, registerOnHcs, uaidFor } from "./registry.js";
-import { checkEndpoint, railwayConfig } from "./deploy.js";
+import { checkEndpoint, railwayConfig, type Backend } from "./deploy.js";
 import { verifyLive } from "./verify.js";
 import {
   HBAR_PER_ACCOUNT_DEFAULT,
   STAKE_HBAR_DEFAULT,
   DEFAULT_MODEL,
+  DEFAULT_BACKEND,
   DEFAULT_PRICE,
   DEFAULT_ROLE,
   DEFAULT_EXCHANGE_URL,
@@ -138,11 +139,19 @@ async function coreStake(role: string, stakeHbar: number) {
   return { staked: true, stakeTx, escrow, stakeHbar, alreadyStaked: false, hashscan: hashscanTx(stakeTx) };
 }
 
-async function coreDeploy(role: string, publicUrl: string, model: string, profile: string, groqKey?: string, cheat?: boolean) {
+async function coreDeploy(
+  role: string,
+  publicUrl: string,
+  model: string,
+  profile: string,
+  backend: Backend,
+  keyConfigured: boolean,
+  cheat?: boolean,
+) {
   const { id } = requireProviderAccount(role);
   const escrow = requireEscrow();
   const check = await checkEndpoint(publicUrl, model);
-  const railway = railwayConfig({ profile, publicUrl, providerId: id, escrowId: escrow, role, groqKey, cheat });
+  const railway = railwayConfig({ profile, publicUrl, providerId: id, escrowId: escrow, role, backend, keyConfigured, cheat });
   // Persist the public URL, don't just hold it in memory: `pnpm provider` boots in a
   // separate shell and re-derives its endpoint from .env. Miss this and it registers
   // http://localhost:<port> over the top of whatever we published to HCS.
@@ -305,16 +314,23 @@ server.registerTool(
     inputSchema: {
       role: z.string().default(DEFAULT_ROLE).describe("Provider account role (used to fill the returned config)."),
       publicUrl: z.string().url().describe("Public URL where your provider service is already running."),
-      model: z.string().default(DEFAULT_MODEL).describe("Model the endpoint should advertise/serve (used for the paywall probe)."),
+      model: z.string().default(DEFAULT_MODEL).describe("Model the endpoint should advertise/serve (used for the paywall probe). Defaults to the 0G model."),
       profile: z.string().default("custom").describe("PROVIDER_PROFILE the service runs under (custom = env-driven)."),
-      groqKey: z.boolean().optional().describe("Whether a Groq key will be set (affects the returned config only)."),
+      backend: z
+        .enum(["0g", "groq", "canned"])
+        .default(DEFAULT_BACKEND)
+        .describe("Where inference comes from (sets PROVIDER_BACKEND in the returned config): 0g (0G Compute — recommended default), groq, or canned."),
+      keyConfigured: z
+        .boolean()
+        .optional()
+        .describe("Whether the chosen backend's API key (ZEROG_API_KEY for 0g, GROQ_API_KEY for groq) will be set on the box. Affects the returned config only; canned needs no key."),
       cheat: z.boolean().optional().describe("CHEAT_MODE for the returned config (leave false — honest providers pass verification)."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
-  async ({ role, publicUrl, model, profile, groqKey, cheat }) => {
+  async ({ role, publicUrl, model, profile, backend, keyConfigured, cheat }) => {
     try {
-      const r = await coreDeploy(role, publicUrl, model, profile, groqKey ? "set" : undefined, cheat);
+      const r = await coreDeploy(role, publicUrl, model, profile, backend, keyConfigured ?? false, cheat);
       if (r.reachable) {
         return ok(`Endpoint ${publicUrl} is reachable and ${r.paywallArmed ? "paywall-armed" : "responding"}.`, r);
       }
@@ -372,12 +388,19 @@ server.registerTool(
     inputSchema: {
       name: z.string().min(1).describe("Provider display name."),
       publicUrl: z.string().url().describe("Public URL where the provider service is (or will be) running."),
-      model: z.string().default(DEFAULT_MODEL).describe("Advertised = served model."),
+      model: z.string().default(DEFAULT_MODEL).describe("Advertised = served model. Defaults to the 0G model."),
       price: z.number().positive().default(DEFAULT_PRICE).describe("Price per request, in the exchange's settlement asset (USDC by default)."),
       role: z.string().default(DEFAULT_ROLE).describe("Env account role."),
       initialBalanceHbar: z.number().positive().max(10000).default(HBAR_PER_ACCOUNT_DEFAULT).describe("Funding for a newly created account."),
       stakeHbar: z.number().positive().max(10000).default(STAKE_HBAR_DEFAULT).describe("Collateral to stake."),
-      groqKey: z.boolean().optional().describe("Whether a Groq key is configured on the box (for the deploy config)."),
+      backend: z
+        .enum(["0g", "groq", "canned"])
+        .default(DEFAULT_BACKEND)
+        .describe("Where inference comes from (sets PROVIDER_BACKEND in the deploy config): 0g (0G Compute — recommended default), groq, or canned."),
+      keyConfigured: z
+        .boolean()
+        .optional()
+        .describe("Whether the chosen backend's API key (ZEROG_API_KEY for 0g, GROQ_API_KEY for groq) is configured on the box (for the deploy config)."),
       cheat: z.boolean().optional().describe("CHEAT_MODE (leave false)."),
       exchangeUrl: z.string().url().default(DEFAULT_EXCHANGE_URL).describe("Exchange base URL for the verify step."),
       requireEndpoint: z.boolean().default(true).describe("If false, skip the endpoint health-check and register anyway (useful when the box comes up after registration)."),
@@ -392,7 +415,7 @@ server.registerTool(
       steps.stake_collateral = await coreStake(args.role, args.stakeHbar);
 
       if (args.requireEndpoint) {
-        const dep = await coreDeploy(args.role, args.publicUrl, args.model, "custom", args.groqKey ? "set" : undefined, args.cheat);
+        const dep = await coreDeploy(args.role, args.publicUrl, args.model, "custom", args.backend, args.keyConfigured ?? false, args.cheat);
         steps.deploy_provider = dep;
         if (!dep.reachable) {
           throw new ProvisionError(
