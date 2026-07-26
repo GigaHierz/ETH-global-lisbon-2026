@@ -30,7 +30,8 @@ The demo makes this visceral: the cheating provider *wins all the traffic* on pr
 | 3 | Agent buys 5 completions. Every one routes to SketchyGPU (cheapest 70b claimant). Balance drains $10.00 → $9.40 with per-call payment refs (Hashscan) | Request feed streams, price index draws at $0.08/req |
 | 4 | Verifier samples a past request, replays it at temp 0 against SketchyGPU **and** witness Titan. Similarity: **0–7%** (threshold: 35%) | Verifier panel: "7% ✗ DIVERGENT" |
 | 5 | Slash: stake 50 → 25 ℏ (escrow→treasury), reputation → 0, verdict published to HCS, removed from routing | 🔴 Full-width flashing SLASHED banner, row struck through |
-| 6 | Next 70b request routes to honest Titan at $0.10 | **Price index steps up $0.08 → $0.10/req** — the market repricing after fraud exits. This is the closing line. |
+| 6 | Next 70b request routes to honest Titan at $0.10 | **Price index steps up $0.08 → $0.10/req** — the market repricing after fraud exits. |
+| 7 | Bonus beat: one completion pinned to **0G Compute** (NimbusAI, `0gm-1.0-35b-a3b`) — a second, decentralized-GPU supply network on the same rails (dashboard model picker routes to any live model on demand) | NimbusAI row in the settlement feed; `servedBy` prints the honest source (0g / canned). This is the closing line. |
 
 The cheat is even visible in the answers: SketchyGPU's canned/8B response to "What is x402?" is *"x402 is an HTTP error code for payments"* (wrong), vs Titan's correct protocol description.
 

@@ -14,8 +14,11 @@ There are three kinds of autonomous actors, each with its own Hedera account + H
 ### The buyer agent (`packages/agent/`)
 An autonomous agent with its own wallet that **accomplishes a goal by buying inference**:
 - Registers an **HCS-14-style identity** (`uaid:aid:hedera:testnet:0.0.9746264`) on-chain **via the Hedera Agent Kit**.
-- Given a goal, **plans** sub-questions, **buys** an answer to each through the exchange (paying
-  real USDC via x402 from its own account), and **synthesizes** a result.
+- Given a goal, **routes it to a model tier** from the live market (simple→cheapest,
+  code/reasoning/long→premium, else middle), **buys** the answer through the exchange (paying real
+  USDC via x402 from its own account), and **synthesizes** a result. Default is **one goal = one
+  purchase**; multi-question decomposition is opt-in via `AGENT_PLAN_MODE=decompose`. An explicit
+  model pin (`POST /run {model}`) skips the router to demo a specific supply network (e.g. 0G) on cue.
 - **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET`.
 
 ### The provider agents (`packages/provider/`, supply side)
