@@ -35,7 +35,7 @@ export interface ProviderInfo {
 
 // A provider's HTS ReputationBond standing (fungible ARBOND token balance).
 // "active" → holding its bond; "frozen" → verifier froze it on fraud (compliance
-// control); "wiped" → bond destroyed by the multi-sig scheduled wipe.
+// control); "wiped" → bond destroyed by the 2-of-2 multi-sig wipe.
 export type BondStatus = "active" | "frozen" | "wiped";
 
 export interface ProviderRow extends ProviderInfo {

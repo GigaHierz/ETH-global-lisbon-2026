@@ -1,4 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { bondTokenId, BOND_AMOUNT } from "./hts.js";
 
 describe("bondTokenId", () => {
@@ -11,9 +13,13 @@ describe("bondTokenId", () => {
     expect(bondTokenId()).toBe("0.0.123456");
   });
 
-  it("returns deployments.json bondToken (null until `pnpm setup-hts` runs) when no override", () => {
-    // deployments.json ships with bondToken: null → resolver yields null, never throws.
-    expect(bondTokenId()).toBeNull();
+  it("falls back to deployments.json bondToken when no override (null before `pnpm setup-hts`)", () => {
+    // Resolver returns whatever deployments.json holds — a 0.0.x id once setup-hts
+    // has run, or null before then — and never throws.
+    const deployed = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), "deployments.json"), "utf8"),
+    ).hederaTestnet?.bondToken ?? null;
+    expect(bondTokenId()).toBe(deployed);
   });
 });
 

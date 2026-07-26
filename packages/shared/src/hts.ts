@@ -3,10 +3,12 @@
 // The bond is a fungible HTS token (created once by `pnpm setup-hts`) whose
 // per-provider balance IS that provider's on-chain reputation. Enforcement is
 // additive to the proven native-HBAR escrow slash: on fraud the verifier
-//   1. FREEZES the fraudster's bond (compliance control, verifier holds freezeKey), then
-//   2. schedules a WIPE that needs a second signer — the token's wipeKey is a
-//      2-of-2 KeyList [verifier, auditor], so destroying reputation is multi-sig.
-//      Verifier ScheduleCreate (sig 1) → auditor ScheduleSign (sig 2) → wipe executes.
+// destroys the fraudster's bond with a 2-of-2 multi-sig TokenWipe — the token's
+// wipeKey is a KeyList [verifier, auditor], so the wipe needs both signatures.
+//
+// (TokenWipe is not in Hedera's Schedule Service whitelist — a scheduled wipe
+// returns SCHEDULED_TRANSACTION_NOT_IN_WHITELIST — so the multi-sig is a direct
+// two-signature transaction, not a scheduled one. See docs/HEDERAFEEDBACK.md.)
 //
 // Every function is real-mode only; callers guard with `if (!MOCK_MODE)` exactly
 // like stakeToEscrow / slashOnChain. All return null on failure so a testnet
@@ -30,7 +32,7 @@ export function bondTokenId(): string | null {
   }
 }
 
-/* v8 ignore start -- Hedera SDK network I/O (HTS + Schedule Service); real mode only */
+/* v8 ignore start -- Hedera SDK network I/O (HTS); real mode only */
 
 // ARBOND balance of an account (consensus-node query, no mirror lag).
 export async function bondBalance(accountId: string): Promise<number> {
@@ -49,80 +51,33 @@ export async function bondBalance(accountId: string): Promise<number> {
   }
 }
 
-// Compliance control: freeze the fraudster's bond (verifier holds freezeKey).
-export async function freezeBond(accountId: string): Promise<string | null> {
+// Destroy a fraudster's bond with a 2-of-2 multi-sig TokenWipe. The token's
+// wipeKey is a KeyList [verifier, auditor]; the verifier freezes + signs the
+// transaction, the auditor co-signs, then it executes — reputation → 0 on-chain,
+// requiring two independent signatures. Returns the wipe tx id (null on failure).
+export async function multiSigWipeBond(accountId: string, amount: number): Promise<string | null> {
   const token = bondTokenId();
   if (!token) return null;
   const verifier = hederaAccount("VERIFIER");
-  const { Client, AccountId, PrivateKey, TokenId, TokenFreezeTransaction } = await import("@hiero-ledger/sdk");
-  const client = Client.forTestnet().setOperator(
-    AccountId.fromString(verifier.id),
-    PrivateKey.fromStringECDSA(verifier.key),
-  );
-  try {
-    const tx = await new TokenFreezeTransaction()
-      .setTokenId(TokenId.fromString(token))
-      .setAccountId(AccountId.fromString(accountId))
-      .execute(client);
-    await tx.getReceipt(client);
-    return tx.transactionId!.toString();
-  } catch {
-    return null;
-  } finally {
-    client.close();
-  }
-}
-
-// Propose the wipe as a scheduled transaction. The token wipeKey is 2-of-2
-// [verifier, auditor]; the verifier's signature (as operator of the
-// ScheduleCreate) is signature 1. Returns the schedule id to be co-signed.
-export async function scheduledWipeBond(
-  accountId: string,
-  amount: number,
-): Promise<{ scheduleId: string | null }> {
-  const token = bondTokenId();
-  if (!token) return { scheduleId: null };
-  const verifier = hederaAccount("VERIFIER");
-  const { Client, AccountId, PrivateKey, TokenId, TokenWipeTransaction, ScheduleCreateTransaction } =
-    await import("@hiero-ledger/sdk");
-  const client = Client.forTestnet().setOperator(
-    AccountId.fromString(verifier.id),
-    PrivateKey.fromStringECDSA(verifier.key),
-  );
-  try {
-    const wipe = new TokenWipeTransaction()
-      .setTokenId(TokenId.fromString(token))
-      .setAccountId(AccountId.fromString(accountId))
-      .setAmount(amount);
-    const tx = await new ScheduleCreateTransaction()
-      .setScheduledTransaction(wipe)
-      .execute(client);
-    const receipt = await tx.getReceipt(client);
-    return { scheduleId: receipt.scheduleId?.toString() ?? null };
-  } catch {
-    return { scheduleId: null };
-  } finally {
-    client.close();
-  }
-}
-
-// Second signature (auditor) on the scheduled wipe → threshold met → wipe
-// executes on-chain. In production this signer is independent of the verifier.
-export async function signSchedule(scheduleId: string): Promise<string | null> {
   const auditor = hederaAccount("AUDITOR");
-  const { Client, AccountId, PrivateKey, ScheduleId, ScheduleSignTransaction } =
-    await import("@hiero-ledger/sdk");
+  const { Client, AccountId, PrivateKey, TokenId, TokenWipeTransaction } = await import("@hiero-ledger/sdk");
   const client = Client.forTestnet().setOperator(
-    AccountId.fromString(auditor.id),
-    PrivateKey.fromStringECDSA(auditor.key),
+    AccountId.fromString(verifier.id),
+    PrivateKey.fromStringECDSA(verifier.key),
   );
   try {
-    const tx = await new ScheduleSignTransaction()
-      .setScheduleId(ScheduleId.fromString(scheduleId))
-      .execute(client);
+    const wipe = await new TokenWipeTransaction()
+      .setTokenId(TokenId.fromString(token))
+      .setAccountId(AccountId.fromString(accountId))
+      .setAmount(amount)
+      .freezeWith(client)
+      .sign(PrivateKey.fromStringECDSA(verifier.key)); // signature 1 (verifier)
+    const signed = await wipe.sign(PrivateKey.fromStringECDSA(auditor.key)); // signature 2 (auditor)
+    const tx = await signed.execute(client);
     await tx.getReceipt(client);
     return tx.transactionId!.toString();
-  } catch {
+  } catch (e) {
+    console.warn(`[verifier] multi-sig wipe failed: ${(e as Error).message.slice(0, 140)}`);
     return null;
   } finally {
     client.close();
