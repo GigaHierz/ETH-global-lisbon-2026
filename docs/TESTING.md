@@ -8,6 +8,10 @@
 |---|---|
 | **Dashboard** (the terminal UI) | https://eth-global-lisbon-2026-dashboard.vercel.app |
 | **Exchange API** (buy inference) | https://exchange-production-275a.up.railway.app |
+| **Agent server** (autonomous buyer) | https://agent-server-production-6029.up.railway.app |
+| **Provider 1** — Titan, honest 70B @ 0.10 | https://provider1-production.up.railway.app |
+| **Provider 2** — Budget, honest 8B @ 0.04 | https://provider2-production.up.railway.app |
+| **Provider 3** — SketchyGPU, **the cheater** @ 0.08 | https://provider3-production.up.railway.app |
 
 Everything behind these is running in **real mode**: USDC settlements on Hedera Testnet, HCS audit trail, live escrow staking. Topic links + tx receipts: [PROOF.md](PROOF.md).
 
@@ -29,7 +33,46 @@ curl -s -X POST https://exchange-production-275a.up.railway.app/v1/chat/completi
 
 You'll get the answer plus `{provider, price, fee, total, asset, latencyMs, paymentRef}` — the `paymentRef` is a real Hedera transaction id.
 
-To see a raw **402** (the paywall itself), hit a provider directly — providers aren't tunneled, so run one locally (`pnpm provider1`, then `curl -X POST localhost:4021/v1/chat/completions -H 'content-type: application/json' -d '{"model":"x","messages":[{"role":"user","content":"hi"}]}'` → HTTP 402 with payment requirements).
+## See the paywall itself — a real HTTP 402
+
+The providers are publicly deployed too, so you can hit the x402 paywall directly with no local
+setup. It answers **HTTP 402** with the payment requirements base64-encoded in the
+`payment-required` header:
+
+```bash
+curl -si -X POST https://provider1-production.up.railway.app/v1/chat/completions \
+  -H "content-type: application/json" \
+  -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"hi"}]}' \
+  | grep -i '^payment-required' | cut -d' ' -f2 | base64 -d | jq
+```
+
+Decoded, that is the live x402 v2 challenge:
+
+```json
+{
+  "x402Version": 2,
+  "error": "Payment required",
+  "resource": { "description": "Titan Compute — llama-3.3-70b-versatile inference" },
+  "accepts": [{
+    "scheme": "exact",
+    "network": "hedera:testnet",
+    "amount": "100000",
+    "asset": "0.0.429274",
+    "payTo": "0.0.9755663",
+    "maxTimeoutSeconds": 300,
+    "extra": { "feePayer": "0.0.7162784" }
+  }]
+}
+```
+
+Everything needed to verify the payment story is in that one response: scheme `exact` on
+`hedera:testnet`, `100000` base units (= 0.10 USDC at 6 decimals) of `asset 0.0.429274`
+(**HTS USDC**, not HBAR), paid to provider1's real account `0.0.9755663`, with the facilitator
+`0.0.7162784` as `feePayer` — which is why the payer needs zero gas.
+
+The other two providers answer the same way with their own prices and accounts —
+`provider2-production` (honest 8B, 0.04) and `provider3-production` (**the cheater**,
+advertises 70B and serves 8B, undercutting Titan at 0.08).
 
 ## The dashboard
 
@@ -40,10 +83,19 @@ Open the dashboard URL in a browser. You should see: provider table (SketchyGPU 
 The dashboard accepts the exchange URL as a query param — no rebuild needed:
 `https://<dashboard-url>/?api=https://<new-api-tunnel-url>`
 
-## ⚠️ Tunnel lifetime
+## Hosting
 
-These are cloudflared **quick tunnels running on a team laptop** — they die when the laptop sleeps or the process stops, and the random URLs change on every restart. If a URL is dead, re-run the tunnels (`cloudflared tunnel --url http://localhost:3000` / `:4100`) and update this file. The durable path is hosted deployment — the exchange and dashboard already run on Railway and Vercel (the URLs above); providers can run on any reachable host via `PROVIDER_PUBLIC_URL`.
+Every URL above is a **durable production deployment**, not a laptop tunnel: the dashboard on
+Vercel, the backends on Railway, each auto-deploying from `main`. They stay up independently of
+anyone's machine. Per-service configuration and the demo runbook are in [DEPLOY.md](DEPLOY.md).
+
+If you do run a provider from your own box behind a tunnel, the address it registers on HCS
+comes from `PROVIDER_PUBLIC_URL` — see
+[provider.md § Listing your own compute](provider.md#listing-your-own-compute).
 
 ## What is NOT exposed
 
-Only the dashboard (:3000) and the exchange API (:4100) are tunneled. Providers, the verifier, `.env`, and every key stay local. Never tunnel additional ports without checking what they serve.
+The dashboard, the exchange, the agent server and the three providers are public. The
+**verifier** is an outbound-only worker with no public domain — it is observable only through
+its effects: the verdicts topic, the slash transfers, and the ARBOND wipe. The `.env` file and
+every private key stay local.
