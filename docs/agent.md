@@ -14,16 +14,21 @@ on-chain actions) + the **Hedera SDK** + **x402**. Everything on-chain is real t
 1. **Registers an HCS-14 identity** (`uaid:aid:hedera:testnet:0.0.9746264`) to the shared HCS
    registry topic — submitted via the Hedera Agent Kit's `submit_topic_message_tool`. Same
    directory the providers register into, so buyers and sellers are one discoverable set.
-2. **Plans** a goal into sub-questions (Groq brain — the agent's own reasoning).
-3. **Buys** an answer to each question through the exchange, **signing the x402 USDC payment with
-   its own AGENT account** (the exchange routes to the cheapest live provider and keeps the spread).
+2. **Routes the goal to a model tier** from the live market (`route-model.ts`): short factual →
+   the cheapest live model, code/reasoning/long → the priciest (capability proxy), else the middle
+   tier. The exchange still picks the cheapest *provider* for that model. An explicit `model` on
+   `POST /run` skips the router — used to demo a specific supply network (e.g. 0G) on cue.
+3. **Buys** the answer through the exchange, **signing the x402 USDC payment with its own AGENT
+   account** (the exchange routes to the cheapest live provider and keeps the spread). By default
+   **one goal = one purchase**; multi-question decomposition (plan a goal into sub-questions and buy
+   each) is opt-in via `AGENT_PLAN_MODE=decompose` — it triples spend and adds latency.
 4. **Enforces a budget** (`AGENT_BUDGET`) — stops buying the moment the next call won't fit.
-5. **Synthesizes** the bought answers into a final result.
+5. **Synthesizes** the bought answer(s) into a final result (a single buy returns its answer verbatim).
 6. **Streams** identity, balance, budget, and every paid step (with Hashscan links) over SSE to
-   the `/agent` web page.
+   the `/agent-demo` web page.
 
 ```
-[web UI /agent] --SSE--> [agent-server :4200] --x402 USDC (AGENT-signed)--> [exchange :4100] --x402--> cheapest provider --> Groq
+[web UI /agent-demo] --SSE--> [agent-server :4200] --x402 USDC (AGENT-signed)--> [exchange :4100] --x402--> cheapest provider --> Groq
                               |__ Hedera Agent Kit: HCS-14 identity registration
 ```
 
@@ -36,22 +41,25 @@ Each terminal first: `export PATH="$HOME/.nvm/versions/node/v22.17.1/bin:$PATH"`
 pnpm exchange         # :4100  (marketplace + x402 paywall)
 pnpm provider1        # :4021  (or your provider fleet)
 pnpm agent-server     # :4200  (this agent)
-pnpm dashboard        # http://localhost:3000/agent
+pnpm dashboard        # http://localhost:3000/agent-demo
 ```
 
-Then open `http://localhost:3000/agent`, enter a goal, and watch it buy.
+Then open `http://localhost:3000/agent-demo`, enter a goal, and watch it buy.
 
 ### HTTP API (agent-server)
 | Route | Purpose |
 |---|---|
-| `POST /run` `{goal}` | start a budget-capped reasoning run |
-| `GET /events` | SSE stream: `goal` · `plan` · `bought` (+Hashscan) · `synthesis` · `done` · `balance` |
+| `POST /run` `{goal, model?}` | start a budget-capped run; optional `model` pins the model and skips the router |
+| `GET /models` | the live market the exchange can route to now (cheapest per model) — powers the dashboard's model picker |
+| `GET /events` | SSE stream: `identity` · `route` · `bought` (+Hashscan) · `synthesis` · `done` · `balance` |
 | `GET /identity` | the agent's HCS-14 UAID + registration tx |
 | `GET /state` | snapshot (balance, budget, findings, events) |
 
 ### Config
 `EXCHANGE_ASK` (0.12) · `AGENT_BUDGET` (2) · `AGENT_PORT` (4200) ·
-`AGENT_MODEL` (llama-3.3-70b-versatile) · `AGENT_MAX_QUESTIONS` (3) · `AGENT_BRAIN_MODEL`.
+`AGENT_MODEL` (llama-3.3-70b-versatile, the router fallback) · `AGENT_PLAN_MODE` (`single` default;
+`decompose` to plan sub-questions) · `AGENT_MAX_QUESTIONS` (3, only when decomposing) ·
+`AGENT_BRAIN_MODEL`.
 
 ## On-chain transactions (live, verifiable on Hashscan)
 
