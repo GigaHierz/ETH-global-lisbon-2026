@@ -40,6 +40,11 @@ function writeCache(c: Record<string, CacheEntry>) {
   fs.writeFileSync(CACHE_FILE, JSON.stringify(c, null, 2));
 }
 
+/** An endpoint only the local box can reach — useless to a remote exchange. */
+export function isLocal(url: string | undefined): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url ?? "");
+}
+
 async function stakeToEscrow(id: string, key: string): Promise<string> {
   const { Client, AccountId, PrivateKey, Hbar, TransferTransaction } = await import("@hiero-ledger/sdk");
   const escrow = process.env.HEDERA_ESCROW_ID;
@@ -83,8 +88,20 @@ export async function ensureRegistered(
   const cache = readCache();
   const entry: CacheEntry = cache[id] ?? {};
   if (entry.registered && entry.endpoint !== endpoint) {
-    log(profile.key, `endpoint changed (${entry.endpoint} → ${endpoint}) — re-registering on HCS`);
-    entry.registered = undefined;
+    // Never downgrade a public registration to localhost. Booting in a shell that lost
+    // PROVIDER_PUBLIC_URL would otherwise publish localhost over the good registration
+    // and the exchange — which reads the topic last-write-wins — would mark us down.
+    if (isLocal(endpoint) && !isLocal(entry.endpoint)) {
+      log(
+        profile.key,
+        `WARN PROVIDER_PUBLIC_URL is unset, so this boot would register ${endpoint} over ` +
+          `${entry.endpoint} — keeping the public registration. Set PROVIDER_PUBLIC_URL in .env ` +
+          `to change it (the exchange routes to the endpoint on the registry topic, not to /info).`,
+      );
+    } else {
+      log(profile.key, `endpoint changed (${entry.endpoint} → ${endpoint}) — re-registering on HCS`);
+      entry.registered = undefined;
+    }
   }
 
   if (!entry.staked) {

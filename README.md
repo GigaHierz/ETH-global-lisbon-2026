@@ -67,6 +67,7 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 | [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness; on divergence slashes staked HBAR and **destroys the HTS bond with a 2-of-2 multi-sig wipe** (verifier + auditor) | [verifier.md](docs/verifier.md) |
 | [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | [`packages/shared`](packages/shared) | Shared Hedera plumbing, HCS helpers, chat types, and constants used by every service | — |
+| [`packages/provider-mcp`](packages/provider-mcp) | MCP server: exposes provider onboarding (account, stake, HCS-14 registration, liveness check) as agent-callable tools | [README](packages/provider-mcp/README.md) |
 
 ## Real payments on Hedera Testnet
 
@@ -122,8 +123,10 @@ packages/
   verifier/    fraud auditor
   dashboard/   Next.js trading terminal
   shared/      Hedera + HCS + x402 plumbing
+  provider-mcp/ MCP server for agent-driven provider onboarding
 scripts/       demo, smoke, and Hedera/HCS setup
 docs/          all documentation
+.claude/skills/ onboarding-a-provider — the guided setup walkthrough
 ```
 
 ## Roadmap

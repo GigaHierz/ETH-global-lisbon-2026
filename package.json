@@ -21,6 +21,7 @@
     "provider:prod": "tsx packages/provider/src/index.ts",
     "verifier:prod": "tsx packages/verifier/src/index.ts",
     "dashboard": "pnpm --filter @agentrouter/dashboard dev",
+    "provider-mcp": "pnpm -s --filter @agentrouter/provider-mcp start",
     "demo": "tsx --env-file=.env scripts/demo.ts",
     "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts",
     "setup-hedera": "tsx scripts/setup-hedera-accounts.ts",

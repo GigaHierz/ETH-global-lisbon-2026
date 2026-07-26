@@ -60,19 +60,30 @@ export interface RailwayConfigInput {
   publicUrl: string;
   providerId: string;
   escrowId: string;
+  role?: string;
   groqKey?: string;
   cheat?: boolean;
 }
 
 /** The exact Railway settings to run the provider service, for someone who needs
- *  to spin up fresh compute. Secrets are placeholders — never emit real keys. */
+ *  to spin up fresh compute. Secrets are placeholders — never emit real keys.
+ *
+ *  Note the deliberate rename: the account is stored locally as HEDERA_<role>_*, but
+ *  the deployed service runs the `custom` profile, which always reads HEDERA_PROVIDER_*.
+ *  We emit the right *value* under the name the service expects, and `secrets` says
+ *  which local var to copy it from — otherwise a non-default role can't be deployed. */
 export function railwayConfig(o: RailwayConfigInput) {
+  const role = o.role ?? "PROVIDER";
   return {
     builder: "DOCKERFILE",
     dockerfilePath: "Dockerfile",
     startCommand: "pnpm provider:prod",
     important:
       "Do NOT set PORT (Railway injects it). PROVIDER_PUBLIC_URL MUST be this service's public domain — otherwise it registers 'localhost' and the exchange shows it 'down'.",
+    secrets: {
+      HEDERA_PROVIDER_KEY: `copy the value of HEDERA_${role}_KEY from your .env`,
+      ...(o.groqKey ? { GROQ_API_KEY: "your Groq API key" } : {}),
+    },
     env: {
       MOCK_MODE: "false",
       PROVIDER_PROFILE: o.profile,

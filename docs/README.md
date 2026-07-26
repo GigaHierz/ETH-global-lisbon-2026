@@ -23,6 +23,14 @@ use the documents below.
 - [verifier.md](verifier.md) — the fraud auditor that slashes cheaters.
 - [FRONTEND.md](FRONTEND.md) — dashboard component and styling conventions.
 
+## Agent tooling
+
+- [`packages/provider-mcp`](../packages/provider-mcp/README.md) — MCP server exposing provider
+  onboarding as callable tools (account, stake, HCS-14 registration, liveness verification).
+- [`.claude/skills/onboarding-a-provider`](../.claude/skills/onboarding-a-provider/SKILL.md) —
+  the guided zero-to-live walkthrough. Uses the MCP tools when they're connected and the `pnpm`
+  commands when they aren't.
+
 ## Operations
 
 - [DEPLOY.md](DEPLOY.md) — production URLs, per-service configuration, and the demo runbook.

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agentrouter-provider": {
+      "command": "pnpm",
+      "args": ["-s", "--filter", "@agentrouter/provider-mcp", "start"]
+    }
+  }
+}

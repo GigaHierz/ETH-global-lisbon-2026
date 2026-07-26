@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import TerminalDots from "@/components/TerminalDots";
 
 export const metadata = {
   title: "AgentRouter — Become a Provider",
@@ -94,6 +95,16 @@ const ENV_VARS: Array<[string, string, string]> = [
   ["PROVIDER_PUBLIC_URL", "http://localhost:4025", "Public address the exchange routes to."],
   ["GROQ_API_KEY", "—", "Upstream inference. Omitted → canned fallback answers."],
   ["STAKE_HBAR", "50", "Boot-time stake posted to escrow."],
+];
+
+// MCP tools — from packages/provider-mcp/src/index.ts.
+const MCP_TOOLS: Array<[string, string]> = [
+  ["create_provider_account", "Creates and funds a Hedera Testnet account, writes it to .env"],
+  ["stake_collateral", "Moves the 50 ℏ quality bond to the escrow account"],
+  ["register_provider", "Publishes the HCS-14 registration to the registry topic"],
+  ["deploy_provider", "Health-checks your running endpoint and records its public URL"],
+  ["verify_provider_live", "Polls the routing table until your wallet shows live"],
+  ["provision_provider", "Runs all of the above from one config — idempotent, resumable"],
 ];
 
 // Public provider endpoints — from provider/src/index.ts.
@@ -232,6 +243,10 @@ export default function ProvidersPage() {
                 <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
                 <span>Set your own model, price, and name in <span className="font-data">.env</span> — no code changes.</span>
               </div>
+              <div className="flex items-start gap-3">
+                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
+                <span>Prefer not to type it? An AI agent can drive the whole thing — <a href="#agent-onboarding" className="text-primary-fixed-dim hover:text-accent-cyan transition-colors">see below</a>.</span>
+              </div>
             </div>
             <a href={`${REPO}/blob/main/docs/GUIDE.md`} target="_blank" rel="noreferrer"
               className="mt-8 w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
@@ -242,11 +257,7 @@ export default function ProvidersPage() {
           {/* Code terminal */}
           <div className="bg-surface-obsidian rounded-lg border border-outline/30 shadow-2xl overflow-hidden font-data text-sm">
             <div className="bg-surface-container px-4 py-3 border-b border-outline-variant flex items-center justify-between">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-hud-error/40" />
-                <div className="w-3 h-3 rounded-full bg-accent-orange/40" />
-                <div className="w-3 h-3 rounded-full bg-accent-cyan/40" />
-              </div>
+              <TerminalDots gapClassName="gap-2" dotClassName="w-3 h-3" />
               <span className="text-on-surface-variant text-[11px] uppercase tracking-widest">provision.sh — bash</span>
             </div>
             <div className="p-6 space-y-4 text-[13px]">
@@ -277,6 +288,99 @@ export default function ProvidersPage() {
                 <span className="text-on-surface-variant text-[12px]">scheme: exact · network: hedera:testnet</span><br />
                 <span className="text-on-surface-variant text-[12px]">amount: 10000000 tinybars · payTo: 0.0.9744152</span>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Agent-driven onboarding ── */}
+        <section id="agent-onboarding" className="py-24 px-4 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+            <div>
+              <div className="inline-block px-3 py-1 mb-6 border border-outline-variant rounded-full bg-surface-container/50 backdrop-blur-md">
+                <span className="font-data text-[11px] font-bold text-accent-cyan uppercase tracking-widest">
+                  Agent-native
+                </span>
+              </div>
+              <h2 className="font-display font-extrabold text-[36px] leading-[42px] md:text-5xl tracking-[-0.04em] mb-6 text-on-surface">
+                Or let an agent do it.
+              </h2>
+              <p className="font-body text-base text-on-surface-variant mb-6 max-w-lg">
+                The repo ships an MCP server and a Claude Code skill for onboarding. The skill walks
+                the setup with you and checks every claim on-chain; the MCP server exposes the
+                Hedera work — account, stake, HCS registration, liveness — as callable tools.
+              </p>
+              <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
+                It doesn&apos;t replace <span className="font-data text-primary-fixed-dim">pnpm provider</span>.
+                Your service still stakes and registers itself on boot — the tools create the account
+                beforehand and confirm you&apos;re routable afterwards. Every tool is idempotent, so a
+                re-run repairs rather than duplicates.
+              </p>
+              <div className="space-y-3 font-body text-sm text-on-surface-variant mb-8">
+                <div className="flex items-start gap-3">
+                  <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
+                  <span>Bring your own compute — no Railway or cloud credentials are ever requested.</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
+                  <span>Private keys stay in your <span className="font-data">.env</span>; tools report presence, never values.</span>
+                </div>
+              </div>
+              <a href={`${REPO}/blob/main/packages/provider-mcp/README.md`} target="_blank" rel="noreferrer"
+                className="w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                MCP server reference <Icon name="open_in_new" className="text-[14px]" />
+              </a>
+            </div>
+
+            {/* Terminal: wiring + a call */}
+            <div className="bg-surface-obsidian rounded-lg border border-outline/30 shadow-2xl overflow-hidden font-data text-sm">
+              <div className="bg-surface-container px-4 py-3 border-b border-outline-variant flex items-center justify-between">
+                <TerminalDots gapClassName="gap-2" dotClassName="w-3 h-3" />
+                <span className="text-on-surface-variant text-[11px] uppercase tracking-widest">.mcp.json — json</span>
+              </div>
+              <div className="p-6 space-y-4 text-[13px]">
+                <div>
+                  <span className="text-accent-orange"># Committed at the repo root — approve it once in your client</span><br />
+                  <span className="text-on-surface">{"{ \"mcpServers\": { \"agentrouter-provider\": {"}</span><br />
+                  <span className="text-on-surface ml-4">{"\"command\": \"pnpm\","}</span><br />
+                  <span className="text-on-surface ml-4">{"\"args\": [\"-s\", \"--filter\", \"@agentrouter/provider-mcp\", \"start\"]"}</span><br />
+                  <span className="text-on-surface">{"} } }"}</span>
+                </div>
+                <div className="pt-4 mt-4 border-t border-outline-variant">
+                  <span className="text-accent-cyan font-bold italic">{"// after your provider is up, one call verifies the lot"}</span><br />
+                  <span className="text-on-surface">provision_provider({"{"}</span><br />
+                  <span className="text-on-surface ml-4">name: &quot;Acme Inference&quot;, model: &quot;llama-3.3-70b-versatile&quot;,</span><br />
+                  <span className="text-on-surface ml-4">price: 0.08, publicUrl: &quot;https://acme.example.com&quot;</span><br />
+                  <span className="text-on-surface">{"}"})</span>
+                </div>
+                <div className="bg-accent-cyan/10 p-3 border-l-2 border-accent-cyan">
+                  <span className="text-accent-cyan font-bold">✓ provisioned — discoverable &amp; live</span><br />
+                  <span className="text-on-surface-variant text-[12px]">alreadyStaked: true · alreadyRegistered: true</span><br />
+                  <span className="text-on-surface-variant text-[12px]">every step links to a Hashscan transaction</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tools */}
+          <div className="mt-16">
+            <h3 className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface mb-6">MCP Tools</h3>
+            <div className="bg-surface-container border border-outline-variant overflow-x-auto">
+              <table className="w-full text-left font-data text-[12px]">
+                <thead className="bg-surface-container-low text-on-surface-variant uppercase text-[9px]">
+                  <tr>
+                    <th className="px-4 py-3">Tool</th>
+                    <th className="px-4 py-3">What it does</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/30">
+                  {MCP_TOOLS.map(([name, does]) => (
+                    <tr key={name} className="hover:bg-accent-cyan/5 transition-colors">
+                      <td className="px-4 py-3 text-primary-fixed-dim whitespace-nowrap">{name}</td>
+                      <td className="px-4 py-3 text-on-surface-variant">{does}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
