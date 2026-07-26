@@ -32,3 +32,4 @@ export function requireEnv(name: string): string {
 }
 export * from "./hcs.js";
 export * from "./hts.js";
+export * from "./zerog.js";

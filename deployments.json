@@ -13,5 +13,17 @@
     },
     "bondToken": "0.0.9758338",
     "note": "Requests settle in HTS USDC (0.0.429274, 6 dp); SETTLEMENT_ASSET=hbar switches back to native HBAR. Staking/slash is always native-HBAR escrow via the Hedera SDK. Reputation is a separate HTS ReputationBond token (bondToken, set by `pnpm setup-hts`) with a custom fractional fee + freeze/pause/wipe compliance controls; on fraud the verifier destroys it with a 2-of-2 multi-sig TokenWipe (verifier + auditor). Agent identity is HCS-14-style (uaid:aid:hedera:testnet:0.0.x) published to the registry topic via the Hedera Agent Kit. No Solidity anywhere — HCS + HTS + Mirror Node, all SDK-native."
+  },
+  "zerogChain": {
+    "network": "0g:galileo-testnet",
+    "chainId": 16602,
+    "rpc": "https://evmrpc-testnet.0g.ai",
+    "explorer": "https://chainscan-galileo.0g.ai",
+    "storageIndexer": "https://indexer-storage-testnet-turbo.0g.ai",
+    "computeRouter": "https://router-api.0g.ai/v1",
+    "verdictRegistry": "0x5b7da2E9432E3A3c3C26cA8B30d0BcafF2A269eE",
+    "agentNft": "0x85ff2BC072cBfec881A13bC04E7cbaf79ad5875D",
+    "erc8004IdentityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "note": "0G Chain (Galileo, chain 16602) is the EVM-native provenance/identity leg — distinct from the Hedera settlement leg above. verdictRegistry (VerdictRegistry.sol) records each 0G-served trade's verifier verdict on-chain; agentNft (AgentNFT.sol, ERC-7857-style) mints the buyer agent as a tradeable Agentic ID whose intelligent-data is the 0G Storage root of its encrypted memory. Both live in packages/onchain-0g and are deployed with `forge script script/Deploy.s.sol` — paste the printed addresses into verdictRegistry/agentNft here and into .env (ZEROG_VERDICT_REGISTRY, ZEROG_AGENT_NFT). Inference runs on 0G Compute (computeRouter, OpenAI-compatible; TEE-verified with X-0G-Provider-Trust-Mode: verified). erc8004IdentityRegistry is 0G's live ERC-8004 registry, an optional discoverability path. Unlike the Hedera leg, this leg uses Solidity (0G Chain is EVM)."
   }
 }

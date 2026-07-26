@@ -19,6 +19,10 @@
     "cors": "^2.8.5",
     "viem": "^2.48.11"
   },
+  "optionalDependencies": {
+    "@0gfoundation/0g-storage-ts-sdk": "^1.2.10",
+    "ethers": "^6.13.0"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",

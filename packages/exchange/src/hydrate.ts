@@ -31,6 +31,10 @@ interface TradePayload {
   inboundTx?: string;
   paymentTx?: string;
   ts?: number;
+  servedBy?: "0g" | "groq" | "canned";
+  upstreamModel?: string;
+  teeAttested?: boolean;
+  attestationRef?: string;
 }
 
 /** Consensus timestamp ("seconds.nanos") → epoch ms. */
@@ -66,6 +70,10 @@ export function tradeToEntry(msg: TopicMessage): RequestLogEntry | null {
     promptPreview: "(restored from HCS)",
     answerPreview: "",
     status: "ok",
+    ...(p.servedBy ? { servedBy: p.servedBy } : {}),
+    ...(p.upstreamModel ? { upstreamModel: p.upstreamModel } : {}),
+    ...(p.teeAttested ? { teeAttested: true } : {}),
+    ...(p.attestationRef ? { attestationRef: p.attestationRef } : {}),
   };
 }
 
