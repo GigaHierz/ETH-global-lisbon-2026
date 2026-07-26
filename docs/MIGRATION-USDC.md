@@ -109,6 +109,31 @@ anywhere; keys are not.
 **Never set `HEDERA_OPERATOR_KEY`** — no runtime service reads it, and it can drain every
 account. Only the local setup scripts use it.
 
+### Start commands
+
+The build is the repo `Dockerfile` (pinned by `railway.json`), so no build command is
+needed. Every service runs the same image and differs only by its **Start Command** and
+its variables:
+
+| Service | Start Command | Domain |
+|---|---|---|
+| exchange | `pnpm exchange:prod` | yes |
+| agent-server | `pnpm agent-server:prod` | yes |
+| provider1 / 2 / 3 | `pnpm provider:prod` | yes, each |
+| verifier | `pnpm verifier:prod` | no — worker |
+
+Two traps in that table, both of which fail quietly rather than loudly:
+
+- **The Dockerfile's default CMD is `pnpm agent-server:prod`.** Any service that does not
+  set its own Start Command boots a second agent instead of what you intended.
+- **`provider:prod` carries no `--profile` flag.** All three providers share one command
+  and are separated purely by `PROVIDER_PROFILE`. Leave it unset and the process exits
+  with "Unknown provider profile undefined".
+
+Always use the `:prod` variants, never the bare ones (`pnpm exchange`, `pnpm provider1`,
+…). The bare scripts load variables from a local file that does not exist in the
+container — they are for local development only.
+
 ### exchange — start command `pnpm exchange:prod`, needs a domain
 
 ```
