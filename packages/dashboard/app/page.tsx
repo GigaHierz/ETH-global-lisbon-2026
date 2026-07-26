@@ -223,9 +223,9 @@ export default function Landing() {
                 </Card>
               </div>
               <div className="mt-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                <a href="mailto:sahilmarketingid@gmail.com?subject=AgentRouter%20Provider%20Waitlist&body=I%20want%20to%20list%20my%20compute%20on%20AgentRouter.%0A%0AHardware%3A%20%0AModels%20I%20can%20serve%3A%20%0AHedera%20account%20(if%20any)%3A%20"
+                <a href="/providers/onboard"
                   className="bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:glow-orange transition-all active:scale-95">
-                  Join the Provider Waitlist
+                  Join as a Provider
                 </a>
                 <a href="/providers"
                   className="font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
