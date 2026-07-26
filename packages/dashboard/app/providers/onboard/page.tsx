@@ -83,7 +83,7 @@ const STEPS: Step[] = [
     why: "Name, model and price are your listing. Advertise exactly what you serve — the verifier replays sampled prompts against another provider of the same model, and serving something cheaper than advertised costs you your bond.",
     cmd: `PROVIDER_NAME="Acme Inference"\nPROVIDER_MODEL="llama-3.3-70b-versatile"\nPROVIDER_PRICE=0.08\nPROVIDER_PORT=4025\nPROVIDER_BACKEND=0g          # 0g (default) | groq | canned\nZEROG_API_KEY=...            # from pc.0g.ai — omit for canned demo answers`,
     cmdLabel: ".env",
-    note: "Backends are pluggable: 0G Compute's decentralized GPU network by default, Groq, or your own box. Without any key you still run — with deterministic canned answers.",
+    note: "Backends are pluggable: 0G Compute's decentralized GPU network (recommended) by default, or Groq. Without any key you still run — with deterministic canned answers, so you can try the whole flow in MOCK_MODE first (no keys, no funding) before going live on testnet.",
   },
   {
     n: "04",

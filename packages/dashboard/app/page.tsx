@@ -133,7 +133,7 @@ export default function Landing() {
               </a>
               <a href="/providers"
                 className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
-                List your GPU
+                Become a provider
               </a>
             </div>
           </div>
@@ -191,16 +191,16 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── List your GPU ── */}
-        <section className="bg-surface-container-lowest border-y border-outline-variant py-24" id="list-gpu">
+        {/* ── Run a provider ── */}
+        <section className="bg-surface-container-lowest border-y border-outline-variant py-24" id="run-provider">
           <div className="px-4 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
             <div className="flex flex-col h-full justify-center">
               <h2 className="font-display font-extrabold text-[42px] leading-[48px] md:text-5xl tracking-[-0.04em] mb-6 text-on-surface">
-                Monetize Your Compute.
+                Run a Provider.
               </h2>
               <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
-                Turn your idle RTX or H100 into a high-yield asset. Join the decentralized backbone
-                of AI inference and earn USDC for every request served.
+                Point any box at 0G Compute (or Groq), stake 50 ℏ on Hedera, and earn USDC for every
+                request the exchange routes to you. No GPU of your own required.
               </p>
               <div className="space-y-4">
                 <Card className="flex items-center gap-4 p-4">
@@ -208,7 +208,7 @@ export default function Landing() {
                     <Icon name="memory" />
                   </div>
                   <div>
-                    <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Minimum Hardware</div>
+                    <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Minimum Setup</div>
                     <div className="font-data text-sm text-on-surface-variant">Any box that can reach 0G Compute (or Groq) — no local GPU required</div>
                   </div>
                 </Card>

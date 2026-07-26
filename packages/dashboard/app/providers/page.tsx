@@ -30,7 +30,7 @@ const STEPS = [
     icon: "cloud_upload",
     iconBg: "bg-accent-orange",
     iconColor: "text-on-primary",
-    title: "List your compute",
+    title: "List your inference",
     items: [
       "Run the provider service on any box — VPS, cloud, or your laptop behind a tunnel.",
       "Point it at 0G Compute (the recommended default), Groq, or run without a key for canned demo answers.",
@@ -139,15 +139,16 @@ export default function ProvidersPage() {
           <div className="relative z-10 max-w-4xl">
             <div className="inline-block px-3 py-1 mb-8 border border-outline-variant rounded-full bg-surface-container/50 backdrop-blur-md">
               <span className="font-data text-[11px] font-bold text-accent-orange uppercase tracking-widest">
-                For Compute Providers
+                For Inference Providers
               </span>
             </div>
             <h1 className="font-display font-extrabold text-[42px] leading-[48px] md:text-[72px] md:leading-[80px] tracking-[-0.04em] mb-6 text-on-surface">
-              Monetize Your <span className="text-accent-cyan">Compute</span>.
+              Run a <span className="text-accent-cyan">Provider</span>.
             </h1>
             <p className="font-body text-base md:text-xl text-on-surface-variant mb-12 max-w-2xl mx-auto">
-              Turn an idle GPU or a spare API key into a high-yield asset. Stake HBAR, register on
-              Hedera, and earn for every request the exchange routes your way.
+              Resell 0G Compute or Groq inference behind a stake-backed x402 paywall. Stake HBAR,
+              register on Hedera testnet, and earn USDC for every request the exchange routes to
+              you — from any box, no GPU of your own required.
             </p>
             <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
               <a href={ONBOARD}
@@ -262,8 +263,16 @@ export default function ProvidersPage() {
               <p className="font-body text-base text-on-surface-variant mb-6 max-w-lg">
                 Onboarding is agent-native. The repo ships a Claude Code skill that walks the setup
                 with you and checks every claim on-chain, and an MCP server that exposes the Hedera
-                work — account, stake, HCS registration, liveness — as callable tools. Point your
-                client at the repo and ask it to list your compute.
+                work — account, stake, HCS registration, liveness — as callable tools.
+              </p>
+              <p className="font-body text-base text-on-surface-variant mb-6 max-w-lg">
+                Both live in the repo under <span className="font-data">.claude/</span> — no
+                marketplace install. Clone it and open it in Claude Code: the{" "}
+                <span className="font-data text-primary-fixed-dim">onboarding-a-provider</span> skill
+                loads automatically (just invoke it and ask to run a provider), and the MCP server
+                activates once you approve it in <span className="font-data">/mcp</span> (config
+                below). Other agents: point them at{" "}
+                <span className="font-data">.claude/skills/onboarding-a-provider/SKILL.md</span>.
               </p>
               <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
                 The tools don&apos;t replace <span className="font-data text-primary-fixed-dim">pnpm provider</span> —
@@ -274,7 +283,7 @@ export default function ProvidersPage() {
               <div className="space-y-3 font-body text-sm text-on-surface-variant mb-8">
                 <div className="flex items-start gap-3">
                   <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                  <span>Bring your own compute — no Railway or cloud credentials are ever requested.</span>
+                  <span>Bring your own box and keys — no Railway or cloud credentials are ever requested.</span>
                 </div>
                 <div className="flex items-start gap-3">
                   <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
@@ -422,7 +431,7 @@ export default function ProvidersPage() {
         {/* ── CTA ── */}
         <section className="py-24 px-4 text-center">
           <h2 className="font-display font-extrabold text-[32px] md:text-5xl tracking-[-0.04em] mb-6 text-on-surface">
-            Ready to list your compute?
+            Ready to run a provider?
           </h2>
           <p className="font-body text-base text-on-surface-variant mb-10 max-w-2xl mx-auto">
             Join as a provider, or clone the repo and run <span className="font-data text-primary-fixed-dim">pnpm provider</span> right now.

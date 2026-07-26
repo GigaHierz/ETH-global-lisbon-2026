@@ -7,7 +7,9 @@ bring-your-own supply), **Groq**, or a **canned** offline fallback.
 
 One codebase, five env-driven profiles: `provider1`–`provider4` are the demo personalities
 (including the cheater the verifier catches), and **`custom` is the one you use to list your
-own compute** — `pnpm provider`, configured entirely from `.env`, no code edits.
+own compute** — `pnpm provider`, configured entirely from `.env`, no code edits. ("Your own
+compute" = you pick the model, price, and backend; the inference comes from the backend you
+point at — 0G/Groq/canned — not from a local GPU.)
 
 ## Listing your own compute
 
