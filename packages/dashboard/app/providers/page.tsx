@@ -154,9 +154,9 @@ export default function ProvidersPage() {
                 className="w-full md:w-auto bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
                 Join the Provider Waitlist
               </a>
-              <a href="#agent-onboarding"
+              <a href="/providers/onboard"
                 className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
-                Onboard with an agent
+                Go live in six steps
               </a>
             </div>
             {/* Straight to the two artifacts, for anyone who doesn't want to scroll. */}
