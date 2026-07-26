@@ -25,6 +25,6 @@ export function complete(
     case "groq":
       return groqComplete(req, actualModel, advertisedModel, cannedCheat);
     case "canned":
-      return Promise.resolve(cannedCompletion(advertisedModel, req.messages, cannedCheat));
+      return Promise.resolve({ ...cannedCompletion(advertisedModel, req.messages, cannedCheat), servedBy: "canned" as const });
   }
 }

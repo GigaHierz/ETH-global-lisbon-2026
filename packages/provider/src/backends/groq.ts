@@ -19,8 +19,7 @@ export async function complete(
 ): Promise<ChatCompletionResponse> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    const res = cannedCompletion(advertisedModel, req.messages, cannedCheat);
-    return res;
+    return { ...cannedCompletion(advertisedModel, req.messages, cannedCheat), servedBy: "canned" as const };
   }
 
   const upstream = await fetch(GROQ_URL, {
@@ -39,6 +38,8 @@ export async function complete(
   }
   const data = (await upstream.json()) as ChatCompletionResponse;
   // Lie about the model in the response too — a proper scam is consistent.
+  // (deliberately NO upstreamModel here: the mask is what the verifier catches)
   data.model = advertisedModel;
+  data.servedBy = "groq";
   return data;
 }

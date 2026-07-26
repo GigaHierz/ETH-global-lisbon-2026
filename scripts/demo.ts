@@ -134,9 +134,10 @@ async function main() {
       });
       const zgRaw = await zg.text();
       try {
-        const zgJson = JSON.parse(zgRaw) as { agentrouter?: { provider: string; total?: number; paymentRef?: string }; choices?: Array<{ message?: { content?: string } }> };
+        const zgJson = JSON.parse(zgRaw) as { agentrouter?: { provider: string; total?: number; paymentRef?: string }; servedBy?: string; choices?: Array<{ message?: { content?: string } }> };
         if (zg.ok && zgJson.agentrouter) {
-          console.log(`  0G trade: ${zgJson.agentrouter.provider} | ${money(zgJson.agentrouter.total ?? "?")} | pay=${(zgJson.agentrouter.paymentRef ?? "").slice(0, 24)}`);
+          const source = zgJson.servedBy === "0g" ? "0G Compute Router" : `${zgJson.servedBy ?? "unknown"} fallback (ZEROG_API_KEY pending)`;
+          console.log(`  0G trade: ${zgJson.agentrouter.provider} | ${money(zgJson.agentrouter.total ?? "?")} | source: ${source} | pay=${(zgJson.agentrouter.paymentRef ?? "").slice(0, 24)}`);
           console.log(`  ✦ ${(zgJson.choices?.[0]?.message?.content ?? "").slice(0, 90)}`);
         } else {
           console.log(`  0G trade skipped: HTTP ${zg.status} — ${zgRaw.slice(0, 100)}`);

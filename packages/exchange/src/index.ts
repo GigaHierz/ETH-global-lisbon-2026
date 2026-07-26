@@ -217,6 +217,8 @@ if (MOCK_MODE) {
         latencyMs: entry.latencyMs,
         inboundTx: inboundRef,
         paymentTx: entry.paymentRef,
+        ...(entry.servedBy ? { servedBy: entry.servedBy } : {}),
+        ...(entry.upstreamModel ? { upstreamModel: entry.upstreamModel } : {}),
       }).catch((e) => log("exchange", `HCS trade publish failed: ${(e as Error).message.slice(0, 80)}`));
     }
   });
@@ -329,6 +331,9 @@ app.post("/v1/chat/completions", async (req, res) => {
       answerPreview: data.choices?.[0]?.message?.content?.slice(0, 80) ?? "",
       status: "ok" as const,
       isAudit,
+      // provenance (additive; absent on legacy providers — never mandatory)
+      ...(data.servedBy ? { servedBy: data.servedBy } : {}),
+      ...(data.upstreamModel ? { upstreamModel: data.upstreamModel } : {}),
     };
     pendingSettles.set(quote.quoteId, entry.id); // real mode: onAfterSettle fills inboundRef + accrues fee
     if (MOCK_MODE) {
