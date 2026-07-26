@@ -72,7 +72,10 @@ async function main() {
 
   // 2. exchange
   banner("2/5 · booting exchange (routes to cheapest provider per model)");
-  boot("exchange", ["packages/exchange/src/index.ts"]);
+  boot("exchange", ["packages/exchange/src/index.ts"], {
+    // seed discovery with all four local providers (mock mode has no HCS registry)
+    PROVIDER_URLS: [4021, 4022, 4023, 4024].map((p) => `http://localhost:${p}`).join(","),
+  });
   await waitFor(`${EXCHANGE_URL}/healthz`);
   await new Promise((r) => setTimeout(r, 1500)); // let discovery run
 
