@@ -65,6 +65,11 @@ export default function AgentDemoControlRoom() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // "" = let the agent's router choose. Anything else pins the model, which is how
+  // you demo a specific supply network (0G, say) instead of hoping the prompt
+  // happens to land in that price tier.
+  const [modelPick, setModelPick] = useState("");
+  const [models, setModels] = useState<Array<{ model: string; price: number }>>([]);
 
   const sym = useAssetSymbol();
 
@@ -161,6 +166,13 @@ export default function AgentDemoControlRoom() {
     streamEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [events.length]);
 
+  useEffect(() => {
+    fetch(`${AGENT}/models`)
+      .then((r) => r.json())
+      .then((m) => Array.isArray(m) && setModels(m))
+      .catch(() => {});
+  }, []);
+
   async function submitGoal(e: React.FormEvent) {
     e.preventDefault();
     const g = goalInput.trim();
@@ -171,7 +183,7 @@ export default function AgentDemoControlRoom() {
       const res = await fetch(`${AGENT}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: g }),
+        body: JSON.stringify(modelPick ? { goal: g, model: modelPick } : { goal: g }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -303,6 +315,20 @@ export default function AgentDemoControlRoom() {
                   placeholder={running ? "agent is working…" : "e.g. Compare the top 3 L1s by throughput and fees"}
                   className="flex-1 bg-surface-obsidian border border-outline-variant px-3 py-2 font-data text-sm text-on-surface outline-none focus:border-accent-cyan disabled:opacity-50 transition-colors"
                 />
+                <select
+                  value={modelPick}
+                  onChange={(e) => setModelPick(e.target.value)}
+                  disabled={running}
+                  title="Pin a model, or let the agent's router pick by prompt"
+                  className="bg-surface-obsidian border border-outline-variant px-2 py-2 font-data text-[11px] text-on-surface-variant outline-none focus:border-accent-cyan disabled:opacity-50 transition-colors max-w-[190px]"
+                >
+                  <option value="">Auto (router)</option>
+                  {models.map((m) => (
+                    <option key={m.model} value={m.model}>
+                      {m.model.replace("-versatile", "").replace("-instant", "")} · {money(sym, m.price, 2)}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={running || submitting || !goalInput.trim()}

@@ -92,17 +92,45 @@ Live settlement + token/freeze/wipe/slash transactions and account links:
 [docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
 Moving an existing deployment to USDC: [docs/MIGRATION-USDC.md](docs/MIGRATION-USDC.md).
 
-## Hedera track alignment
+## Bounties & outcomes
 
 Everything on-chain is SDK-native across three Hedera services — **HCS, HTS, Mirror Node** — with
-**zero Solidity**. Full per-bounty mapping (with `file:line` + Hashscan proof):
-[docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md).
+**zero Solidity**, plus a **0G Compute** decentralized-GPU supply integration. Full per-bounty
+mapping (with `file:line` + Hashscan proof): [docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md).
+
+### Hedera prize tracks
 
 | Hedera prize track | Fit | What AgentRouter uses |
 |---|---|---|
 | **AI & Agentic Payments** | **Implemented** | Autonomous AI agent making per-request **x402** payments in **HTS USDC** (native HBAR behind one flag); **Hedera Agent Kit** identity; HCS-14-style UAIDs; HCS audit trails |
 | **"No Solidity Allowed"** | **Implemented** | Whole economic loop — identity, stake, slash, HTS bond, multi-sig wipe — via **Hedera SDKs** across HCS + HTS + Mirror Node, no contracts |
 | **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** + a **2-of-2 multi-sig `TokenWipe`** on fraud; settlement itself rides a second HTS token (USDC) |
+
+### 0G Compute — decentralized GPU supply
+
+Provider 4 (**NimbusAI**) resells inference from the **0G Compute Router** — one OpenAI-compatible
+endpoint over 0G's decentralized GPU marketplace (`0gm-1.0-35b-a3b`, TEE-signed results) — and it's
+the **default bring-your-own backend** for anyone onboarding new supply (`groq`/`canned` selectable
+per instance). It joins the marketplace **permissionlessly**: boots, stakes, registers on HCS, and
+is discovered within seconds. Its full on-chain legs — stake, HCS registration carrying the 0G model
+id, and a settled USDC trade — ran on Testnet **2026-07-26** ([docs/PROOF.md](docs/PROOF.md)).
+
+### What's live on-chain
+
+- **Real USDC settlement** — two HTS transfers per request (agent → exchange `price + fee`,
+  exchange → provider `price`), in **HTS USDC** (`0.0.429274`), fee-sponsored so payers need no gas.
+- **HTS ReputationBond** (`ARBOND`, `0.0.9758338`) — a **2% custom fractional fee** +
+  **freeze/pause/wipe** keys; a **2-of-2 multi-sig `TokenWipe`** destroyed a caught cheater's bond
+  on Testnet **2026-07-26**.
+- **Native-HBAR staking + slashing** — 50 ℏ stake to a plain escrow *account*, 25 ℏ escrow → treasury
+  slash on fraud, no contract deployed.
+- **HCS audit trail** — registry · trades · verdicts topics, every registration/trade/verdict
+  replayable from the public Mirror Node.
+- **Live hosted** — dashboard on Vercel + exchange API on Railway; buy an inference call yourself in
+  [docs/TESTING.md](docs/TESTING.md).
+
+Full receipts + Hashscan links: [docs/PROOF.md](docs/PROOF.md) ·
+[docs/TRANSACTIONS.md](docs/TRANSACTIONS.md).
 
 ## Documentation
 
@@ -111,8 +139,10 @@ Everything lives in [docs/](docs/README.md). Start there, or jump to:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — actors, flow, and the Hedera stack
 - [GUIDE.md](docs/GUIDE.md) — env vars, demo script, components, troubleshooting
 - Services: [agent.md](docs/agent.md) · [provider.md](docs/provider.md) · [exchange.md](docs/exchange.md) · [verifier.md](docs/verifier.md) · [FRONTEND.md](docs/FRONTEND.md)
-- [DEPLOY.md](docs/DEPLOY.md) — production URLs, per-service config, runbook
+- [HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md) — per-bounty mapping to the Hedera prize tracks
+- [DEPLOY.md](docs/DEPLOY.md) — production URLs, per-service config, runbook · [TESTING.md](docs/TESTING.md) — live URLs, buy an inference call
 - [PROOF.md](docs/PROOF.md) · [TRANSACTIONS.md](docs/TRANSACTIONS.md) — on-chain evidence and how native staking/slashing works
+- [FUNDING.md](docs/FUNDING.md) · [MIGRATION-USDC.md](docs/MIGRATION-USDC.md) — settlement funding + the HBAR→USDC migration
 - [RESEARCH.md](docs/RESEARCH.md) · [DEVREL_BRIEF.md](docs/DEVREL_BRIEF.md) · [HEDERAFEEDBACK.md](docs/HEDERAFEEDBACK.md)
 
 ## Repository layout
