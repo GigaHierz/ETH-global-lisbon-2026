@@ -65,3 +65,11 @@ Boot-time: services walk the ladder, verify `/supported` contains `hedera:testne
 
 - Facilitator ladder pattern: https://github.com/blockydevs/wad2026-x402-workshop (HBAR-native x402 on hedera:testnet via blocky402)
 - `@x402/hedera` README (package source is the ground truth for asset ids/decimals)
+
+
+## 0G Compute key (supply-side, optional)
+
+Providers using the default `0g` backend need `ZEROG_API_KEY`: sign up at
+https://pc.0g.ai, deposit 0G testnet tokens (human-gated, like the Hedera faucet).
+Without a key the provider falls back to canned answers and stays routable — the
+Hedera payment path is unaffected either way.

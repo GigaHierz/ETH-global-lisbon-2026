@@ -230,7 +230,7 @@ async function auditOnce() {
       // A witness-less candidate is left un-audited on purpose: it becomes
       // auditable the moment a second provider for that model comes up.
       if (selection.reason === "no_witness") {
-        log("verifier", `no witness for ${selection.request.model} — skipping audit of ${selection.accused.displayName}`);
+        log("verifier", `no witness available for ${selection.request.model} (unique model on the exchange — cross-backend outputs are not comparable) — skipping audit of ${selection.accused.displayName}`);
       }
       return;
     }

@@ -63,7 +63,7 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 | Package | What it does | Docs |
 |---|---|---|
 | [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: plans a goal into questions, buys each answer through the exchange, budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
-| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK); four env-driven personalities | [provider.md](docs/provider.md) |
+| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK). Default supply backend: **0G Compute** (decentralized GPU network); groq/canned selectable per instance (ollama planned) | [provider.md](docs/provider.md) |
 | [`packages/exchange`](packages/exchange) | Discovers supply from HCS, routes each request to the cheapest live provider claiming the model, pays via x402, publishes trades | [exchange.md](docs/exchange.md) |
 | [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness; on divergence slashes staked HBAR, **freezes the HTS bond, and multi-sig scheduled-wipes it** (Schedule Service) | [verifier.md](docs/verifier.md) |
 | [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
@@ -108,7 +108,7 @@ Everything lives in [docs/](docs/README.md). Start there, or jump to:
 ```
 packages/
   agent/       buyer agent
-  provider/    inference supply (four personalities)
+  provider/    inference supply (four personalities; 0G Compute default backend)
   exchange/    routing + settlement core
   verifier/    fraud auditor
   dashboard/   Next.js trading terminal

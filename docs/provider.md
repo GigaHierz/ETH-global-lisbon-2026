@@ -120,3 +120,21 @@ NimbusAI [`0.0.9746711`](https://hashscan.io/testnet/account/0.0.9746711)
 
 *Component of **AgentRouter** — the on-chain OpenRouter. See the root [`README.md`](../README.md) for the full
 system and [`agent.md`](agent.md) for the buyer side.*
+
+
+## Compute backends (default: 0G Compute)
+
+Where a provider's completions actually come from is pluggable
+(`packages/provider/src/backends/`):
+
+| Backend | What | Select |
+|---|---|---|
+| `0g` (**default** for bring-your-own) | 0G Compute Router — one OpenAI-compatible endpoint over 0G's decentralized GPU marketplace (`router-api.0g.ai/v1`, TEE-signed results). Needs `ZEROG_API_KEY` from https://pc.0g.ai funded with 0G testnet tokens | `PROVIDER_BACKEND=0g` |
+| `groq` | Groq API (deterministic at temp 0 — the demo's verifier arc depends on it) | `PROVIDER_BACKEND=groq` |
+| `canned` | Deterministic offline answers | automatic fallback when the chosen backend is unreachable/unkeyed |
+
+The named demo profiles pin their backend: **p1/p2/p3 are frozen on `groq`** (the
+slash arc needs deterministic same-model outputs) and **provider4 (NimbusAI) is the
+0G personality** — honest, `0gm-1.0-35b-a3b` at 0.06 ℏ. Its model id is unique on
+the exchange, so the verifier logs "no witness available" instead of auditing it
+(cross-backend outputs aren't comparable under the similarity threshold).
