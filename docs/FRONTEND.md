@@ -39,6 +39,22 @@ two instances differ, express the difference as a prop — don't fork the markup
 - Runtime config (the exchange / agent base URLs, with their env overrides and defaults) lives
   in `lib/config.ts`. Import from there; don't re-declare the constants per page.
 
+## Settlement feed — the "TX in·out" column
+
+The live settlement feed on the exchange page (`app/exchange/page.tsx`) ends each row with a
+`TX in·out` column of up to three `Icon` links. The **direction of the arrow is the meaning** —
+each points to one leg of the settlement on HashScan (see the two-legs model in
+[`TRANSACTIONS.md`](./TRANSACTIONS.md)):
+
+- **↙ `call_received`** → `hashscanTx(inboundRef)` — leg 1, **agent → exchange** (money in).
+- **↗ `call_made`** → `hashscanTx(paymentRef)` — leg 2, **exchange → provider** (money out).
+- **↩ `undo`** (orange, refunded rows only) → `hashscanTx(refundRef)` — the refund back to the agent.
+
+Each icon renders only when its ref resolves to a valid HashScan tx link (`hashscanTx` returns
+`null` for anything that isn't a `…@…` tx id); if none resolve the cell shows a plain `—`. Every
+icon carries a `title` tooltip naming the leg, and the column header's `title` summarizes all
+three — keep those in sync with this table if the icons change.
+
 ## Verifying
 
 `pnpm --filter @agentrouter/dashboard build` must pass (types + lint + prerender). A styling or

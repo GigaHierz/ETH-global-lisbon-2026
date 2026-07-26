@@ -62,6 +62,11 @@ That pair is the **0G trade** — NimbusAI reselling 0G Compute on `0gm-1.0-35b-
 transaction id belongs to the facilitator (`0.0.7162784`) because it is the fee payer; the
 agent's own HBAR balance is untouched across the entire flow.
 
+These two legs are what the dashboard's live settlement feed exposes per row in its `TX in·out`
+column: **↙** links leg 1 (agent → exchange, money in) and **↗** links leg 2 (exchange → provider,
+money out), each opening the transaction on HashScan. Refunded rows add a third **↩** icon for the
+return transfer. (Dashboard reference: [`FRONTEND.md`](./FRONTEND.md#settlement-feed--the-tx-inout-column).)
+
 Measured deltas from a six-request run:
 
 | Account | Δ | Why |

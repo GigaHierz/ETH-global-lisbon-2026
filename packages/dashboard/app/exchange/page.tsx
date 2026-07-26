@@ -449,7 +449,7 @@ export default function ExchangeControlRoom() {
                       <th className="px-4 py-2 text-right">Total ({sym})</th>
                       <th className="px-4 py-2 text-right">Lat.</th>
                       <th className="px-4 py-2 text-center">Status</th>
-                      <th className="px-4 py-2 text-right">TX in·out</th>
+                      <th className="px-4 py-2 text-right" title="The two on-chain settlement legs: ↙ agent→exchange (in), ↗ exchange→provider (out). Click an arrow to open the transaction on HashScan.">TX in·out</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/30">
@@ -472,19 +472,19 @@ export default function ExchangeControlRoom() {
                         </td>
                         <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
                           {r.inboundRef && hashscanTx(r.inboundRef) && (
-                            <a className="text-on-surface-variant hover:text-accent-cyan" title="agent→exchange settlement"
+                            <a className="text-on-surface-variant hover:text-accent-cyan" title="Leg 1 · agent → exchange settlement (money in) — click to view the transaction on HashScan"
                               href={hashscanTx(r.inboundRef)!} target="_blank" rel="noreferrer">
                               <Icon name="call_received" className="text-[14px]" />
                             </a>
                           )}
                           {hashscanTx(r.paymentRef) && (
-                            <a className="text-on-surface-variant hover:text-accent-cyan" title="exchange→provider settlement"
+                            <a className="text-on-surface-variant hover:text-accent-cyan" title="Leg 2 · exchange → provider settlement (money out) — click to view the transaction on HashScan"
                               href={hashscanTx(r.paymentRef)!} target="_blank" rel="noreferrer">
                               <Icon name="call_made" className="text-[14px]" />
                             </a>
                           )}
                           {r.refundRef && hashscanTx(r.refundRef) && (
-                            <a className="text-accent-orange hover:text-on-surface" title="refund to agent"
+                            <a className="text-accent-orange hover:text-on-surface" title="Refund · exchange → agent (payment returned) — click to view the transaction on HashScan"
                               href={hashscanTx(r.refundRef)!} target="_blank" rel="noreferrer">
                               <Icon name="undo" className="text-[14px]" />
                             </a>
