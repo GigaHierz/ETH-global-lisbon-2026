@@ -3,8 +3,8 @@
 Feedback from building **AgentRouter** — an inference marketplace where AI agents pay per LLM
 request in native HBAR over x402, providers stake collateral, register HCS-14-style identities on
 the Hedera Consensus Service (via the Hedera Agent Kit), and hold an **HTS ReputationBond**, and a
-verifier slashes providers that lie about their model — freezing the bond and destroying it with a
-**multi-sig scheduled wipe** (Schedule Service).
+verifier slashes providers that lie about their model — destroying the bond with a **2-of-2
+multi-sig `TokenWipe`** (verifier + auditor).
 
 **Our setup:** TypeScript pnpm monorepo, `@hiero-ledger/sdk` 2.85, `@x402/hedera` 2.19,
 Hedera Agent Kit, Hedera Testnet. We took it from mock mode to real on-chain settlement in one
@@ -73,36 +73,46 @@ time you submit a registration and don't see it immediately, it *looks* like a b
 "poll, don't assume failure — consensus messages appear within a few seconds" note in the HCS/Mirror
 Node quickstarts would prevent a phantom debugging session.
 
-### HTS ReputationBond + multi-sig scheduled wipe: a few sharp edges (docs)
-Extending the no-Solidity path to **HTS + Schedule Service** for a reputation bond surfaced small
-ordering/signature gotchas worth a canonical example:
+### `TokenWipe` (and other HTS admin ops) can't be scheduled — `SCHEDULED_TRANSACTION_NOT_IN_WHITELIST` (real, reproducible)
+We wanted a **multi-sig, keeper-less token compliance action**: a `TokenWipe` whose wipeKey is a
+2-of-2 `KeyList` [verifier, auditor], collected asynchronously via the **Schedule Service**
+(`ScheduleCreate` → `ScheduleSign` → execute). On Hedera Testnet this fails at `ScheduleCreate`:
+
+```
+receipt … contained error status SCHEDULED_TRANSACTION_NOT_IN_WHITELIST
+```
+
+`TokenWipe` (and, we believe, most HTS admin operations) is not in the Schedule Service
+`scheduling.whitelist`, so it can't be scheduled at all. We fell back to a **direct 2-of-2
+`TokenWipe`** (both signatures on one transaction), which works — but the async, keeper-less
+"propose-then-approve" pattern the Schedule Service is pitched for is unavailable for token
+compliance ops. Two asks:
+- **Document the whitelist** — publish the current testnet `scheduling.whitelist` so builders know
+  up front which tx types are schedulable (today you only find out via the error).
+- **Consider expanding it** to HTS admin ops (`TokenWipe`/`TokenFreeze`/`TokenMint`/…) — multi-sig
+  token compliance via scheduled transactions is exactly the "no keeper" governance pattern Hedera
+  promotes for the agent economy.
+
+> **Candidate issue to file** on `hiero-ledger/hiero-consensus-node` (and a docs note on
+> `hedera-dev`): the `SCHEDULED_TRANSACTION_NOT_IN_WHITELIST` above, with the minimal repro
+> (`ScheduleCreate(TokenWipe)` on testnet) — asking for the whitelist to be documented and, ideally,
+> extended to HTS admin ops. Reproduced during [issue #51](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues/51).
+
+### Two smaller HTS gotchas worth a canonical example (docs)
 - **Associate-before-grant ordering.** An account must be associated (`TokenAssociateTransaction`,
   signed by that account) *before* the treasury can transfer the bond to it — obvious in hindsight,
   but a runnable "create → associate → grant" snippet would save a round-trip.
-- **Threshold `KeyList` as a `wipeKey`.** Making the wipe key a **2-of-2** `KeyList`
-  [verifier, auditor] is exactly the "multi-sig enforcement, no keeper" pattern Hedera pitches, yet
-  there's no end-to-end example wiring it to the **Schedule Service** (`ScheduleCreate` collects
-  signature 1, `ScheduleSign` collects signature 2, then the inner `TokenWipe` executes).
 - **Treasury fee exemption.** That the treasury/fee-collector is exempt from a token's own
   `CustomFractionalFee` (so grants are fee-free while peer transfers pay) is correct but easy to
   second-guess without a note in the custom-fee docs.
 
-> **Candidate issue to file** (complements #17 on `hedera-dev/hedera-skills`): a canonical,
-> runnable **"multi-sig, keeper-less token enforcement"** skill/example — create an HTS token
-> whose compliance key is a threshold `KeyList`, then freeze + `ScheduleCreate`/`ScheduleSign`
-> the wipe so it executes with no off-chain relayer. This is the reputation/compliance pattern
-> for the agent economy and the one thing we had to assemble from SDK source + Schedule-Service
-> docs. (Filing it after the real-mode run — [issue #51](https://github.com/GigaHierz/ETH-global-lisbon-2026/issues/51)
-> — confirms exact reproduction steps.)
-
-### Agent Kit single-tool invocation also bites the token / schedule plugins (extends #1031)
+### Agent Kit single-tool invocation also bites the token plugin (extends #1031)
 Issue #1031 (undocumented programmatic single-tool invocation) is not consensus-specific: the
 same gap applies to the Agent Kit's **account/token plugins** — if you want an agent to run a
-single HTS operation (create/associate/transfer/freeze) or drive the Schedule Service without an
-LLM in the loop, there's no documented `tool.invoke(...)` path. We used the Hiero SDK directly
-for the bond rather than route it through the kit, partly for this reason (and partly for the
-dual-SDK issue #1030 — our bond/schedule code is `@hiero-ledger/sdk`, the kit path is
-`@hashgraph/sdk`).
+single HTS operation (create/associate/transfer/freeze/wipe) without an LLM in the loop, there's
+no documented `tool.invoke(...)` path. We used the Hiero SDK directly for the bond rather than
+route it through the kit, partly for this reason (and partly for the dual-SDK issue #1030 — our
+bond code is `@hiero-ledger/sdk`, the kit path is `@hashgraph/sdk`).
 
 ### Testnet HBAR is tight for multi-account demos (portal/faucet)
 Our demo fans out into 8 accounts (agent, exchange, 4 providers, verifier, escrow) at ~100 ℏ each
@@ -131,14 +141,15 @@ worked first try. The highest-leverage improvements are **developer experience a
 platform:
 
 1. **Agent Kit should adopt `@hiero-ledger/sdk`** (issue #1030) and document **single-tool
-   invocation across all plugins** (issue #1031 — not just consensus; token/schedule bite too),
+   invocation across all plugins** (issue #1031 — not just consensus; the token plugin bites too),
    and the rename should be signposted everywhere, including for AI coding assistants that still
    emit `@hashgraph/sdk`.
 2. **Ship one canonical, runnable HCS-14 identity + x402 HBAR example** (relates to #17) — the exact
    agent-economy use case Hedera is pitching, and the one thing we had to assemble ourselves.
-3. **Ship a "multi-sig, keeper-less token enforcement" example** — threshold-`KeyList` HTS key +
-   freeze + Schedule-Service wipe (candidate issue above). The reputation/compliance primitive for
-   agent marketplaces, currently un-exampled.
+3. **Document (and ideally expand) the Schedule Service whitelist** — `TokenWipe` isn't schedulable
+   on testnet (`SCHEDULED_TRANSACTION_NOT_IN_WHITELIST`), which blocks multi-sig, keeper-less HTS
+   compliance actions (candidate issue above). The reputation/compliance primitive for agent
+   marketplaces.
 4. **Clearer SDK error messages** for key mismatches (issue #4287).
 
 *— The AgentRouter team, ETHGlobal Lisbon 2026*

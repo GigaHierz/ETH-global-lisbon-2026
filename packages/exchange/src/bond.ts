@@ -1,6 +1,6 @@
 // HTS ReputationBond state transitions, extracted from the HTTP handler so it can
 // be unit-tested. The verifier reports each transition (active → frozen → wiped)
-// after it freezes and multi-sig-scheduled-wipes a fraudster's bond on-chain.
+// after it destroys a fraudster's bond with a 2-of-2 multi-sig wipe on-chain.
 // Mutates and returns the matched row, mirroring applySlash.
 
 import type { ProviderRow, BondStatus } from "@agentrouter/shared";
