@@ -389,6 +389,9 @@ export default function ExchangeControlRoom() {
 
               {/* On-chain audit trail */}
               <Card className="flex flex-col">
+                <div className="p-4 border-b border-outline-variant flex justify-between items-center">
+                  <span className="font-data text-[11px] tracking-[0.1em]">AUDIT VIEW OF AGENTROUTER</span>
+                </div>
                 <div className="flex border-b border-outline-variant">
                   {(["registry", "trades", "verdicts"] as const).map((name) => (
                     <button key={name} onClick={() => setActiveTopic(name)}
