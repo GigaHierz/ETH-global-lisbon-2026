@@ -10,7 +10,7 @@
       "trades": "0.0.9756366",
       "verdicts": "0.0.9756367"
     },
-    "bondToken": null,
-    "note": "Requests settle in HTS USDC (0.0.429274, 6 dp); SETTLEMENT_ASSET=hbar switches back to native HBAR. Staking/slash is always native-HBAR escrow via the Hedera SDK. Reputation is a separate HTS ReputationBond token (bondToken, set by `pnpm setup-hts`) with freeze/pause/wipe compliance controls; on fraud the verifier freezes it and executes a multi-sig scheduled wipe via the Hedera Schedule Service. Agent identity is HCS-14 (uaid:aid:hedera:testnet:0.0.x) published to the registry topic via the Hedera Agent Kit. No Solidity anywhere — HCS + HTS + Schedule + Mirror Node, all SDK-native."
+    "bondToken": "0.0.9758338",
+    "note": "Requests settle in HTS USDC (0.0.429274, 6 dp); SETTLEMENT_ASSET=hbar switches back to native HBAR. Staking/slash is always native-HBAR escrow via the Hedera SDK. Reputation is a separate HTS ReputationBond token (bondToken, set by `pnpm setup-hts`) with a custom fractional fee + freeze/pause/wipe compliance controls; on fraud the verifier destroys it with a 2-of-2 multi-sig TokenWipe (verifier + auditor). Agent identity is HCS-14-style (uaid:aid:hedera:testnet:0.0.x) published to the registry topic via the Hedera Agent Kit. No Solidity anywhere — HCS + HTS + Mirror Node, all SDK-native."
   }
 }

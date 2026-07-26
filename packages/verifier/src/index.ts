@@ -20,9 +20,7 @@ import {
   hederaAccount,
   publishToTopic,
   bondTokenId,
-  freezeBond,
-  scheduledWipeBond,
-  signSchedule,
+  multiSigWipeBond,
   log,
   type ProviderRow,
   type RequestLogEntry,
@@ -170,45 +168,27 @@ async function postBondEvent(body: Record<string, unknown>) {
   }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 // HTS ReputationBond enforcement — additive compliance layer on top of the proven
-// native-HBAR slash. Freeze the fraudster's bond immediately (verifier freezeKey),
-// then destroy it via a multi-sig scheduled wipe: verifier ScheduleCreate (sig 1),
-// auditor ScheduleSign (sig 2) → the wipe executes on-chain, no keeper. In real
-// mode both signatures run here for an end-to-end demo; in production the auditor
-// is an independent signer. All chain calls are no-ops in mock mode.
+// native-HBAR slash. Destroy the fraudster's bond with a 2-of-2 multi-sig
+// TokenWipe: the token's wipeKey is a KeyList [verifier, auditor], so the wipe
+// carries two signatures (verifier + auditor) — reputation → 0 on-chain, no
+// single party can do it alone. In real mode both signatures run here for the
+// end-to-end demo; in production the auditor is an independent signer. All chain
+// calls are no-ops in mock mode.
 async function enforceBond(wallet: string, displayName: string) {
   const onChain = !MOCK_MODE && !!bondTokenId();
   // Only surface bond enforcement when it's real (on-chain) or in the mock demo.
   // In real mode without a configured bond token (`pnpm setup-hts` not run), the
-  // feature is simply off — never post frozen/wiped events for a bond that
-  // doesn't exist on-chain.
+  // feature is simply off — never post a wiped event for a bond that doesn't
+  // exist on-chain.
   if (!MOCK_MODE && !onChain) return;
 
-  // 1. Freeze — a fast compliance action; the bond can no longer move.
-  let freezeTx: string | null = null;
-  if (onChain) {
-    freezeTx = await freezeBond(wallet);
-    if (freezeTx) log("verifier", `🔒 froze ${displayName} ARBOND bond: https://hashscan.io/testnet/transaction/${freezeTx}`);
-  }
-  await postBondEvent({ wallet, bondStatus: "frozen", bondTokens: BOND_AMOUNT, freezeTx });
-
-  // Let the dashboard show active → frozen before the wipe lands.
-  await sleep(1200);
-
-  // 2. Multi-sig scheduled wipe (Hedera Schedule Service).
-  let scheduleId: string | null = null;
   let wipeTx: string | null = null;
   if (onChain) {
-    ({ scheduleId } = await scheduledWipeBond(wallet, BOND_AMOUNT));
-    if (scheduleId) {
-      log("verifier", `📅 scheduled wipe of ${displayName} bond (schedule ${scheduleId}) — awaiting 2nd signer`);
-      wipeTx = await signSchedule(scheduleId);
-      if (wipeTx) log("verifier", `⚖️ multi-sig wipe executed: https://hashscan.io/testnet/transaction/${wipeTx}`);
-    }
+    wipeTx = await multiSigWipeBond(wallet, BOND_AMOUNT);
+    if (wipeTx) log("verifier", `⚖️ 2-of-2 multi-sig bond wipe (${displayName}): https://hashscan.io/testnet/transaction/${wipeTx}`);
   }
-  await postBondEvent({ wallet, bondStatus: "wiped", bondTokens: 0, scheduleId, wipeTx });
+  await postBondEvent({ wallet, bondStatus: "wiped", bondTokens: 0, wipeTx });
 }
 
 async function auditOnce() {
@@ -314,7 +294,7 @@ async function auditOnce() {
     });
     log("verifier", `⚡ ${target.displayName} slashed and removed from routing`);
 
-    // Additive HTS enforcement: freeze the bond, then multi-sig scheduled wipe.
+    // Additive HTS enforcement: destroy the bond with a 2-of-2 multi-sig wipe.
     await enforceBond(target.wallet, target.displayName);
   } catch (err) {
     log("verifier", `audit error: ${(err as Error).message.slice(0, 150)}`);

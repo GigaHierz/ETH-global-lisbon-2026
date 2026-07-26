@@ -99,7 +99,7 @@ async function main() {
     const providers = await fetch(`${EXCHANGE_URL}/providers`).then((r) => r.json());
     const slashed = providers.find((p: { status: string }) => p.status === "slashed");
     if (slashed) {
-      banner(`⚡ SLASHED: ${slashed.displayName} — HBAR stake cut, HTS bond frozen → multi-sig scheduled wipe, OUT of routing`);
+      banner(`⚡ SLASHED: ${slashed.displayName} — HBAR stake cut, HTS bond wiped via 2-of-2 multi-sig, OUT of routing`);
       // Same paywall as every other buyer call: in mock mode the exchange wants
       // the mock payment header, in real mode the caller must settle over x402.
       const res = await fetch(`${EXCHANGE_URL}/v1/chat/completions`, {
