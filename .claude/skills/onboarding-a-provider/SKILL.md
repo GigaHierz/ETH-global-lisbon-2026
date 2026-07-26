@@ -13,7 +13,7 @@ Walk a would-be provider from a fresh checkout to a **live, registered, payment-
 
 **REQUIRED:** the marketplace side (an exchange, and at least one other provider serving the same model as a verification witness) must be reachable. Locally that's `pnpm exchange` + `pnpm demo`; in production it's the hosted exchange URL.
 
-This repo also ships an MCP server (`packages/provider-mcp`) whose tools automate the account, the stake, the HCS registration and the liveness check. **It does not replace `pnpm provider`** — the service stakes and registers itself on boot, before it can serve anything. The steps below are the same either way; the MCP just does some of them for you.
+This repo also ships an MCP server (`packages/provider-mcp`) whose tools automate the account, the stake, the HCS registration and the liveness check. **It does not replace `pnpm provider`** — the service stakes and registers itself on boot. The steps below are the same either way; the MCP just does some of them for you.
 
 ## The one rule that must never break
 
@@ -86,7 +86,12 @@ grep -qE '^PROVIDER_PUBLIC_URL=https?://(localhost|127\.0\.0\.1|\[::1\])([:/]|$)
 ```bash
 pnpm provider          # from the repo root; profile "custom" reads the vars above
 ```
-On boot it transfers `STAKE_HBAR` (50) to the escrow account and publishes its registration to the HCS registry topic. **Booting the service is the only thing that performs the first stake and registration** — there's no skipping it, because it registers before it starts listening. (On a remote box the same is true of `pnpm provider:prod`; see the remote-deploy section.)
+On boot it transfers `STAKE_HBAR` (50 ℏ — always HBAR, whatever the settlement asset) to the escrow account and publishes its registration to the HCS registry topic. **Booting the service is what performs the first stake and registration** — the MCP tools don't replace it. (On a remote box the same is true of `pnpm provider:prod`; see the remote-deploy section.)
+
+**It binds the port first and registers in the background**, deliberately: a slow on-chain call before `listen` would leave the platform staring at a service that never answers. So `/healthz` starts returning `{"ok":true}` *before* the stake and registration have landed. Two consequences worth holding on to:
+
+- A healthy `/healthz` is not evidence of registration. Wait for the two Hashscan lines below before moving on.
+- If registration fails, the service keeps serving and logs `REGISTRATION FAILED` — it does not exit. Read the boot log; don't infer success from the process still running.
 
 **Verify the two on-chain actions from the boot log** — it prints real Hashscan links:
 - `staked 50 ℏ → escrow: https://hashscan.io/testnet/transaction/...`
@@ -102,7 +107,9 @@ curl -s localhost:4025/info        # displayName, model, price, wallet, agentId,
 ### 5. Attach and confirm the registration (MCP only)
 Skip this step entirely if the tools aren't available — step 4 already registered you.
 
-**Never call `provision_provider` before `pnpm provider` is running.** It health-checks a live endpoint, so before boot it can only fail. Once the service is up, call it **once**:
+**Never call `provision_provider` before `pnpm provider` is running.** It health-checks a live endpoint, so before boot it can only fail.
+
+**And don't race it.** The service registers in the background *after* the port opens, so a green `/healthz` doesn't mean registration is done. Calling the MCP straight away means two registrations in flight for the same account, and one wasted HCS message. Wait for step 4's `registered on HCS registry topic` line, then call it **once**:
 
 ```
 provision_provider({ name: "<PROVIDER_NAME>", publicUrl: "<your URL>",
