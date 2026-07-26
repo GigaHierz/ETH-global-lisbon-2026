@@ -22,10 +22,18 @@ const BUDGET = parseFloat(process.env.AGENT_BUDGET || "2");
 // Public URL advertised in the HCS-14 registration (set to the host's URL in prod).
 const ENDPOINT = process.env.AGENT_PUBLIC_URL || `http://localhost:${PORT}`;
 
-// ---- boot: identity + payer + starting balance ----
-await initAgentPayer();
-const identity: Identity = await registerIdentity({ displayName: "AgentRouter Demo Buyer", endpoint: ENDPOINT });
-const account = MOCK_MODE ? "0.0.mock-agent" : hederaAccount("AGENT").id;
+// ---- boot ----
+// The port is bound FIRST, before any chain work. Registering an HCS identity and
+// reading an on-chain balance are network calls that can be slow, hang, or throw;
+// doing them ahead of app.listen means a bad key or a stalled node stops the port
+// from ever opening. The platform then reports "Application failed to respond"
+// with nothing in the logs, because from the process's point of view it is still
+// booting. Binding first turns that silence into a service that answers /healthz
+// and tells you exactly what went wrong.
+let identity: Identity = { agentId: "(registering…)", account: "", hashscan: "" };
+let account = "";
+let bootError: string | null = null;
+let ready = false;
 
 interface WireBudget {
   cap: number;
@@ -35,13 +43,23 @@ interface WireBudget {
 const state = {
   running: false,
   goal: null as string | null,
-  balance: MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE || "10") : await settlementBalance(account),
+  balance: MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE || "10") : 0,
   budget: { cap: BUDGET, spent: 0, remaining: BUDGET } as WireBudget,
   findings: [] as { q: string; a: string }[],
   events: [] as unknown[],
 };
 
 const buy = makeBuy(EXCHANGE, ASK, MODEL);
+
+// Everything that touches the network, off the critical path to listening.
+async function boot() {
+  await initAgentPayer();
+  identity = await registerIdentity({ displayName: "AgentRouter Demo Buyer", endpoint: ENDPOINT });
+  account = MOCK_MODE ? "0.0.mock-agent" : hederaAccount("AGENT").id;
+  if (!MOCK_MODE) state.balance = await settlementBalance(account);
+  ready = true;
+  log("agent", `ready | ${identity.agentId} | balance ${money(state.balance.toFixed(4))}`);
+}
 
 // ---- SSE fanout ----
 const clients = new Set<(chunk: string) => void>();
@@ -75,7 +93,11 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/healthz", (_req, res) => res.json({ ok: true, agentId: identity.agentId, account }));
+// `ok` stays true while booting so a platform health check does not kill a service
+// that is merely still starting; `ready` and `error` carry the real state.
+app.get("/healthz", (_req, res) =>
+  res.json({ ok: true, ready, error: bootError, agentId: identity.agentId, account, mock: MOCK_MODE }),
+);
 app.get("/identity", (_req, res) => res.json(identity));
 app.get("/state", (_req, res) =>
   res.json({
@@ -102,6 +124,7 @@ app.get("/events", (req, res) => {
 });
 
 app.post("/run", (req, res) => {
+  if (!ready) return res.status(503).json({ error: bootError ?? "agent is still starting up" });
   if (state.running) return res.status(409).json({ error: "a run is already in progress" });
   const goal = (req.body as { goal?: string })?.goal?.trim();
   if (!goal) return res.status(400).json({ error: "goal required" });
@@ -138,6 +161,10 @@ app.post("/run", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  log("agent", `agent-server on :${PORT} | ${identity.agentId} | budget ${money(BUDGET)} | MOCK_MODE=${MOCK_MODE}`);
-  log("agent", `buying ${MODEL} via ${EXCHANGE} @ ${money(ASK)}/req | balance ${money(state.balance.toFixed(4))}`);
+  log("agent", `agent-server on :${PORT} | budget ${money(BUDGET)} | MOCK_MODE=${MOCK_MODE}`);
+  log("agent", `buying ${MODEL} via ${EXCHANGE} @ ${money(ASK)}/req`);
+  boot().catch((e: Error) => {
+    bootError = e.message;
+    log("agent", `BOOT FAILED: ${e.message} — serving /healthz so the cause is visible`);
+  });
 });
