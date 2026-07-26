@@ -357,6 +357,14 @@ export default function AgentDemoControlRoom() {
   const bought = events.filter((e): e is Extract<AgentEvent, { type: "bought" }> => e.type === "bought");
   const errors = events.filter((e): e is Extract<AgentEvent, { type: "error" }> => e.type === "error");
 
+  // Cumulative across all runs: durable on-chain calls (GET /calls) plus the current
+  // run's live boughts not yet flushed to /calls, deduped by paymentRef. refreshCalls()
+  // on `done` reconciles the two, so a completed run's boughts never double-count.
+  const callRefs = new Set(calls.map((c) => c.paymentRef));
+  const liveBoughts = bought.filter((b) => !callRefs.has(b.paymentRef));
+  const answersBought = calls.length + liveBoughts.length;
+  const spentTotal = [...calls, ...liveBoughts].reduce((sum, x) => sum + x.cost, 0);
+
   const connDot = conn === "live" ? "bg-accent-cyan" : conn === "connecting" ? "bg-accent-orange" : "bg-hud-error";
   const connLabel = conn === "live" ? "Agent Live" : conn === "connecting" ? "Connecting…" : "Agent Offline";
 
@@ -367,8 +375,8 @@ export default function AgentDemoControlRoom() {
         <NavStats
           stats={[
             ["BALANCE", money(sym, balance, 2), "text-primary-fixed-dim"],
-            ["SPENT", money(sym, budget.spent, 2), "text-accent-orange"],
-            ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
+            ["SPENT", money(sym, spentTotal, 2), "text-accent-orange"],
+            ["ANSWERS BOUGHT", String(answersBought), "text-primary-fixed-dim"],
           ]}
         />
         <StatusPill variant="nav" dotClassName={connDot} label={connLabel} />
