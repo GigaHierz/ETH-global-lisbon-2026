@@ -65,13 +65,16 @@ type Conn = "connecting" | "live" | "offline";
 
 const DEFAULT_BUDGET: Budget = { cap: 0, spent: 0, remaining: 0 };
 
-// One-click demo: fire a single question pinned to the 0G model. Pinning `model`
-// bypasses the agent's prompt router (agent-server /run) — the exchange routes
-// `0gm-1.0-35b-a3b` exclusively to NimbusAI (0G backend), so the demo stays on 0G
-// and never runs away to the other price tiers. Edit the goal here to change what's
-// asked on stage.
+// One-click demo: two questions, each pinned to a specific model. Pinning `model`
+// bypasses the agent's prompt router (agent-server /run) — the exchange then routes to
+// the cheapest live provider for that model:
+//   1. `0gm-1.0-35b-a3b`      → NimbusAI (0G backend) — the 0G showcase call.
+//   2. `llama-3.3-70b-versatile` → SketchyGPU (cheater, undercuts Titan on the same model).
+// The verifier reviews SketchyGPU against the honest 70b witness (Titan) and slashes it
+// live within ~15s — the climax. Edit the goals here to change what's asked on stage.
 const DEMO_QUESTIONS: Array<{ goal: string; model: string }> = [
   { goal: "Give a concise overview of how proof-of-stake secures a blockchain.", model: "0gm-1.0-35b-a3b" },
+  { goal: "Prove step by step that the square root of 2 is irrational, explaining each step.", model: "llama-3.3-70b-versatile" },
 ];
 
 function fmtTime(ts: number): string {
@@ -95,9 +98,9 @@ export default function AgentDemoControlRoom() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  // One-click demo: fires DEMO_QUESTIONS (a single 0G-pinned question) via /run.
-  // The loop stays generic (each /run is single-flight, so we wait for each to
-  // finish before the next); demoStep drives the "1/1" progress label.
+  // One-click demo: fires DEMO_QUESTIONS (0G showcase, then the SketchyGPU slash) via
+  // /run. Each /run is single-flight, so we wait for each to finish before the next;
+  // demoStep drives the "1/2" progress label.
   const [demoRunning, setDemoRunning] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
   // "" = let the agent's router choose. Anything else pins the model, which is how
@@ -304,7 +307,7 @@ export default function AgentDemoControlRoom() {
     }
   }
 
-  // Fire the DEMO_QUESTIONS (a single 0G-pinned question) with no typing. /run is
+  // Fire the DEMO_QUESTIONS (0G call, then the SketchyGPU slash) with no typing. /run is
   // single-flight (409 while a run is active), so between goals we poll /state until
   // the agent is idle before firing the next. A ~90s cap per goal keeps a wedged run
   // from hanging the whole sequence.
@@ -561,10 +564,10 @@ export default function AgentDemoControlRoom() {
                   type="button"
                   onClick={runDemoSequence}
                   disabled={running || demoRunning || submitting}
-                  title="Fire one question at the 0G provider (NimbusAI) — no typing"
+                  title="Fire two questions — one at 0G (NimbusAI), then one that trips the SketchyGPU slash — no typing"
                   className="bg-accent-orange text-on-primary px-6 py-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold whitespace-nowrap disabled:opacity-40 hover:brightness-110 transition-all active:scale-95"
                 >
-                  {demoRunning ? `Demo ${demoStep}/${DEMO_QUESTIONS.length}…` : "▶ Run 0G Demo"}
+                  {demoRunning ? `Demo ${demoStep}/${DEMO_QUESTIONS.length}…` : "▶ Run Demo (0G + slash)"}
                 </button>
               </form>
               {submitError && <p className="px-4 pb-3 font-data text-xs text-hud-error">⚠ {submitError}</p>}
