@@ -18,14 +18,35 @@ import {
   log,
   type ChatCompletionRequest,
   type ChatCompletionResponse,
+  type ChatMessage,
 } from "@agentrouter/shared";
 
 const ZEROG_ROUTER_URL =
   process.env.ZEROG_ROUTER_URL || "https://router-api.0g.ai/v1/chat/completions";
 const ZEROG_CHAIN_RPC = process.env.ZEROG_CHAIN_RPC || "https://evmrpc-testnet.0g.ai";
 
+// 0G's flagship model (0gm-1.0-35b-a3b) runs with "thinking" on by default, so the
+// request needs generous headroom — with a small cap the whole budget is spent on the
+// reasoning trace and `content` comes back empty. Overridable via ZEROG_MAX_TOKENS.
+const ZEROG_MAX_TOKENS = Number(process.env.ZEROG_MAX_TOKENS) || 4096;
+
 function canned(advertisedModel: string, req: ChatCompletionRequest, cheat: boolean): ChatCompletionResponse {
   return { ...cannedCompletion(advertisedModel, req.messages, cheat), servedBy: "canned" as const };
+}
+
+/** Thinking-enabled 0G models can return the final answer in `reasoning_content` with
+ * `content` left empty. Promote that text into `content` so a 200 carrying a real answer
+ * isn't rejected downstream (the agent's parser requires non-empty content). Returns
+ * true when the response now has usable content, false when it should be treated as a
+ * soft failure (→ canned fallback, honoring this backend's "never blocks" contract). */
+export function salvageThinkingAnswer(data: ChatCompletionResponse): boolean {
+  const msg = data.choices?.[0]?.message as (ChatMessage & { reasoning_content?: string }) | undefined;
+  if (!msg) return false;
+  if ((!msg.content || msg.content.length === 0) &&
+      typeof msg.reasoning_content === "string" && msg.reasoning_content.length > 0) {
+    msg.content = msg.reasoning_content;
+  }
+  return typeof msg.content === "string" && msg.content.length > 0;
 }
 
 /* v8 ignore start -- network/broker wiring; canned fallback is covered by cannedCompletion's tests */
@@ -74,12 +95,16 @@ async function completeViaBroker(
       model,
       messages: req.messages,
       temperature: req.temperature ?? 0.7,
-      max_tokens: req.max_tokens ?? 512,
+      max_tokens: req.max_tokens ?? ZEROG_MAX_TOKENS,
     }),
   });
   if (!upstream.ok) throw new Error(`0G broker ${upstream.status}: ${(await upstream.text()).slice(0, 160)}`);
   const chatID = upstream.headers.get("ZG-Res-Key") ?? undefined;
   const data = (await upstream.json()) as ChatCompletionResponse;
+
+  // Thinking-model answers can land in reasoning_content — salvage before we verify or
+  // return. Empty even after that → soft-fail so complete() falls back (router/canned).
+  if (!salvageThinkingAnswer(data)) throw new Error("0G broker returned empty completion");
 
   // Cryptographically verify the TEE-signed response.
   const answer = data.choices?.[0]?.message?.content ?? "";
@@ -114,7 +139,7 @@ async function completeViaRouter(
       model: actualModel,
       messages: req.messages,
       temperature: req.temperature ?? 0.7,
-      max_tokens: req.max_tokens ?? 512,
+      max_tokens: req.max_tokens ?? ZEROG_MAX_TOKENS,
     }),
   });
   if (!upstream.ok) {
@@ -123,6 +148,13 @@ async function completeViaRouter(
   // Capture any attestation the router surfaces (verified trust mode).
   const attestation = upstream.headers.get("ZG-Res-Key") ?? upstream.headers.get("X-0G-Attestation") ?? undefined;
   const data = (await upstream.json()) as ChatCompletionResponse;
+  // Thinking-model answers can arrive in reasoning_content with content empty. Salvage
+  // it; if the model still returned nothing usable, return null so complete() falls back
+  // to the canned answer rather than forwarding an empty completion the agent rejects.
+  if (!salvageThinkingAnswer(data)) {
+    log("provider", "0G router returned empty completion — canned fallback");
+    return null;
+  }
   data.upstreamModel = data.model; // router-reported model — verbatim provenance
   data.model = advertisedModel;
   data.servedBy = "0g";
