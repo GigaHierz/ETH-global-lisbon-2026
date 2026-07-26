@@ -21,6 +21,7 @@ export default defineConfig({
         "packages/shared/src/hcs.ts",
         "packages/exchange/src/state.ts",
         "packages/exchange/src/discovery.ts",
+        "packages/exchange/src/hydrate.ts",
         "packages/exchange/src/slash.ts",
         "packages/provider/src/profiles.ts",
         "packages/agent/src/budget.ts",

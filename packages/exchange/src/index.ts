@@ -35,6 +35,7 @@ import {
   statsSnapshot,
 } from "./state.js";
 import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
+import { hydrateFromTrades } from "./hydrate.js";
 import { initPayer, paidPost } from "./payer.js";
 import { applySlash } from "./slash.js";
 import { applyBondEvent } from "./bond.js";
@@ -58,6 +59,13 @@ function routeQuote(body: ChatCompletionRequest): Quote | null {
 
 await initPayer();
 startDiscovery();
+
+// Rebuild the settlement feed from the trades topic before serving. Without this a
+// redeploy shows an empty dashboard and zeroed revenue, even though every trade is
+// still on-chain — the container's uptime, not the ledger, decided what you saw.
+hydrateFromTrades()
+  .then((n) => n > 0 && log("exchange", `rehydrated ${n} trades from the HCS trades topic`))
+  .catch(() => {});
 
 const app = express();
 app.use(cors());
