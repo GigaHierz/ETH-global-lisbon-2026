@@ -79,6 +79,16 @@ Gotchas:
 - The Dockerfile's default CMD is `agent-server:prod`, so **every non-agent service must set its own
   Start Command** or it'll run the agent by mistake.
 
+Deploying a *new* provider rather than one of the demo four? Use `PROVIDER_PROFILE=custom` with
+`PROVIDER_NAME` / `PROVIDER_MODEL` / `PROVIDER_PRICE` — see
+[provider.md § Listing your own compute](provider.md#listing-your-own-compute). The
+[`provider-mcp`](../packages/provider-mcp/README.md) `deploy_provider` tool emits this exact
+variable set for a given endpoint with secrets left as placeholders, which is a useful checklist
+even if you fill Railway in by hand. One caveat: **don't stake from your laptop for a box that
+will run elsewhere.** The stake is skipped only when the local `.registry-cache.json` records it,
+and a fresh container starts empty — so the deployed service would post a second bond. Let the
+box stake itself on first boot.
+
 ## Vercel
 - Root Directory `packages/dashboard`, Production Branch `main`. Auto-deploys on push to `main`.
 - No env vars required — the dashboard defaults to the Railway URLs (overridable by

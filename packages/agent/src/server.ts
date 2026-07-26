@@ -5,10 +5,11 @@
 
 import express from "express";
 import cors from "cors";
-import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money } from "@agentrouter/shared";
+import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money, publishToTopic, readTopicMessages } from "@agentrouter/shared";
 import { Budget } from "./budget.js";
 import { groqBrain } from "./brain.js";
 import { makeBuy } from "./buy.js";
+import { routeModel } from "./route-model.js";
 import { initAgentPayer } from "./payer.js";
 import { registerIdentity, type Identity } from "./identity.js";
 import { runGoal, type AgentEvent } from "./loop.js";
@@ -40,6 +41,25 @@ interface WireBudget {
   spent: number;
   remaining: number;
 }
+
+// One durable record per inference call the agent bought. Written to the
+// `agentCalls` HCS topic (real mode) and mirrored here in-memory so the
+// dashboard's "Previous Calls" view has data before Mirror Node lag catches up
+// and while running in mock mode.
+interface Call {
+  ts: number;
+  goal: string | null;
+  question: string;
+  answer: string; // short preview — the on-chain message stays well under HCS size limits
+  provider: string;
+  cost: number;
+  paymentRef: string;
+  hashscan: string;
+}
+const ANSWER_PREVIEW = 240;
+const CALLS_CAP = 200;
+const calls: Call[] = [];
+
 const state = {
   running: false,
   goal: null as string | null,
@@ -49,7 +69,30 @@ const state = {
   events: [] as unknown[],
 };
 
+// Default buy (fallback model); per-run buys are routed against the live market.
 const buy = makeBuy(EXCHANGE, ASK, MODEL);
+
+/** Route the goal to a model tier using the exchange's live provider market.
+ *  An explicit `pick` skips the router entirely — the tier heuristic is prompt-shaped,
+ *  which is fine for autonomy but useless when you need to demonstrate a specific
+ *  supply network on demand. */
+async function routedBuyFor(goal: string, pick?: string) {
+  if (pick) {
+    log("agent", `router: overridden — buying ${pick} explicitly`);
+    return { buy: makeBuy(EXCHANGE, ASK, pick), route: { model: pick, tier: "medium" as const, reason: "model chosen explicitly" } };
+  }
+  try {
+    const providers = (await (await fetch(`${EXCHANGE}/providers`)).json()) as Array<{
+      model: string; price?: number; priceHbar?: number; status: string;
+    }>;
+    const market = providers.map((p) => ({ model: p.model, price: p.price ?? p.priceHbar ?? 0, status: p.status }));
+    const route = routeModel(goal, market, MODEL);
+    log("agent", `router: "${goal.slice(0, 48)}…" → ${route.tier} tier → ${route.model} (${route.reason})`);
+    return { buy: makeBuy(EXCHANGE, ASK, route.model), route };
+  } catch {
+    return { buy, route: { model: MODEL, tier: "medium" as const, reason: "market unreachable — fallback" } };
+  }
+}
 
 // Everything that touches the network, off the critical path to listening.
 async function boot() {
@@ -83,10 +126,43 @@ function emit(ev: AgentEvent) {
     state.events.push(wire);
     broadcast(wire);
     broadcast({ type: "balance", amount: state.balance, asset: ASSET_LABEL });
+    recordCall(ev, wire.hashscan);
     return;
   }
   state.events.push(ev);
   broadcast(ev);
+}
+
+// Persist a bought call: buffer it in-memory (capped, survives across runs) and,
+// in real mode, append it to the agent's own `agentCalls` HCS topic — a durable,
+// per-agent, on-chain record of every paid inference call. Fire-and-forget: a
+// publish failure never blocks or breaks the run.
+function recordCall(ev: Extract<AgentEvent, { type: "bought" }>, hashscan: string) {
+  const call: Call = {
+    ts: Date.now(),
+    goal: state.goal,
+    question: ev.question,
+    answer: ev.answer.slice(0, ANSWER_PREVIEW),
+    provider: ev.provider,
+    cost: ev.cost,
+    paymentRef: ev.paymentRef,
+    hashscan,
+  };
+  calls.push(call);
+  if (calls.length > CALLS_CAP) calls.shift();
+
+  if (!MOCK_MODE) {
+    publishToTopic("agentCalls", hederaAccount("AGENT"), {
+      type: "call",
+      agentId: identity.agentId,
+      goal: call.goal,
+      question: call.question,
+      answer: call.answer,
+      provider: call.provider,
+      cost: call.cost,
+      paymentRef: call.paymentRef,
+    }).catch((e) => log("agent", `HCS call publish failed: ${(e as Error).message.slice(0, 80)}`));
+  }
 }
 
 const app = express();
@@ -99,6 +175,26 @@ app.get("/healthz", (_req, res) =>
   res.json({ ok: true, ready, error: bootError, agentId: identity.agentId, account, mock: MOCK_MODE }),
 );
 app.get("/identity", (_req, res) => res.json(identity));
+
+// The models the exchange can actually route to right now, cheapest first. The UI
+// reads this to offer an explicit choice instead of hoping the router picks the one
+// you want to show.
+app.get("/models", async (_req, res) => {
+  try {
+    const providers = (await (await fetch(`${EXCHANGE}/providers`)).json()) as Array<{
+      model: string; price?: number; status: string;
+    }>;
+    const cheapest = new Map<string, number>();
+    for (const p of providers) {
+      if (p.status !== "live" || typeof p.price !== "number" || !Number.isFinite(p.price)) continue;
+      const seen = cheapest.get(p.model);
+      if (seen === undefined || p.price < seen) cheapest.set(p.model, p.price);
+    }
+    res.json([...cheapest].sort((a, b) => a[1] - b[1]).map(([model, price]) => ({ model, price })));
+  } catch {
+    res.json([]);
+  }
+});
 app.get("/state", (_req, res) =>
   res.json({
     running: state.running,
@@ -109,6 +205,39 @@ app.get("/state", (_req, res) =>
     events: state.events,
   }),
 );
+
+// Durable "previous calls": every inference call this agent bought, across all
+// runs. Reads its own `agentCalls` HCS topic via the Mirror Node (survives
+// restarts) and merges the in-memory buffer (instant reflection before Mirror
+// lag; sole source in mock mode), deduped by payment ref, newest first.
+app.get("/calls", async (req, res) => {
+  const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
+  let onChain: Call[] = [];
+  if (!MOCK_MODE) {
+    try {
+      const msgs = await readTopicMessages("agentCalls", limit);
+      onChain = msgs
+        .map((m) => m.payload)
+        .filter((p): p is Record<string, unknown> => !!p && p.type === "call" && p.agentId === identity.agentId)
+        .map((p) => ({
+          ts: Number(p.ts) || 0,
+          goal: (p.goal as string) ?? null,
+          question: String(p.question ?? ""),
+          answer: String(p.answer ?? ""),
+          provider: String(p.provider ?? ""),
+          cost: Number(p.cost) || 0,
+          paymentRef: String(p.paymentRef ?? ""),
+          hashscan: hashscanTx(String(p.paymentRef ?? "")),
+        }));
+    } catch (e) {
+      log("agent", `/calls Mirror Node read failed: ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  const byRef = new Map<string, Call>();
+  for (const c of [...onChain, ...calls]) byRef.set(c.paymentRef, c);
+  const merged = [...byRef.values()].sort((a, b) => b.ts - a.ts).slice(0, limit);
+  res.json({ calls: merged });
+});
 
 app.get("/events", (req, res) => {
   res.writeHead(200, {
@@ -123,11 +252,13 @@ app.get("/events", (req, res) => {
   req.on("close", () => clients.delete(write));
 });
 
-app.post("/run", (req, res) => {
+app.post("/run", async (req, res) => {
   if (!ready) return res.status(503).json({ error: bootError ?? "agent is still starting up" });
   if (state.running) return res.status(409).json({ error: "a run is already in progress" });
-  const goal = (req.body as { goal?: string })?.goal?.trim();
+  const body = req.body as { goal?: string; model?: string };
+  const goal = body?.goal?.trim();
   if (!goal) return res.status(400).json({ error: "goal required" });
+  const pick = body?.model?.trim() || undefined;
 
   state.running = true;
   state.goal = goal;
@@ -137,9 +268,13 @@ app.post("/run", (req, res) => {
   state.budget = { cap: BUDGET, spent: 0, remaining: BUDGET };
   res.json({ ok: true });
 
+  const routed = await routedBuyFor(goal, pick);
+  broadcast({ type: "route", model: routed.route.model, tier: routed.route.tier, reason: routed.route.reason });
+  state.events.push({ type: "route", model: routed.route.model, tier: routed.route.tier, reason: routed.route.reason });
+
   runGoal(goal, {
     brain: groqBrain,
-    buy,
+    buy: routed.buy,
     budget,
     ask: ASK,
     emit: (ev) => {

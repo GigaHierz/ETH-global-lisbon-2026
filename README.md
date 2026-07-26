@@ -28,7 +28,9 @@ calls). The agent buys five inference calls; the exchange routes each to the che
 claiming `llama-3.3-70b-versatile` — which is SketchyGPU Labs, undercutting on price while
 secretly serving a smaller model. The verifier replays a sampled prompt against an honest
 witness, measures the divergence, slashes the cheater's stake, publishes the verdict to HCS,
-and the dashboard flags the slash as the cheater drops out of routing.
+and the dashboard flags the slash as the cheater drops out of routing. As a final beat, the demo
+buys one completion sourced from **0G Compute** (NimbusAI's `0gm-1.0-35b-a3b`) — a second,
+decentralized-GPU supply network settling on the same rails.
 
 Reset: Ctrl-C the demo, `rm -f .registry-cache.json`, then run `pnpm demo` again. Set
 `GROQ_API_KEY` in `.env` for real inference; without it, deterministic canned responses keep
@@ -43,14 +45,16 @@ Hedera Consensus Service.
 ```mermaid
 flowchart LR
     A[Agent<br/>Hedera account] -->|"POST /v1/chat/completions"| E[Exchange :4100<br/>route to cheapest<br/>SSE feed + price index]
-    E -->|"x402 HBAR payment"| P1[Provider 1 · Titan<br/>70b @ 0.10 ℏ]
-    E -->|"x402 HBAR payment"| P2[Provider 2 · Budget<br/>8b @ 0.04 ℏ]
-    E -->|"x402 HBAR payment"| P3[Provider 3 · Sketchy<br/>claims 70b @ 0.08 ℏ<br/>serves 8b]
+    E -->|"x402 USDC payment"| P1[Provider 1 · Titan<br/>70b @ $0.10]
+    E -->|"x402 USDC payment"| P2[Provider 2 · Budget<br/>8b @ $0.04]
+    E -->|"x402 USDC payment"| P3[Provider 3 · Sketchy<br/>claims 70b @ $0.08<br/>serves 8b]
+    E -->|"x402 USDC payment"| P4[Provider 4 · NimbusAI<br/>0gm-1.0-35b-a3b @ $0.06]
     P1 & P2 & P3 -->|proxy| G[Groq API]
-    P1 & P2 & P3 -->|"registration JSON<br/>+ 50 ℏ stake to escrow"| HCS[HCS topics<br/>registry · trades · verdicts]
+    P4 -->|proxy| Z[0G Compute Router]
+    P1 & P2 & P3 & P4 -->|"registration JSON<br/>+ 50 ℏ stake to escrow"| HCS[HCS topics<br/>registry · trades · verdicts]
     E -->|"trade messages"| HCS
     V[Verifier] -->|"replay temp-0 prompt<br/>vs witness · compare"| P1 & P3
-    V -->|"slash: escrow to treasury<br/>+ verdict message"| HCS
+    V -->|"slash 25 ℏ escrow→treasury<br/>+ 2-of-2 ARBOND wipe<br/>+ verdict message"| HCS
     V -->|"POST /slash"| E
     M[Mirror Node REST] -.->|"1-5s lag"| E & D
     D[Dashboard :3000<br/>trading terminal<br/>+ audit trail panel] <-->|SSE| E
@@ -61,8 +65,8 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 | Package | What it does | Docs |
 |---|---|---|
-| [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: plans a goal into questions, buys each answer through the exchange, budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
-| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK). Default supply backend: **0G Compute** (decentralized GPU network); groq/canned selectable per instance (ollama planned) | [provider.md](docs/provider.md) |
+| [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: routes each goal to a model tier from the live market, buys the answer through the exchange (one goal = one purchase; decomposition opt-in), budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
+| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 USDC paywall (native HBAR via `SETTLEMENT_ASSET=hbar`); on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK). Default supply backend: **0G Compute** (decentralized GPU network); groq/canned selectable per instance | [provider.md](docs/provider.md) |
 | [`packages/exchange`](packages/exchange) | Discovers supply from HCS, routes each request to the cheapest live provider claiming the model, pays via x402, publishes trades | [exchange.md](docs/exchange.md) |
 | [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness; on divergence slashes staked HBAR and **destroys the HTS bond with a 2-of-2 multi-sig wipe** (verifier + auditor) | [verifier.md](docs/verifier.md) |
 | [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
@@ -90,17 +94,45 @@ Live settlement + token/freeze/wipe/slash transactions and account links:
 [docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
 Moving an existing deployment to USDC: [docs/MIGRATION-USDC.md](docs/MIGRATION-USDC.md).
 
-## Hedera track alignment
+## Bounties & outcomes
 
 Everything on-chain is SDK-native across three Hedera services — **HCS, HTS, Mirror Node** — with
-**zero Solidity**. Full per-bounty mapping (with `file:line` + Hashscan proof):
-[docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md).
+**zero Solidity**, plus a **0G Compute** decentralized-GPU supply integration. Full per-bounty
+mapping (with `file:line` + Hashscan proof): [docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md).
+
+### Hedera prize tracks
 
 | Hedera prize track | Fit | What AgentRouter uses |
 |---|---|---|
 | **AI & Agentic Payments** | **Implemented** | Autonomous AI agent making per-request **x402** payments in **HTS USDC** (native HBAR behind one flag); **Hedera Agent Kit** identity; HCS-14-style UAIDs; HCS audit trails |
 | **"No Solidity Allowed"** | **Implemented** | Whole economic loop — identity, stake, slash, HTS bond, multi-sig wipe — via **Hedera SDKs** across HCS + HTS + Mirror Node, no contracts |
 | **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** + a **2-of-2 multi-sig `TokenWipe`** on fraud; settlement itself rides a second HTS token (USDC) |
+
+### 0G Compute — decentralized GPU supply
+
+Provider 4 (**NimbusAI**) resells inference from the **0G Compute Router** — one OpenAI-compatible
+endpoint over 0G's decentralized GPU marketplace (`0gm-1.0-35b-a3b`, TEE-signed results) — and it's
+the **default bring-your-own backend** for anyone onboarding new supply (`groq`/`canned` selectable
+per instance). It joins the marketplace **permissionlessly**: boots, stakes, registers on HCS, and
+is discovered within seconds. Its full on-chain legs — stake, HCS registration carrying the 0G model
+id, and a settled USDC trade — ran on Testnet **2026-07-26** ([docs/PROOF.md](docs/PROOF.md)).
+
+### What's live on-chain
+
+- **Real USDC settlement** — two HTS transfers per request (agent → exchange `price + fee`,
+  exchange → provider `price`), in **HTS USDC** (`0.0.429274`), fee-sponsored so payers need no gas.
+- **HTS ReputationBond** (`ARBOND`, `0.0.9758338`) — a **2% custom fractional fee** +
+  **freeze/pause/wipe** keys; a **2-of-2 multi-sig `TokenWipe`** destroyed a caught cheater's bond
+  on Testnet **2026-07-26**.
+- **Native-HBAR staking + slashing** — 50 ℏ stake to a plain escrow *account*, 25 ℏ escrow → treasury
+  slash on fraud, no contract deployed.
+- **HCS audit trail** — registry · trades · verdicts topics, every registration/trade/verdict
+  replayable from the public Mirror Node.
+- **Live hosted** — dashboard on Vercel + exchange API on Railway; buy an inference call yourself in
+  [docs/TESTING.md](docs/TESTING.md).
+
+Full receipts + Hashscan links: [docs/PROOF.md](docs/PROOF.md) ·
+[docs/TRANSACTIONS.md](docs/TRANSACTIONS.md).
 
 ## Documentation
 
@@ -109,8 +141,10 @@ Everything lives in [docs/](docs/README.md). Start there, or jump to:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — actors, flow, and the Hedera stack
 - [GUIDE.md](docs/GUIDE.md) — env vars, demo script, components, troubleshooting
 - Services: [agent.md](docs/agent.md) · [provider.md](docs/provider.md) · [exchange.md](docs/exchange.md) · [verifier.md](docs/verifier.md) · [FRONTEND.md](docs/FRONTEND.md)
-- [DEPLOY.md](docs/DEPLOY.md) — production URLs, per-service config, runbook
+- [HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md) — per-bounty mapping to the Hedera prize tracks
+- [DEPLOY.md](docs/DEPLOY.md) — production URLs, per-service config, runbook · [TESTING.md](docs/TESTING.md) — live URLs, buy an inference call
 - [PROOF.md](docs/PROOF.md) · [TRANSACTIONS.md](docs/TRANSACTIONS.md) — on-chain evidence and how native staking/slashing works
+- [FUNDING.md](docs/FUNDING.md) · [MIGRATION-USDC.md](docs/MIGRATION-USDC.md) — settlement funding + the HBAR→USDC migration
 - [RESEARCH.md](docs/RESEARCH.md) · [DEVREL_BRIEF.md](docs/DEVREL_BRIEF.md) · [HEDERAFEEDBACK.md](docs/HEDERAFEEDBACK.md)
 
 ## Repository layout

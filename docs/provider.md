@@ -1,7 +1,8 @@
 # AgentRouter — Inference Provider (Supply)
 
-An OpenAI-compatible inference server that **sells LLM answers per request and gets paid in real
-HBAR** on Hedera Testnet, over the [x402](https://x402.org) protocol. On boot it **stakes 50 ℏ of
+An OpenAI-compatible inference server that **sells LLM answers per request and gets paid in USDC**
+(native HBAR behind `SETTLEMENT_ASSET=hbar`) on Hedera Testnet, over the [x402](https://x402.org)
+protocol. On boot it **stakes 50 ℏ of
 collateral** into an escrow account and **registers an on-chain HCS-14 identity** on the shared
 registry topic, so the exchange discovers it automatically. One codebase runs several env-driven
 "personalities" — including a deliberate **cheater** that advertises one model but serves a weaker
@@ -21,8 +22,9 @@ payments) + **`@x402/express`** paywall. Everything on-chain is real testnet —
    ~1–5 s. Re-registers automatically if its public endpoint changes.
 3. **Puts the endpoint behind an x402 paywall.** Walks a **facilitator ladder**
    (`api.testnet.blocky402.com` → `x402.org/facilitator`) and gates `POST /v1/chat/completions` with
-   `@x402/express` + `@x402/hedera` — `402 Payment Required` → signed HBAR payment → `200`,
-   tinybar-exact, at the advertised price. Facilitator sponsors fees, so buyers need no gas.
+   `@x402/express` + `@x402/hedera` — `402 Payment Required` → signed USDC payment → `200`,
+   base-unit-exact, at the advertised price (native HBAR via `SETTLEMENT_ASSET=hbar`). Facilitator
+   sponsors fees, so buyers need no gas.
 4. **Serves inference.** Proxies **Groq** (or deterministic canned answers when no `GROQ_API_KEY` is
    set — the demo works either way). The **cheat** personality secretly serves `llama-3.1-8b-instant`
    while advertising `llama-3.3-70b-versatile`.
@@ -36,7 +38,7 @@ payments) + **`@x402/express`** paywall. Everything on-chain is real testnet —
 | `provider1` | Titan Compute | llama-3.3-70b-versatile | same (honest) | $0.10 | 4021 |
 | `provider2` | Budget Inference Co | llama-3.1-8b-instant | same (honest) | $0.04 | 4022 |
 | `provider3` | SketchyGPU Labs | llama-3.3-70b-versatile | **8b when `CHEAT_MODE=true`** | $0.08 | 4023 |
-| `provider4` | NimbusAI | llama-3.3-70b-versatile | same (honest) | $0.06 | 4024 |
+| `provider4` | NimbusAI | `0gm-1.0-35b-a3b` (**0G Compute**) | same (honest) | $0.06 | 4024 |
 
 `provider4` (NimbusAI) was added to demonstrate **permissionless supply joining live**: it boots,
 stakes, registers, is discovered within seconds, and — being the cheapest *honest* 70b seller —
@@ -47,7 +49,7 @@ immediately wins routing while passing verification.
 ```
                          stake 50 ℏ ─────────────► [escrow 0.0.9746385]
                          register (HCS-14) ──────► [HCS registry topic 0.0.9744593]
-[Provider :40xx] ◄── discover (Mirror Node) ── [Exchange :4100] ◄── x402 HBAR ── [Agent]
+[Provider :40xx] ◄── discover (Mirror Node) ── [Exchange :4100] ◄── x402 USDC ── [Agent]
        │  POST /v1/chat/completions behind @x402/express paywall (402 → paid → 200)
        └── proxies ──► [Groq API]   (or canned answers with no key)
 
@@ -57,8 +59,8 @@ immediately wins routing while passing verification.
 ## What we built / verified (submission notes)
 
 - **Real mode on Hedera Testnet, end-to-end:** providers stake, register, and get paid per request
-  in native HBAR — verified with a strict smoke gate (402 → paid → exact balance deltas, twice) and
-  the full demo (stake → route → serve → slash the cheater).
+  in USDC (native HBAR behind `SETTLEMENT_ASSET=hbar`) — verified with a strict smoke gate (402 →
+  paid → exact balance deltas, twice) and the full demo (stake → route → serve → slash the cheater).
 - **NimbusAI (4th provider):** added to show a new supplier onboarding onto the marketplace live.
 - **Deployable as a standalone service (Railway etc.):** the provider now binds to the injected
   `PORT` and advertises `PROVIDER_PUBLIC_URL` (registering that public address on HCS instead of
@@ -72,17 +74,48 @@ immediately wins routing while passing verification.
 pnpm provider1      # :4021  Titan Compute (honest 70b)
 pnpm provider2      # :4022  Budget Inference Co (honest 8b)
 pnpm provider3      # :4023  SketchyGPU Labs (cheater, CHEAT_MODE=true)
-pnpm provider4      # :4024  NimbusAI (honest 70b)
+pnpm provider4      # :4024  NimbusAI (honest, resells 0G Compute)
+pnpm provider       # :4025  your own compute (profile "custom", configured from .env)
 curl -s localhost:4024/info   # sanity: name, model, price, wallet
 ```
 
 Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) — same flow, same UI.
 
+## Listing your own compute
+
+`provider1`–`provider4` are the demo personalities. **`custom` is the bring-your-own profile**:
+`pnpm provider` reads `PROVIDER_NAME`, `PROVIDER_MODEL`, `PROVIDER_PRICE`, `PROVIDER_BACKEND`
+and `PROVIDER_PUBLIC_URL` from `.env` and needs no code edits. It sets `actualModel =
+advertisedModel`, so it is honest by construction — which is what keeps the verifier off you.
+
+Two aids, both optional:
+
+- **[`onboarding-a-provider`](../.claude/skills/onboarding-a-provider/SKILL.md)** — a guided
+  walkthrough that does the setup one step at a time and verifies each step on-chain (a Hashscan
+  link, the routing-table row, a real `402`) instead of trusting log lines.
+- **[`@agentrouter/provider-mcp`](../packages/provider-mcp/README.md)** — the Hedera work as
+  idempotent MCP tools: `create_provider_account`, `stake_collateral`, `register_provider`,
+  `deploy_provider`, `verify_provider_live`, and a `provision_provider` orchestrator. A project
+  `.mcp.json` ships at the repo root, so an MCP client only has to approve it once.
+
+The tools do **not** replace `pnpm provider` — the service stakes and registers itself on boot.
+They create the account beforehand and confirm you are discoverable afterwards. Two things are
+worth knowing before you start, because both fail quietly:
+
+- **`PROVIDER_PUBLIC_URL` must be in `.env`**, not merely exported in your shell. The service
+  re-reads `.env` on every boot; if it is missing, the service registers
+  `http://localhost:<port>` over whatever was there and the exchange — last-write-wins on the
+  registry topic — marks you `down`.
+- **The port opens before registration finishes.** The service binds first and registers in the
+  background, so a healthy `/healthz` is not evidence that you are registered. Wait for the
+  `registered on HCS registry topic` line; a failed registration leaves the service serving
+  rather than exiting.
+
 ## HTTP API
 
 | Route | Auth | Purpose |
 |---|---|---|
-| `POST /v1/chat/completions` | **x402 (paid)** | OpenAI-compatible inference; returns `402` unpaid, `200` after HBAR payment |
+| `POST /v1/chat/completions` | **x402 (paid)** | OpenAI-compatible inference; returns `402` unpaid, `200` after USDC payment (native HBAR via `SETTLEMENT_ASSET=hbar`) |
 | `GET /info` | public | `{ displayName, model, price, wallet, agentId, url }` — what the exchange sees |
 | `GET /healthz` | public | `{ ok: true }` |
 
@@ -102,7 +135,7 @@ Every item below is a **real Hedera Testnet transaction**. Append the id to
 **Provider accounts:** Titan [`0.0.9746381`](https://hashscan.io/testnet/account/0.0.9746381) ·
 Budget [`0.0.9746382`](https://hashscan.io/testnet/account/0.0.9746382) ·
 SketchyGPU [`0.0.9746383`](https://hashscan.io/testnet/account/0.0.9746383) ·
-NimbusAI [`0.0.9746711`](https://hashscan.io/testnet/account/0.0.9746711)
+NimbusAI [`0.0.9755666`](https://hashscan.io/testnet/account/0.0.9755666)
 **Escrow (stake pool):** [`0.0.9746385`](https://hashscan.io/testnet/account/0.0.9746385) ·
 **HCS registry topic:** [`0.0.9744593`](https://hashscan.io/testnet/topic/0.0.9744593) ·
 **HCS verdicts topic:** [`0.0.9744595`](https://hashscan.io/testnet/topic/0.0.9744595)
@@ -138,6 +171,6 @@ Where a provider's completions actually come from is pluggable
 
 The named demo profiles pin their backend: **p1/p2/p3 are frozen on `groq`** (the
 slash arc needs deterministic same-model outputs) and **provider4 (NimbusAI) is the
-0G personality** — honest, `0gm-1.0-35b-a3b` at 0.06 ℏ. Its model id is unique on
+0G personality** — honest, `0gm-1.0-35b-a3b` at $0.06. Its model id is unique on
 the exchange, so the verifier logs "no witness available" instead of auditing it
 (cross-backend outputs aren't comparable under the similarity threshold).
