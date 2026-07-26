@@ -38,6 +38,32 @@ export function appendEnvLines(lines: string[], header: string): void {
   }
 }
 
+/**
+ * Set `KEY=value` in the .env file, replacing ALL existing lines for that key,
+ * and reflect it into the running process.
+ *
+ * Must replace rather than append: readEnvVar() matches with the `m` flag and so
+ * takes the FIRST occurrence, while `node --env-file` (how every service boots)
+ * takes the LAST. A duplicate key would make this server and the provider service
+ * read different values out of the same file.
+ */
+export function upsertEnvVar(name: string, value: string, header: string): void {
+  const line = `${name}=${value}`;
+  let body = "";
+  try {
+    body = readFileSync(ENV_PATH, "utf8");
+  } catch {
+    /* no .env yet — fall through to the append path below */
+  }
+  const existing = new RegExp(`^${name}=.*$`, "gm");
+  if (!body.match(existing)) {
+    appendEnvLines([line], header);
+    return; // appendEnvLines already mirrored it into process.env
+  }
+  writeFileSync(ENV_PATH, body.replace(existing, line));
+  process.env[name] = value;
+}
+
 /** Load the .env file into process.env at startup (Node 22 built-in). Best-effort. */
 export function loadEnv(): void {
   try {

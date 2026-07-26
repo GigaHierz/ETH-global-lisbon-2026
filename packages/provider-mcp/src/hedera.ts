@@ -8,7 +8,6 @@ import {
   PrivateKey,
   Hbar,
   AccountCreateTransaction,
-  AccountBalanceQuery,
   TransferTransaction,
 } from "@hiero-ledger/sdk";
 import { readEnvVar } from "./envStore.js";
@@ -39,16 +38,6 @@ function clientFor(id: string, key: string): Client {
 export function operatorClient(): Client {
   const op = getOperator();
   return clientFor(op.id, op.key);
-}
-
-export async function hbarBalance(accountId: string): Promise<number> {
-  const client = operatorClient();
-  try {
-    const b = await new AccountBalanceQuery().setAccountId(accountId).execute(client);
-    return b.hbars.toBigNumber().toNumber();
-  } finally {
-    client.close();
-  }
 }
 
 /** Create + fund an ECDSA account from the operator. Returns id + the 0x-prefixed
