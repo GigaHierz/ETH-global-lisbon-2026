@@ -5,7 +5,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "AgentRouter — on-chain OpenRouter: agents buy LLM inference per-request with HBAR via x402 on Hedera, providers registered + reputation-tracked via HCS-14 + Hedera Consensus Service",
+  "description": "AgentRouter \u2014 on-chain OpenRouter: agents buy LLM inference per-request with HBAR via x402 on Hedera, providers registered + reputation-tracked via HCS-14 + Hedera Consensus Service",
   "scripts": {
     "provider1": "tsx --env-file=.env packages/provider/src/index.ts --profile provider1",
     "provider2": "tsx --env-file=.env packages/provider/src/index.ts --profile provider2",
@@ -28,7 +28,8 @@
     "setup-hcs": "tsx scripts/setup-hcs-topics.ts",
     "setup-hts": "tsx scripts/setup-hts-token.ts",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "fund-accounts": "tsx scripts/fund-accounts.ts"
   },
   "dependencies": {
     "@agentrouter/shared": "workspace:*",

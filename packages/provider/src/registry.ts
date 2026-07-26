@@ -1,5 +1,5 @@
 // Provider identity + staking (no-Solidity path).
-// Real mode, on boot (idempotent via .registry-cache.json):
+// Real mode, on boot (idempotent — see the note on durability below):
 //   1. stake STAKE_HBAR (default 50 ℏ) → the verifier-held escrow account
 //   2. publish an HCS-14-style registration JSON to the HCS registry topic
 //      (HCS-14 universal agent id + hcs14 profile block)
@@ -16,6 +16,7 @@ import {
   MOCK_MODE,
   bondTokenId,
   bondBalance,
+  readTopicMessages,
 } from "@agentrouter/shared";
 import type { ProviderProfile } from "./profiles.js";
 
@@ -37,7 +38,45 @@ function readCache(): Record<string, CacheEntry> {
 }
 
 function writeCache(c: Record<string, CacheEntry>) {
-  fs.writeFileSync(CACHE_FILE, JSON.stringify(c, null, 2));
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(c, null, 2));
+  } catch {
+    /* read-only or ephemeral filesystem — the registry topic is the real record */
+  }
+}
+
+/** Has this account already registered (and therefore staked)? Answered from the HCS
+ *  registry topic, which is the durable record — the local cache file is only a way
+ *  to skip this lookup.
+ *
+ *  This matters on any host with an ephemeral filesystem. A container starts with no
+ *  cache file, concludes it has never staked, and transfers STAKE_HBAR again — so
+ *  every redeploy silently costs another 50 ℏ until the account is drained and its
+ *  HCS publishes start failing. Asking the chain makes staking idempotent across
+ *  restarts, rebuilds and hosts. */
+async function onChainRegistration(account: string): Promise<CacheEntry | null> {
+  try {
+    const msgs = await readTopicMessages("registry", 100); // newest first
+    let found: CacheEntry | null = null;
+    for (const m of msgs) {
+      const p = m.payload as { type?: string; account?: string; endpoint?: string; stakeTx?: string | null } | null;
+      if (p?.type !== "registration" || p.account !== account) continue;
+      // The newest message wins for endpoint/registration state...
+      found ??= { registered: `hcs-seq-${m.sequence}`, endpoint: p.endpoint };
+      // ...but the stake is a one-time event that may predate it. A later
+      // re-registration (an endpoint change, say) can carry stakeTx: null while the
+      // collateral is still sitting in escrow, so keep scanning back for the message
+      // that recorded it. Taking only the newest here is what re-staked 50 HBAR.
+      if (p.stakeTx) {
+        found.staked = p.stakeTx;
+        break;
+      }
+    }
+    return found;
+  } catch {
+    /* Mirror Node unreachable — fall through and let the cache decide */
+  }
+  return null;
 }
 
 /** An endpoint only the local box can reach — useless to a remote exchange. */
@@ -86,7 +125,16 @@ export async function ensureRegistered(
   // reaches you at the endpoint you register, and localhost only works on its box.
   const endpoint = process.env.PROVIDER_PUBLIC_URL ?? `http://localhost:${profile.port}`;
   const cache = readCache();
-  const entry: CacheEntry = cache[id] ?? {};
+  // Local cache first (fast, no network); otherwise ask the chain, so a fresh
+  // container does not re-stake just because it has no file.
+  let entry: CacheEntry = cache[id] ?? {};
+  if (!entry.staked && !entry.registered) {
+    const onChain = await onChainRegistration(id);
+    if (onChain) {
+      entry = onChain;
+      log(profile.key, `found an existing registration on the HCS registry topic — not re-staking`);
+    }
+  }
   if (entry.registered && entry.endpoint !== endpoint) {
     // Never downgrade a public registration to localhost. Booting in a shell that lost
     // PROVIDER_PUBLIC_URL would otherwise publish localhost over the good registration
