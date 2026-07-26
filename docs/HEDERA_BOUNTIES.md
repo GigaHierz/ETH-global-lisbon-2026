@@ -31,11 +31,17 @@ standard.
 - **Durable per-agent on-chain purchase history** — the agent publishes every paid inference call
   to its **own HCS topic** (`agentCalls`) and reads it back through the Mirror Node, giving a
   verifiable record of every x402 purchase that survives restarts. Surfaced as "Previous Calls" on
-  the Agent page. `packages/agent/src/server.ts` (`recordCall`, `GET /calls`).
+  the Agent page. `packages/agent/src/server.ts` (`recordCall`, `GET /calls`). The exchange applies
+  the same principle to its settlement feed: on boot it **replays the HCS trades topic** to rebuild
+  the feed and revenue counters (`packages/exchange/src/hydrate.ts` `hydrateFromTrades`, wired at
+  `packages/exchange/src/index.ts:67`), so the ledger — not container uptime — decides what the demo
+  shows. A rehydrated row is deliberately partial (money + both settlement tx ids, not the prompt
+  text or provider URL).
 - **x402 payment standard, USDC (native HBAR behind a flag), per request** — official `@x402/*` 2.19,
   `ExactHederaScheme` on `hedera:testnet`, signed with the agent's own key; the exchange/provider run
   the x402 paywall. `packages/agent/src/payer.ts:25-53`, `packages/exchange/src/index.ts` (x402
-  resource server ~L128-136), `packages/provider/src/index.ts:55-61`. Fee-sponsored facilitator ladder:
+  resource server ~L128-136), `packages/provider/src/index.ts:63-89` (real `ExactHederaScheme`
+  paywall; L51-61 is the MOCK branch). Fee-sponsored facilitator ladder:
   `packages/shared/src/hedera.ts:43-76` (payers need zero gas).
 - **Hedera Agent Kit** — the agent registers its **HCS-14-style Universal Agent ID**
   (`uaid:aid:hedera:testnet:0.0.x`) through `HederaLangchainToolkit` + `coreConsensusPlugin`
@@ -100,8 +106,10 @@ Applications using only the Hedera SDK, no smart contracts.
 **three native Hedera services** (the bounty asks for two):
 - **HCS** — identity registry + trade + verdict topics, plus a per-agent `agentCalls` topic that
   is the buyer agent's own durable purchase log (read back via Mirror Node to power the Agent
-  page's "Previous Calls" view). `packages/shared/src/hcs.ts`, `packages/agent/src/server.ts`,
-  `deployments.json`.
+  page's "Previous Calls" view). These topics *are* the source of truth: on boot the exchange
+  replays the trades topic to rebuild its settlement feed (`packages/exchange/src/hydrate.ts`),
+  mirroring how `discovery.ts` rebuilds the provider table from the registry topic. `packages/shared/src/hcs.ts`,
+  `packages/agent/src/server.ts`, `deployments.json`.
 - **HTS** — the ReputationBond token, custom fee, freeze/pause/wipe keys, and the 2-of-2 multi-sig
   wipe. `scripts/setup-hts-token.ts`, `packages/shared/src/hts.ts`.
 - **Mirror Node REST API** — provider discovery + audit-trail reads.
@@ -114,6 +122,27 @@ Applications using only the Hedera SDK, no smart contracts.
 **Qualification:** Hedera SDK exclusively, no contracts ✓ · ≥2 native services (we use 3) ✓ ·
 public repo + README ✓ · demo video (to record). Optional: Mirror Node ✓, HCS ✓, Hedera Agent
 Kit ✓.
+
+---
+
+## Links & references
+
+Every Hedera tool/service we use, its official docs, and the exact code where we use it. Code
+links are **permalinks pinned to commit [`ef3a140`](https://github.com/GigaHierz/ETH-global-lisbon-2026/tree/ef3a140)**
+(on `main`) so the line anchors stay stable.
+
+| Hedera tool / service | Official docs / repo | Where we use it (exact lines) |
+| --- | --- | --- |
+| **Hedera Consensus Service (HCS)** | [SDK docs](https://docs.hedera.com/hedera/sdks-and-apis/sdks/consensus-service) | publish → [`hcs.ts#L39-L68`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/shared/src/hcs.ts#L39-L68) · read → [`hcs.ts#L70-L87`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/shared/src/hcs.ts#L70-L87) · boot replay → [`hydrate.ts#L78-L92`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/exchange/src/hydrate.ts#L78-L92) |
+| **Hedera Token Service (HTS)** | [SDK docs](https://docs.hedera.com/hedera/sdks-and-apis/sdks/token-service) | token create + custom fee + keys → [`setup-hts-token.ts#L94-L107`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/scripts/setup-hts-token.ts#L94-L107) · 2-of-2 multi-sig wipe → [`hts.ts#L110-L145`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/shared/src/hts.ts#L110-L145) |
+| **Mirror Node REST API** | [REST API docs](https://docs.hedera.com/hedera/sdks-and-apis/rest-api) | topic reads → [`hcs.ts#L70-L87`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/shared/src/hcs.ts#L70-L87) · provider discovery → [`discovery.ts`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/exchange/src/discovery.ts) |
+| **Hedera Agent Kit** (`hedera-agent-kit`) | [repo](https://github.com/hashgraph/hedera-agent-kit-js) · [docs](https://docs.hedera.com/solutions/ai/agent-kit) | `HederaLangchainToolkit` + `SUBMIT_TOPIC_MESSAGE_TOOL` (autonomous mode) → [`identity.ts#L77-L97`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/agent/src/identity.ts#L77-L97) |
+| **Hiero SDK** (`@hiero-ledger/sdk`) | [repo](https://github.com/hiero-ledger/hiero-sdk-js) | stake via `TransferTransaction` → [`registry.ts#L40-L55`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/provider/src/registry.ts#L40-L55) · slash → [`verifier/index.ts#L115-L143`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/verifier/src/index.ts#L115-L143) |
+| **x402** (`@x402/*`, incl. `@x402/hedera`) | [repo](https://github.com/x402-foundation/x402) · [docs](https://docs.x402.org) | client / `ExactHederaScheme` → [`payer.ts#L25-L53`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/agent/src/payer.ts#L25-L53) · resource-server paywall → [`provider/index.ts#L63-L89`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/provider/src/index.ts#L63-L89) · fee-sponsored facilitator ladder → [`hedera.ts#L43-L76`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/packages/shared/src/hedera.ts#L43-L76) |
+| **Hashscan** (explorer) | [testnet](https://hashscan.io/testnet) | ARBOND bond token → [`0.0.9758338`](https://hashscan.io/testnet/token/0.0.9758338); full tx list in [`docs/PROOF.md`](https://github.com/GigaHierz/ETH-global-lisbon-2026/blob/ef3a140/docs/PROOF.md) |
+
+`@hashgraph/sdk` also appears, but only where the Hedera Agent Kit pins it — the Hiero SDK
+(`@hiero-ledger/sdk`) is what we call directly everywhere else.
 
 ---
 
