@@ -66,6 +66,9 @@ export default function ExchangeControlRoom() {
     fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()).then((l) => setFeed(l.reverse())).catch(() => {});
     fetch(`${EXCHANGE}/price-index`).then((r) => r.json()).then(setPrices).catch(() => {});
     fetch(`${EXCHANGE}/stats`).then((r) => r.json()).then(setStats).catch(() => {});
+    // Backfill the verifier audit log so it isn't empty on load: the exchange
+    // returns oldest→newest, but live SSE prepends, so reverse to newest-first.
+    fetch(`${EXCHANGE}/verifies?limit=10`).then((r) => r.json()).then((v: VerifyEvent[]) => setVerifies(v.reverse())).catch(() => {});
 
     const es = new EventSource(`${EXCHANGE}/events`);
     es.onopen = () => setConnected(true);
@@ -386,6 +389,9 @@ export default function ExchangeControlRoom() {
 
               {/* On-chain audit trail */}
               <Card className="flex flex-col">
+                <div className="p-4 border-b border-outline-variant flex justify-between items-center">
+                  <span className="font-data text-[11px] tracking-[0.1em]">AUDIT VIEW OF AGENTROUTER</span>
+                </div>
                 <div className="flex border-b border-outline-variant">
                   {(["registry", "trades", "verdicts"] as const).map((name) => (
                     <button key={name} onClick={() => setActiveTopic(name)}
@@ -446,7 +452,7 @@ export default function ExchangeControlRoom() {
                       <th className="px-4 py-2 text-right">Total ({sym})</th>
                       <th className="px-4 py-2 text-right">Lat.</th>
                       <th className="px-4 py-2 text-center">Status</th>
-                      <th className="px-4 py-2 text-right">TX in·out</th>
+                      <th className="px-4 py-2 text-right" title="The two on-chain settlement legs: ↙ agent→exchange (in), ↗ exchange→provider (out). Click an arrow to open the transaction on HashScan.">TX in·out</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/30">
@@ -469,19 +475,19 @@ export default function ExchangeControlRoom() {
                         </td>
                         <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
                           {r.inboundRef && hashscanTx(r.inboundRef) && (
-                            <a className="text-on-surface-variant hover:text-accent-cyan" title="agent→exchange settlement"
+                            <a className="text-on-surface-variant hover:text-accent-cyan" title="Leg 1 · agent → exchange settlement (money in) — click to view the transaction on HashScan"
                               href={hashscanTx(r.inboundRef)!} target="_blank" rel="noreferrer">
                               <Icon name="call_received" className="text-[14px]" />
                             </a>
                           )}
                           {hashscanTx(r.paymentRef) && (
-                            <a className="text-on-surface-variant hover:text-accent-cyan" title="exchange→provider settlement"
+                            <a className="text-on-surface-variant hover:text-accent-cyan" title="Leg 2 · exchange → provider settlement (money out) — click to view the transaction on HashScan"
                               href={hashscanTx(r.paymentRef)!} target="_blank" rel="noreferrer">
                               <Icon name="call_made" className="text-[14px]" />
                             </a>
                           )}
                           {r.refundRef && hashscanTx(r.refundRef) && (
-                            <a className="text-accent-orange hover:text-on-surface" title="refund to agent"
+                            <a className="text-accent-orange hover:text-on-surface" title="Refund · exchange → agent (payment returned) — click to view the transaction on HashScan"
                               href={hashscanTx(r.refundRef)!} target="_blank" rel="noreferrer">
                               <Icon name="undo" className="text-[14px]" />
                             </a>

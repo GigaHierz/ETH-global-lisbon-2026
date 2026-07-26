@@ -29,9 +29,11 @@ import {
   providerList,
   requestLog,
   priceIndex,
+  verifyLog,
   addSSEClient,
   broadcast,
   pushRequest,
+  pushVerify,
   mockLedger,
   revenue,
   statsSnapshot,
@@ -96,6 +98,13 @@ app.get("/log", (req, res) => {
 
 app.get("/price-index", (_req, res) => res.json(priceIndex.slice(-500)));
 
+// Verifier audit history (oldest→newest). Lets the dashboard backfill its
+// audit log on load instead of waiting for the next live `verify` SSE event.
+app.get("/verifies", (req, res) => {
+  const limit = parseInt(String(req.query.limit || "10"), 10);
+  res.json(verifyLog.slice(-limit));
+});
+
 app.get("/events", (req, res) => {
   res.writeHead(200, {
     "content-type": "text/event-stream",
@@ -142,7 +151,7 @@ app.post("/bond-event", (req, res) => {
 // Verifier reports each comparison so the dashboard can show verification activity.
 app.post("/verify-report", (req, res) => {
   const { provider, witness, similarity, verdict } = req.body;
-  broadcast({ type: "verify", provider, witness, similarity, verdict });
+  pushVerify({ provider, witness, similarity, verdict });
   const row = providerList().find((p) => p.displayName === provider);
   if (row && verdict === "ok" && row.status === "live") {
     row.reputation = Math.min(100, row.reputation + 1);

@@ -9,8 +9,8 @@ export const metadata = {
 };
 
 const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
-const WAITLIST =
-  "mailto:sahilmarketingid@gmail.com?subject=AgentRouter%20Provider%20Waitlist&body=I%20want%20to%20list%20my%20compute%20on%20AgentRouter.%0A%0AHardware%3A%20%0AModels%20I%20can%20serve%3A%20%0AHedera%20account%20(if%20any)%3A%20";
+// Onboarding is self-serve: the CTA goes straight to the walkthrough, not a mailing list.
+const ONBOARD = "/providers/onboard";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -127,9 +127,9 @@ export default function ProvidersPage() {
           className="hidden sm:block font-data text-[11px] tracking-[0.1em] uppercase text-on-surface-variant hover:text-on-surface transition-colors">
           GitHub
         </a>
-        <a href={WAITLIST}
+        <a href={ONBOARD}
           className="bg-accent-orange text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
-          Join Waitlist
+          Join as a Provider
         </a>
       </Navbar>
 
@@ -150,13 +150,13 @@ export default function ProvidersPage() {
               Hedera, and earn for every request the exchange routes your way.
             </p>
             <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
-              <a href={WAITLIST}
+              <a href={ONBOARD}
                 className="w-full md:w-auto bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
-                Join the Provider Waitlist
+                Join as a Provider
               </a>
-              <a href="/providers/onboard"
+              <a href="#agent-onboarding"
                 className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
-                Go live in six steps
+                Onboard with an agent
               </a>
             </div>
             {/* Straight to the two artifacts, for anyone who doesn't want to scroll. */}
@@ -425,12 +425,12 @@ export default function ProvidersPage() {
             Ready to list your compute?
           </h2>
           <p className="font-body text-base text-on-surface-variant mb-10 max-w-2xl mx-auto">
-            Join the provider waitlist, or clone the repo and run <span className="font-data text-primary-fixed-dim">pnpm provider</span> right now.
+            Join as a provider, or clone the repo and run <span className="font-data text-primary-fixed-dim">pnpm provider</span> right now.
           </p>
           <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
-            <a href={WAITLIST}
+            <a href={ONBOARD}
               className="w-full md:w-auto bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
-              Join the Provider Waitlist
+              Join as a Provider
             </a>
             <a href={REPO} target="_blank" rel="noreferrer"
               className="w-full md:w-auto border border-outline-variant bg-surface-container/50 text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">

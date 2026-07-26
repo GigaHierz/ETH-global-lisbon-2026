@@ -4,8 +4,10 @@ import {
   providers,
   requestLog,
   priceIndex,
+  verifyLog,
   providerList,
   pushRequest,
+  pushVerify,
   addSSEClient,
   broadcast,
   revenue,
@@ -50,6 +52,7 @@ function row(url: string): ProviderRow {
 beforeEach(() => {
   requestLog.length = 0;
   priceIndex.length = 0;
+  verifyLog.length = 0;
   providers.clear();
 });
 
@@ -65,6 +68,28 @@ describe("pushRequest ring buffers", () => {
     for (let i = 0; i < 2100; i++) pushRequest(entry(i));
     expect(priceIndex.length).toBe(2000);
     expect(priceIndex[0].ts).toBe(100); // first 100 price points evicted
+  });
+});
+
+describe("pushVerify ring buffer", () => {
+  const verify = (i: number) => ({
+    provider: `P${i}`, witness: "W", similarity: 0.9, verdict: "ok" as const,
+  });
+
+  it("caps the verify log at 50, dropping the oldest", () => {
+    for (let i = 0; i < 60; i++) pushVerify(verify(i));
+    expect(verifyLog.length).toBe(50);
+    expect(verifyLog[0].provider).toBe("P10"); // P0..P9 evicted
+    expect(verifyLog.at(-1)!.provider).toBe("P59");
+  });
+
+  it("broadcasts each verify to SSE subscribers", () => {
+    const writes: string[] = [];
+    addSSEClient((chunk) => writes.push(chunk));
+    pushVerify(verify(1));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('"type":"verify"');
+    expect(writes[0]).toContain('"provider":"P1"');
   });
 });
 
