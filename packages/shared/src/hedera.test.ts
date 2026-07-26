@@ -6,11 +6,8 @@ import {
   hashscanTopic,
   HBAR_ASSET,
   HEDERA_NETWORK,
-  USDC_TOKEN_ID,
-  USDC_DECIMALS,
   TINYBAR,
   MIRROR_NODE,
-  SETTLEMENT_ASSET,
 } from "./hedera.js";
 
 describe("hbarPrice", () => {
@@ -40,10 +37,7 @@ describe("network constants", () => {
   it("exposes the expected Hedera testnet values", () => {
     expect(HEDERA_NETWORK).toBe("hedera:testnet");
     expect(HBAR_ASSET).toBe("0.0.0");
-    expect(USDC_TOKEN_ID).toBe("0.0.429274");
-    expect(USDC_DECIMALS).toBe(6);
     expect(TINYBAR).toBe(100_000_000);
     expect(MIRROR_NODE).toBe("https://testnet.mirrornode.hedera.com");
-    expect(SETTLEMENT_ASSET).toBe("hbar"); // default when SETTLEMENT_ASSET is unset
   });
 });

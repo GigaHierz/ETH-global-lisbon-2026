@@ -10,7 +10,7 @@ flowchart LR
     E -->|"x402 HBAR"| P1[Titan 70b · 0.10 ℏ :4021]
     E -->|"x402 HBAR"| P2[Budget 8b · 0.04 ℏ :4022]
     E -->|"x402 HBAR"| P3[Sketchy 😈 claims 70b · 0.08 ℏ :4023]
-    P1 & P2 & P3 --> G[Groq / Ollama / canned]
+    P1 & P2 & P3 --> G[Groq / canned]
     P1 & P2 & P3 -->|"register + stake 50 ℏ"| H[HCS: registry · trades · verdicts<br/>escrow 0.0.9744157]
     E -->|trades| H
     V[Verifier] -->|"temp-0 replay vs witness"| P1 & P3
@@ -43,20 +43,39 @@ flowchart LR
 | `MOCK_MODE` | `true` | all — in-memory chain/payments when true |
 | `GROQ_API_KEY` | — | providers (canned fallback without) |
 | `CHEAT_MODE` | `true` | provider3 serves 8b while advertising 70b |
-| `SETTLEMENT_ASSET` | `hbar` | `hbar` (native) or `usdc` (HTS 0.0.429274) |
 | `FACILITATOR_URL` | ladder | override rung 1; ladder = blocky402 → x402.org |
-| `SELF_HOST_FACILITATOR` | `false` | local facilitator stub (TODO) |
 | `HEDERA_OPERATOR_ID/KEY/EVM_ADDRESS` | — | setup script, topic creation, treasury |
 | `HEDERA_<ROLE>_ID/KEY/EVM` | from `pnpm setup-hedera` | AGENT, EXCHANGE, PROVIDER1-3, VERIFIER, ESCROW |
 | `STAKE_HBAR` | `50` | provider boot-time stake to escrow |
+| `EXCHANGE_FEE_BPS` | `1000` | taker fee in basis points (10%) |
+| `REFUND_ON_FAILURE` | `true` | refund settled payments when the provider call fails |
 | `SLASH_HBAR` | `25` | verifier slash amount |
 | `SIMILARITY_THRESHOLD` | `0.35` | fraud line |
 | `VERIFY_INTERVAL_MS` | `15000` | audit cadence |
 | `PROVIDER_URLS` | 3 localhosts | exchange discovery list |
+| `PROVIDER_NAME` / `PROVIDER_MODEL` / `PROVIDER_PRICE_HBAR` / `PROVIDER_PORT` | Custom Provider / 70b / `0.10` / `4025` | custom provider (`pnpm provider`) — list your own compute, no code edits |
+| `PROVIDER_PUBLIC_URL` | localhost:\<port\> | public address a provider registers on HCS (tunnel/VPS) |
 | `EXCHANGE_URL` | `http://localhost:4100` | agent, verifier, dashboard |
 | `AGENT_MODEL` / `AGENT_MOCK_BALANCE_HBAR` | 70b / `10` | agent |
-| `PROVIDER_BACKEND` / `OLLAMA_BASE_URL` | `groq` | optional Ollama supply (post-step-3) |
 | `HCS_REGISTRY_TOPIC` / `HCS_TRADES_TOPIC` / `HCS_VERDICTS_TOPIC` | deployments.json | HCS audit trail (live) |
+
+## Pricing: 10% taker-side fee
+
+The exchange charges a percentage fee on top of each provider's ask — **the provider
+always receives exactly its listed price**; the agent pays `price + fee`.
+
+- `EXCHANGE_FEE_BPS` (default `1000` = 10%). Fee math is integer tinybars only:
+  `fee = ceil(price × bps / 10000)` — rounded UP so the exchange never underquotes.
+- The 402 quote is **dynamic per request** (depends on which provider routing picks) and
+  **pinned for 60s**: the paid retry settles at the quoted total even if provider prices
+  change in between. Expired/unknown quote → fresh 402.
+- On provider failure the agent is made whole: in real mode the verified payment is
+  canceled before settlement (never charged); if money already moved, `REFUND_ON_FAILURE`
+  (default true) sends it back with memo `refund:<quoteId>`.
+- `GET /stats` → `{ totalVolumeHbar, requests, feeRevenueHbar, refunds, refundFailures, feeBps }`;
+  the dashboard's EXCHANGE REVENUE chip mirrors it live.
+- HCS trade messages carry `priceHbar`, `feeHbar`, `totalHbar` and BOTH settlement txs
+  (`inboundTx` agent→exchange, `paymentTx` exchange→provider).
 
 ## Demo script
 
@@ -78,7 +97,7 @@ Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` 
 
 | Component | Owns |
 |---|---|
-| Supply | Providers, optional Ollama backend, VPS hosting |
+| Supply | Providers (Groq-backed inference) |
 | Agent + verifier | Buyer agent, audit loop, test matrix |
 | DevRel | Payments story, HCS map, submission |
 | Exchange | Routing core + dashboard |
@@ -88,7 +107,7 @@ Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` 
 | Symptom | Cause / fix |
 |---|---|
 | Exchange sees no providers / stale table | **Mirror lag is 1-5s** — registration takes a beat to appear; also check provider `/healthz` and `PROVIDER_URLS` |
-| Tunnel URLs dead | trycloudflare quick tunnels die with the laptop/process — restart per [TESTING.md](TESTING.md); VPS is the durable home |
+| Tunnel URLs dead | trycloudflare quick tunnels die with the laptop/process — restart per [TESTING.md](TESTING.md); durable hosting (Railway/Vercel) avoids this |
 | Groq 429s under `--spam` | free-tier rate limit — slow down, or unset `GROQ_API_KEY` to switch to canned answers (flow unaffected) |
 | Boot log: facilitator rung unreachable | ladder auto-advances; if all rungs fail → `MOCK_MODE=true` and the demo continues offline |
 | `Missing HEDERA_*` | run `pnpm setup-hedera` where the operator key lives, or paste the role lines into `.env` |

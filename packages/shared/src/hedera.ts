@@ -1,19 +1,13 @@
 // Hedera testnet plumbing: the only chain in this project.
-// Settlement default = native HBAR (asset 0.0.0, tinybar amounts).
-// USDC (HTS 0.0.429274) stays available behind SETTLEMENT_ASSET=usdc.
+// Settlement is native HBAR (asset 0.0.0, tinybar amounts).
 
 export const HEDERA_NETWORK = "hedera:testnet";
 export const HBAR_ASSET = "0.0.0";
-export const USDC_TOKEN_ID = "0.0.429274"; // Hedera testnet USDC (HTS), 6 decimals
-export const USDC_DECIMALS = 6;
 export const TINYBAR = 100_000_000; // 1 ℏ
-
-export const SETTLEMENT_ASSET = (process.env.SETTLEMENT_ASSET ?? "hbar") as "hbar" | "usdc";
 
 export const MIRROR_NODE = "https://testnet.mirrornode.hedera.com";
 
-// x402 price object for a native-HBAR amount (the "$" money parser only maps to
-// HTS USDC, so HBAR pricing must use the explicit AssetAmount form).
+// x402 price object for a native-HBAR amount, using the explicit AssetAmount form.
 export function hbarPrice(hbar: number): { amount: string; asset: string } {
   return { amount: String(Math.round(hbar * TINYBAR)), asset: HBAR_ASSET };
 }
@@ -28,7 +22,7 @@ export function hashscanTopic(id: string): string {
   return `https://hashscan.io/testnet/topic/${id}`;
 }
 
-export type HederaRole = "AGENT" | "EXCHANGE" | "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "VERIFIER" | "ESCROW";
+export type HederaRole = "AGENT" | "EXCHANGE" | "PROVIDER1" | "PROVIDER2" | "PROVIDER3" | "PROVIDER4" | "PROVIDER" | "VERIFIER" | "ESCROW";
 
 /* v8 ignore start -- reads env + process.exit; exercised only in real mode */
 export function hederaAccount(role: HederaRole): { id: string; key: string } {
@@ -45,8 +39,6 @@ export function hederaAccount(role: HederaRole): { id: string; key: string } {
 // ── facilitator ladder ──────────────────────────────────────────────────
 // Boot-time: walk the ladder, use the first /supported that serves
 // hedera:testnet exact. FACILITATOR_URL env is tried first when set.
-// SELF_HOST_FACILITATOR=true is reserved for a local @x402/hedera facilitator
-// (TODO: stub — hosted rungs are both live as of 2026-07-25).
 
 const LADDER = [
   "https://api.testnet.blocky402.com",
@@ -58,9 +50,6 @@ let resolved: string | null = null;
 /* v8 ignore start -- network I/O (facilitator ladder); real mode only */
 export async function resolveFacilitator(tag = "x402"): Promise<string> {
   if (resolved) return resolved;
-  if (process.env.SELF_HOST_FACILITATOR === "true") {
-    throw new Error("SELF_HOST_FACILITATOR=true: local facilitator stub not built yet (hosted rungs live) — unset to use the ladder");
-  }
   const candidates = process.env.FACILITATOR_URL
     ? [process.env.FACILITATOR_URL, ...LADDER.filter((u) => u !== process.env.FACILITATOR_URL)]
     : LADDER;
@@ -98,3 +87,24 @@ export async function hbarBalance(accountId: string): Promise<number> {
   }
 }
 /* v8 ignore stop */
+
+// ── exchange fee math: integer tinybars only, no float money ────────────
+// feeTinybar = ceil(priceTinybar * feeBps / 10000). Rounding is always UP so
+// the exchange never underquotes. Floats appear only at the display edge.
+export const EXCHANGE_FEE_BPS = parseInt(process.env.EXCHANGE_FEE_BPS || "1000", 10); // 10%
+
+export function tinybarsOf(hbar: number): number {
+  return Math.round(hbar * TINYBAR);
+}
+
+export function feeForPrice(priceTinybar: number, feeBps: number = EXCHANGE_FEE_BPS): number {
+  return Math.ceil((priceTinybar * feeBps) / 10_000);
+}
+
+export function totalForPrice(priceTinybar: number, feeBps: number = EXCHANGE_FEE_BPS): number {
+  return priceTinybar + feeForPrice(priceTinybar, feeBps);
+}
+
+export function hbarOf(tinybar: number): number {
+  return tinybar / TINYBAR;
+}

@@ -19,7 +19,7 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 const STATS = [
   { icon: "payments", label: "Per 70B request", value: "0.10 ℏ" },
   { icon: "savings", label: "Quality bond", value: "50 ℏ" },
-  { icon: "memory", label: "Backend", value: "Groq · Ollama" },
+  { icon: "memory", label: "Backend", value: "Groq" },
   { icon: "hub", label: "Registry", value: "HCS on-chain" },
 ];
 
@@ -31,8 +31,8 @@ const STEPS = [
     iconColor: "text-on-primary",
     title: "List your compute",
     items: [
-      "Run the provider service on any box — local GPU, VPS, or cloud.",
-      "Point it at a Groq API key, or a local Ollama backend for your own models.",
+      "Run the provider service on any box — VPS, cloud, or your laptop behind a tunnel.",
+      "Point it at a Groq API key, or run without one for canned demo answers.",
       "Advertise the model you serve and a price in HBAR per request.",
     ],
   },
@@ -66,7 +66,7 @@ const REQUIREMENTS = [
   {
     icon: "memory",
     title: "Minimum hardware",
-    body: "Any box. A Groq or Ollama backend is enough; ~8GB VRAM if you serve local models.",
+    body: "Any box — no GPU required. A Groq API key serves real models; without one, canned answers keep you live.",
   },
   {
     icon: "account_balance",
@@ -85,14 +85,15 @@ const REQUIREMENTS = [
   },
 ];
 
-// Env vars a provider sets — from GUIDE.md's configuration table.
+// Env vars a custom provider sets — `pnpm provider` reads these (no code edits).
 const ENV_VARS: Array<[string, string, string]> = [
-  ["HEDERA_PROVIDER1_ID", "from pnpm setup-hedera", "Account that stakes, registers, and receives payment."],
-  ["HEDERA_PROVIDER1_KEY", "from pnpm setup-hedera", "Private key for that account."],
-  ["PROVIDER_PUBLIC_URL", "http://localhost:4021", "Public address the exchange routes to."],
+  ["PROVIDER_NAME", "Custom Provider", "Display name shown in the routing table."],
+  ["PROVIDER_MODEL", "llama-3.3-70b-versatile", "The model you advertise — and must actually serve."],
+  ["PROVIDER_PRICE_HBAR", "0.10", "Your price per request, in HBAR."],
+  ["HEDERA_PROVIDER_ID / _KEY", "from pnpm setup-hedera", "Account that stakes, registers, and receives payment."],
+  ["PROVIDER_PUBLIC_URL", "http://localhost:4025", "Public address the exchange routes to."],
   ["GROQ_API_KEY", "—", "Upstream inference. Omitted → canned fallback answers."],
   ["STAKE_HBAR", "50", "Boot-time stake posted to escrow."],
-  ["PROVIDER_BACKEND / OLLAMA_BASE_URL", "groq", "Switch to a local Ollama supply instead of Groq."],
 ];
 
 // Public provider endpoints — from provider/src/index.ts.
@@ -229,14 +230,10 @@ export default function ProvidersPage() {
               </div>
               <div className="flex items-start gap-3">
                 <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>Run multiple profiles (<span className="font-data">provider1…provider4</span>) from one repo.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>Swap Groq for a local Ollama backend to serve your own models.</span>
+                <span>Set your own model, price, and name in <span className="font-data">.env</span> — no code changes.</span>
               </div>
             </div>
-            <a href={`${REPO}/blob/main/GUIDE.md`} target="_blank" rel="noreferrer"
+            <a href={`${REPO}/blob/main/docs/GUIDE.md`} target="_blank" rel="noreferrer"
               className="mt-8 w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
               Full setup guide <Icon name="open_in_new" className="text-[14px]" />
             </a>
@@ -258,8 +255,9 @@ export default function ProvidersPage() {
                 <span className="text-on-surface">git clone {REPO.replace("https://", "")} &amp;&amp; pnpm install</span>
               </div>
               <div>
-                <span className="text-accent-orange"># 2. Add your Hedera keys to .env</span><br />
-                <span className="text-on-surface">HEDERA_PROVIDER1_ID=0.0.xxxxx · HEDERA_PROVIDER1_KEY=0x…</span>
+                <span className="text-accent-orange"># 2. Add your Hedera keys + advertise a model/price in .env</span><br />
+                <span className="text-on-surface">HEDERA_PROVIDER_ID=0.0.xxxxx · HEDERA_PROVIDER_KEY=0x…</span><br />
+                <span className="text-on-surface">PROVIDER_NAME=Acme · PROVIDER_MODEL=llama-3.3-70b-versatile · PROVIDER_PRICE_HBAR=0.10</span>
               </div>
               <div>
                 <span className="text-accent-orange"># 3. Make your box reachable</span><br />
@@ -267,11 +265,11 @@ export default function ProvidersPage() {
               </div>
               <div>
                 <span className="text-accent-orange"># 4. Start — stakes 50 ℏ + registers on HCS automatically</span><br />
-                <span className="text-on-surface">pnpm provider1</span>
+                <span className="text-on-surface">pnpm provider</span>
               </div>
               <div className="pt-4 mt-4 border-t border-outline-variant">
                 <span className="text-accent-cyan font-bold italic">{"// unpaid request → the paywall answers"}</span><br />
-                <span className="text-on-surface">curl -X POST localhost:4021/v1/chat/completions \</span><br />
+                <span className="text-on-surface">curl -X POST localhost:4025/v1/chat/completions \</span><br />
                 <span className="text-on-surface ml-4">-d {"'"}{"{"}&quot;model&quot;:&quot;llama-3.3-70b-versatile&quot;,…{"}"}{"'"}</span>
               </div>
               <div className="bg-hud-error/10 p-3 border-l-2 border-hud-error">
@@ -357,7 +355,7 @@ export default function ProvidersPage() {
             Ready to list your compute?
           </h2>
           <p className="font-body text-base text-on-surface-variant mb-10 max-w-2xl mx-auto">
-            Join the provider waitlist, or clone the repo and run <span className="font-data text-primary-fixed-dim">pnpm provider1</span> right now.
+            Join the provider waitlist, or clone the repo and run <span className="font-data text-primary-fixed-dim">pnpm provider</span> right now.
           </p>
           <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
             <a href={WAITLIST}
