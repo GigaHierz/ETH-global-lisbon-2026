@@ -17,7 +17,7 @@ export const AGENT =
 export const VERIFIER =
   (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vapi")) ||
   process.env.NEXT_PUBLIC_VERIFIER_URL ||
-  "https://verifier-production.up.railway.app";
+  "https://verifier-production-6400.up.railway.app";
 
 // Shared token for the guarded /demo/* endpoints. Public by nature (ships to the browser)
 // — a casual-abuse deterrent at the venue, not a real secret. Empty ⇒ endpoints unguarded.

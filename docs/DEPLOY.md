@@ -24,7 +24,7 @@ service needs, and how to run — and re-arm — the demo on stage.
 | provider1 (Titan, honest 70B) | `https://provider1-production.up.railway.app` |
 | provider2 (Budget, honest 8B) | `https://provider2-production.up.railway.app` |
 | provider3 (SketchyGPU, **cheater**) | `https://provider3-production.up.railway.app` |
-| verifier | *(no public domain — outbound-only worker)* |
+| verifier | `https://verifier-production-6400.up.railway.app` *(control endpoint only — audit loop is outbound)* |
 
 > **If a service returns 502 with `x-railway-fallback: true` while Railway shows it
 > online, check the domain's target port before anything else.** A Railway domain
