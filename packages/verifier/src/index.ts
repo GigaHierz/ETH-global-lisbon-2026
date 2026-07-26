@@ -13,8 +13,8 @@
 import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
-  AUDIT_REQUEST_HEADER,
   DEFAULT_EXCHANGE_URL,
+  REQUEST_LOG_LIMIT,
   HEDERA_NETWORK,
   BOND_AMOUNT,
   hederaAccount,
@@ -36,6 +36,9 @@ const INTERVAL_MS = parseInt(process.env.VERIFY_INTERVAL_MS || "15000", 10);
 const THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || String(DEFAULT_SIMILARITY_THRESHOLD));
 const SLASH_HBAR = parseFloat(process.env.SLASH_HBAR || "25");
 const REPLAY_TIMEOUT_MS = parseInt(process.env.REPLAY_TIMEOUT_MS || "20000", 10);
+// How much of the exchange log to consider each tick. Defaults to the exchange's
+// whole buffer, so no served request is out of audit reach just for being old.
+const LOG_LIMIT = parseInt(process.env.VERIFY_LOG_LIMIT || String(REQUEST_LOG_LIMIT), 10);
 
 const audited = new Set<string>(); // request ids already checked
 const slashedWallets = new Set<string>(); // payout accounts this verifier has slashed
@@ -66,6 +69,11 @@ async function initPayFetch() {
 
 // Replays one prompt and maps every failure mode onto a ReplayOutcome instead
 // of throwing, so the classifier — not the transport — decides the verdict.
+//
+// The replay carries no audit marker on purpose. It goes straight to the provider,
+// bypassing the exchange, so it can never enter the request log and never become a
+// future candidate — the marker would buy nothing here and would hand a provider a
+// way to recognise an audit and serve the honest model only when it is being watched.
 async function ask(
   providerUrl: string,
   model: string,
@@ -81,7 +89,7 @@ async function ask(
         `${providerUrl}/v1/chat/completions`,
         {
           method: "POST",
-          headers: { "content-type": "application/json", [AUDIT_REQUEST_HEADER]: "1" },
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({
             model,
             messages: [{ role: "user", content: prompt }],
@@ -218,9 +226,15 @@ async function auditOnce() {
   auditInFlight = true;
   try {
     const [logEntries, providers] = await Promise.all([
-      fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()) as Promise<RequestLogEntry[]>,
+      fetch(`${EXCHANGE}/log?limit=${LOG_LIMIT}`).then((r) => r.json()) as Promise<RequestLogEntry[]>,
       fetch(`${EXCHANGE}/providers`).then((r) => r.json()) as Promise<ProviderRow[]>,
     ]);
+
+    // A full page means the exchange had at least this much to give: anything older
+    // is outside the audit window, so say so rather than let it look like coverage.
+    if (logEntries.length >= LOG_LIMIT) {
+      log("verifier", `log window saturated at ${LOG_LIMIT} entries — older requests are out of audit reach`);
+    }
 
     const selection = selectAuditCandidate({
       requestLog: logEntries,
