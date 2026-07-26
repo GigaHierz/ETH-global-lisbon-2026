@@ -14,7 +14,7 @@ import {
 } from "@agentrouter/shared";
 import { resolveProfile } from "./profiles.js";
 import { complete } from "./backends/index.js";
-import { ensureRegistered } from "./registry.js";
+import { ensureRegistered, providerIdentity } from "./registry.js";
 
 const profile = resolveProfile();
 const TAG = profile.key;
@@ -24,7 +24,11 @@ const TAG = profile.key;
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : profile.port;
 const PUBLIC_URL = process.env.PROVIDER_PUBLIC_URL || `http://localhost:${PORT}`;
 
-const { wallet, agentId } = await ensureRegistered(profile);
+// Identity is derived locally so the port can open immediately. Staking 50 ℏ and
+// publishing the HCS registration are on-chain calls that can be slow or stall —
+// doing them before app.listen means the platform sees a service that never
+// responds, with no error to show for it.
+const { wallet, agentId } = providerIdentity(profile);
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -109,5 +113,10 @@ app.listen(PORT, () => {
     TAG,
     `${profile.displayName} listening :${PORT} (${PUBLIC_URL}) | advertises ${profile.advertisedModel} @ ${money(profile.price)}/req` +
       (profile.actualModel !== profile.advertisedModel ? ` | CHEAT_MODE: serving ${profile.actualModel}` : ""),
+  );
+  // Stake + register once we are already serving. A failure here leaves the
+  // provider reachable and loudly logged rather than invisible.
+  ensureRegistered(profile).catch((e: Error) =>
+    log(TAG, `REGISTRATION FAILED: ${e.message} — serving, but the exchange will not discover us via HCS`),
   );
 });
