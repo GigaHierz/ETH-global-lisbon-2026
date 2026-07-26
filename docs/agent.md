@@ -100,6 +100,6 @@ pnpm --filter @agentrouter/agent test    # budget, loop, buy, identity — 17 te
 ## Fees: the agent pays price + fee
 
 Every purchase costs `provider price + exchange fee` (10% taker-side, ceil-rounded in
-tinybars). The CLI prints `price 0.08 + fee 0.008 = 0.088 ℏ` per call with running spend,
+tinybars). The CLI prints `price $0.08 + fee $0.008 = $0.088` per call with running spend,
 and the budget cap is enforced against the TOTAL, not the provider price. The mock payer
 mirrors the real x402 client: it reads the dynamic 402 quote and pays the exact total.

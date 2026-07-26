@@ -55,7 +55,59 @@ export async function bondBalance(accountId: string): Promise<number> {
 // wipeKey is a KeyList [verifier, auditor]; the verifier freezes + signs the
 // transaction, the auditor co-signs, then it executes — reputation → 0 on-chain,
 // requiring two independent signatures. Returns the wipe tx id (null on failure).
-export async function multiSigWipeBond(accountId: string, amount: number): Promise<string | null> {
+// Compliance control: freeze the fraudster's bond so it cannot move while the
+// 2-of-2 wipe is assembled. Single-signer — the verifier alone holds the freezeKey,
+// which is the point: containment is immediate, destruction needs a second party.
+export async function freezeBond(accountId: string): Promise<string | null> {
+  const token = bondTokenId();
+  if (!token) return null;
+  const verifier = hederaAccount("VERIFIER");
+  const { Client, AccountId, PrivateKey, TokenId, TokenFreezeTransaction } = await import("@hiero-ledger/sdk");
+  const client = Client.forTestnet().setOperator(
+    AccountId.fromString(verifier.id),
+    PrivateKey.fromStringECDSA(verifier.key),
+  );
+  try {
+    const tx = await new TokenFreezeTransaction()
+      .setTokenId(TokenId.fromString(token))
+      .setAccountId(AccountId.fromString(accountId))
+      .execute(client);
+    await tx.getReceipt(client);
+    return tx.transactionId!.toString();
+  } catch (e) {
+    console.warn(`[verifier] bond freeze failed: ${(e as Error).message.slice(0, 140)}`);
+    return null;
+  } finally {
+    client.close();
+  }
+}
+
+// Release a freeze. Required before a wipe: Hedera rejects TokenWipe against a
+// frozen balance with ACCOUNT_FROZEN_FOR_TOKEN.
+export async function unfreezeBond(accountId: string): Promise<string | null> {
+  const token = bondTokenId();
+  if (!token) return null;
+  const verifier = hederaAccount("VERIFIER");
+  const { Client, AccountId, PrivateKey, TokenId, TokenUnfreezeTransaction } = await import("@hiero-ledger/sdk");
+  const client = Client.forTestnet().setOperator(
+    AccountId.fromString(verifier.id),
+    PrivateKey.fromStringECDSA(verifier.key),
+  );
+  try {
+    const tx = await new TokenUnfreezeTransaction()
+      .setTokenId(TokenId.fromString(token))
+      .setAccountId(AccountId.fromString(accountId))
+      .execute(client);
+    await tx.getReceipt(client);
+    return tx.transactionId!.toString();
+  } catch {
+    return null;
+  } finally {
+    client.close();
+  }
+}
+
+export async function multiSigWipeBond(accountId: string, amount: number, retried = false): Promise<string | null> {
   const token = bondTokenId();
   if (!token) return null;
   const verifier = hederaAccount("VERIFIER");
@@ -77,7 +129,15 @@ export async function multiSigWipeBond(accountId: string, amount: number): Promi
     await tx.getReceipt(client);
     return tx.transactionId!.toString();
   } catch (e) {
-    console.warn(`[verifier] multi-sig wipe failed: ${(e as Error).message.slice(0, 140)}`);
+    const msg = (e as Error).message;
+    // A bond frozen by an earlier enforcement pass blocks its own destruction.
+    // Lift the freeze and try once more — the verifier holds the freeze key.
+    if (msg.includes("ACCOUNT_FROZEN_FOR_TOKEN") && !retried) {
+      console.warn("[verifier] bond is frozen — unfreezing so the wipe can proceed");
+      await unfreezeBond(accountId);
+      return multiSigWipeBond(accountId, amount, true);
+    }
+    console.warn(`[verifier] multi-sig wipe failed: ${msg.slice(0, 140)}`);
     return null;
   } finally {
     client.close();

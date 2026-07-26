@@ -53,26 +53,25 @@ pnpm --filter @agentrouter/provider-mcp inspect  # MCP Inspector
 
 ## Wire it into an MCP client
 
-The server runs TypeScript directly via `tsx` (matching the repo). Point your client at it over
-stdio. Example client config (Claude Desktop / any MCP client):
+The repo ships this as a project-scoped [`.mcp.json`](../../.mcp.json) at its root, so in Claude
+Code there is nothing to write — approve it once (`/mcp`) and the tools appear:
 
 ```json
 {
   "mcpServers": {
     "agentrouter-provider": {
-      "command": "node",
-      "args": [
-        "--import",
-        "tsx",
-        "/ABSOLUTE/PATH/ETH-global-lisbon-2026/packages/provider-mcp/src/index.ts"
-      ],
-      "env": {
-        "AGENTROUTER_ENV_PATH": "/ABSOLUTE/PATH/ETH-global-lisbon-2026/.env"
-      }
+      "command": "pnpm",
+      "args": ["-s", "--filter", "@agentrouter/provider-mcp", "start"]
     }
   }
 }
 ```
+
+The same `command`/`args` work in any stdio MCP client. No absolute paths are needed: `pnpm
+--filter` finds the workspace root from any subdirectory, and `ENV_PATH` derives from the
+server's own module location, so it resolves correctly in every clone and worktree. Set
+`AGENTROUTER_ENV_PATH` only to target an `.env` outside the repo — and see the caveat under
+Idempotency below. On a fresh clone the server won't connect until `pnpm install` has run.
 
 Then the agent can call, e.g.:
 
@@ -110,7 +109,7 @@ python scripts/evaluation.py -t stdio -c node \
 | `HEDERA_OPERATOR_ID` / `HEDERA_OPERATOR_KEY` | funds new provider accounts |
 | `HEDERA_ESCROW_ID` | destination for staked collateral |
 | `HEDERA_<role>_ID` / `_KEY` / `_EVM` | the provider account (written by `create_provider_account`; role default `PROVIDER`) |
-| `PROVIDER_PUBLIC_URL` | endpoint registered on HCS (set by `deploy_provider` or passed to `register_provider`) |
+| `PROVIDER_PUBLIC_URL` | endpoint registered on HCS. **Written to `.env`** by `deploy_provider` and `register_provider` — see "Why it writes `.env`" below |
 | `STAKE_HBAR` | stake amount (default 50) |
 | `HCS_REGISTRY_TOPIC` | registry topic id (auto-resolved from `deployments.json` if unset) |
 | `AGENTROUTER_ENV_PATH` | which `.env` file to read/write (default: monorepo root) |
@@ -123,3 +122,26 @@ python scripts/evaluation.py -t stdio -c node \
 - **stdio hygiene.** Logs go to **stderr** only — stdout carries the MCP protocol.
 - **Idempotency everywhere.** State is checked before every mutation (`.env` presence, the
   `.registry-cache.json` cache, Mirror Node), so re-running `provision_provider` resumes/repairs.
+
+### Why it writes `PROVIDER_PUBLIC_URL` to `.env`
+
+The invariant the system depends on is *the endpoint published to HCS equals the endpoint the
+provider service re-derives on its next boot* — and that spans two processes. `pnpm provider`
+reads `.env` at process start in whatever shell it was launched from; if `PROVIDER_PUBLIC_URL`
+isn't there it falls back to `http://localhost:<port>`, sees a different endpoint than the one
+cached, and republishes localhost over the good registration. The exchange reads the registry
+topic last-write-wins, so the provider then shows `down`.
+
+So both `deploy_provider` and `register_provider` **upsert** the value into `.env` (replacing any
+existing line, never appending a duplicate: `readEnvVar` takes the first match while
+`node --env-file` takes the last, and a duplicate would make the two disagree). The provider
+service also refuses to downgrade a registered public endpoint to localhost, and warns instead.
+
+### Idempotency caveats
+
+- The stake check is **local**, not on-chain: it reads `.registry-cache.json`, which is
+  gitignored. Delete that file and `stake_collateral` will move another 50 ℏ.
+- That cache is resolved **relative to the `.env` directory** here, but relative to the **current
+  working directory** by the provider service. They agree when you run `pnpm` from the repo root
+  and leave `AGENTROUTER_ENV_PATH` unset. Diverge from either and the service won't see the
+  cached stake — and will stake again.

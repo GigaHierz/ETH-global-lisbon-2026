@@ -27,7 +27,7 @@ curl -s -X POST https://exchange-production-275a.up.railway.app/v1/chat/completi
   -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"What is x402? One sentence."}]}' | jq .agentrouter
 ```
 
-You'll get the answer plus `{provider, pricePaid, latencyMs, paymentRef}` — the `paymentRef` is a real Hedera transaction id.
+You'll get the answer plus `{provider, price, fee, total, asset, latencyMs, paymentRef}` — the `paymentRef` is a real Hedera transaction id.
 
 To see a raw **402** (the paywall itself), hit a provider directly — providers aren't tunneled, so run one locally (`pnpm provider1`, then `curl -X POST localhost:4021/v1/chat/completions -H 'content-type: application/json' -d '{"model":"x","messages":[{"role":"user","content":"hi"}]}'` → HTTP 402 with payment requirements).
 

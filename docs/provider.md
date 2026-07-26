@@ -36,7 +36,7 @@ payments) + **`@x402/express`** paywall. Everything on-chain is real testnet —
 | `provider1` | Titan Compute | llama-3.3-70b-versatile | same (honest) | $0.10 | 4021 |
 | `provider2` | Budget Inference Co | llama-3.1-8b-instant | same (honest) | $0.04 | 4022 |
 | `provider3` | SketchyGPU Labs | llama-3.3-70b-versatile | **8b when `CHEAT_MODE=true`** | $0.08 | 4023 |
-| `provider4` | NimbusAI | llama-3.3-70b-versatile | same (honest) | $0.06 | 4024 |
+| `provider4` | NimbusAI | `0gm-1.0-35b-a3b` (**0G Compute**) | same (honest) | $0.06 | 4024 |
 
 `provider4` (NimbusAI) was added to demonstrate **permissionless supply joining live**: it boots,
 stakes, registers, is discovered within seconds, and — being the cheapest *honest* 70b seller —
@@ -72,7 +72,7 @@ immediately wins routing while passing verification.
 pnpm provider1      # :4021  Titan Compute (honest 70b)
 pnpm provider2      # :4022  Budget Inference Co (honest 8b)
 pnpm provider3      # :4023  SketchyGPU Labs (cheater, CHEAT_MODE=true)
-pnpm provider4      # :4024  NimbusAI (honest 70b)
+pnpm provider4      # :4024  NimbusAI (honest, resells 0G Compute)
 curl -s localhost:4024/info   # sanity: name, model, price, wallet
 ```
 
@@ -102,7 +102,7 @@ Every item below is a **real Hedera Testnet transaction**. Append the id to
 **Provider accounts:** Titan [`0.0.9746381`](https://hashscan.io/testnet/account/0.0.9746381) ·
 Budget [`0.0.9746382`](https://hashscan.io/testnet/account/0.0.9746382) ·
 SketchyGPU [`0.0.9746383`](https://hashscan.io/testnet/account/0.0.9746383) ·
-NimbusAI [`0.0.9746711`](https://hashscan.io/testnet/account/0.0.9746711)
+NimbusAI [`0.0.9755666`](https://hashscan.io/testnet/account/0.0.9755666)
 **Escrow (stake pool):** [`0.0.9746385`](https://hashscan.io/testnet/account/0.0.9746385) ·
 **HCS registry topic:** [`0.0.9744593`](https://hashscan.io/testnet/topic/0.0.9744593) ·
 **HCS verdicts topic:** [`0.0.9744595`](https://hashscan.io/testnet/topic/0.0.9744595)
@@ -138,6 +138,6 @@ Where a provider's completions actually come from is pluggable
 
 The named demo profiles pin their backend: **p1/p2/p3 are frozen on `groq`** (the
 slash arc needs deterministic same-model outputs) and **provider4 (NimbusAI) is the
-0G personality** — honest, `0gm-1.0-35b-a3b` at 0.06 ℏ. Its model id is unique on
+0G personality** — honest, `0gm-1.0-35b-a3b` at $0.06. Its model id is unique on
 the exchange, so the verifier logs "no witness available" instead of auditing it
 (cross-backend outputs aren't comparable under the similarity threshold).

@@ -23,7 +23,7 @@ export async function complete(
 ): Promise<ChatCompletionResponse> {
   const apiKey = process.env.ZEROG_API_KEY;
   if (!apiKey) {
-    return cannedCompletion(advertisedModel, req.messages, cannedCheat);
+    return { ...cannedCompletion(advertisedModel, req.messages, cannedCheat), servedBy: "canned" as const };
   }
   try {
     const upstream = await fetch(ZEROG_ROUTER_URL, {
@@ -40,12 +40,17 @@ export async function complete(
       throw new Error(`0G router ${upstream.status}: ${(await upstream.text()).slice(0, 200)}`);
     }
     const data = (await upstream.json()) as ChatCompletionResponse;
+    // Preserve the router-reported model verbatim (evidence for provenance
+    // correlation — Jean's finding #1), THEN present the advertised name for
+    // OpenAI-compat. Never destroy upstream-reported fields.
+    data.upstreamModel = data.model;
     data.model = advertisedModel;
+    data.servedBy = "0g";
     return data;
   } catch (e) {
     // Never block the marketplace on an upstream compute outage.
     log("provider", `0G backend unavailable (${(e as Error).message.slice(0, 120)}) — canned fallback`);
-    return cannedCompletion(advertisedModel, req.messages, cannedCheat);
+    return { ...cannedCompletion(advertisedModel, req.messages, cannedCheat), servedBy: "canned" as const };
   }
 }
 /* v8 ignore stop */

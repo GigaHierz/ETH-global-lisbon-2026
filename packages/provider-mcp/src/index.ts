@@ -14,9 +14,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { hashscanTx, hashscanAccount } from "@agentrouter/shared";
 
-import { ENV_PATH, REPO_ROOT, loadEnv, readEnvVar, appendEnvLines } from "./envStore.js";
+import { ENV_PATH, REPO_ROOT, loadEnv, readEnvVar, appendEnvLines, upsertEnvVar } from "./envStore.js";
 import { toErrorShape, ProvisionError } from "./errors.js";
-import { getOperator, hbarBalance, createAndFundAccount, stakeToEscrow } from "./hedera.js";
+import { getOperator, createAndFundAccount, stakeToEscrow } from "./hedera.js";
 import { getCacheEntry, setStaked, setRegistered, registerOnHcs, uaidFor } from "./registry.js";
 import { checkEndpoint, railwayConfig } from "./deploy.js";
 import { verifyLive } from "./verify.js";
@@ -27,6 +27,7 @@ import {
   DEFAULT_PRICE,
   DEFAULT_ROLE,
   DEFAULT_EXCHANGE_URL,
+  CHARACTER_LIMIT,
 } from "./constants.js";
 
 const log = (...a: unknown[]) => console.error("[provider-mcp]", ...a);
@@ -53,10 +54,13 @@ type ToolResult = {
 };
 
 function ok(summary: string, structured: Record<string, unknown>): ToolResult {
-  return {
-    content: [{ type: "text", text: `${summary}\n\n${JSON.stringify(structured, null, 2)}` }],
-    structuredContent: structured,
-  };
+  // Truncate only the human-readable rendering — structuredContent stays whole so an
+  // agent reading fields programmatically never sees a clipped value.
+  let text = `${summary}\n\n${JSON.stringify(structured, null, 2)}`;
+  if (text.length > CHARACTER_LIMIT) {
+    text = `${text.slice(0, CHARACTER_LIMIT)}\n… truncated — read the full result from structuredContent.`;
+  }
+  return { content: [{ type: "text", text }], structuredContent: structured };
 }
 
 function fail(e: unknown): ToolResult {
@@ -138,9 +142,11 @@ async function coreDeploy(role: string, publicUrl: string, model: string, profil
   const { id } = requireProviderAccount(role);
   const escrow = requireEscrow();
   const check = await checkEndpoint(publicUrl, model);
-  const railway = railwayConfig({ profile, publicUrl, providerId: id, escrowId: escrow, groqKey, cheat });
-  // remember the public URL for the registration step in this run
-  if (check.reachable) process.env.PROVIDER_PUBLIC_URL = publicUrl;
+  const railway = railwayConfig({ profile, publicUrl, providerId: id, escrowId: escrow, role, groqKey, cheat });
+  // Persist the public URL, don't just hold it in memory: `pnpm provider` boots in a
+  // separate shell and re-derives its endpoint from .env. Miss this and it registers
+  // http://localhost:<port> over the top of whatever we published to HCS.
+  if (check.reachable) upsertEnvVar("PROVIDER_PUBLIC_URL", publicUrl, "provider-mcp endpoint");
   // Never throw on unreachable — the railwayConfig is exactly what the caller needs
   // to bring a box up, so it's more useful returned than swallowed.
   return {
@@ -159,6 +165,10 @@ async function coreRegister(role: string, name: string, model: string, price: nu
   const { id, key } = requireProviderAccount(role);
   const stakeHbar = parseFloat(readEnvVar("STAKE_HBAR") ?? String(STAKE_HBAR_DEFAULT));
   const cached = getCacheEntry(id);
+  // Registration is the real commit point for the endpoint (register_provider can be
+  // called with an explicit publicUrl, bypassing deploy_provider), so .env is written
+  // here too — including on the idempotent path, so a repair run fixes a stale .env.
+  upsertEnvVar("PROVIDER_PUBLIC_URL", endpoint, "provider-mcp endpoint");
   if (cached.registered && cached.endpoint === endpoint) {
     return {
       registered: true,

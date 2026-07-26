@@ -11,6 +11,10 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
 }
 
+// Where a completion was actually served from (honesty marker, optional —
+// absent on legacy/foreign responses). "canned" = deterministic offline fallback.
+export type ServedBy = "0g" | "groq" | "canned";
+
 export interface ChatCompletionResponse {
   id: string;
   object: "chat.completion";
@@ -22,6 +26,11 @@ export interface ChatCompletionResponse {
     finish_reason: string;
   }>;
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  /** Compute source, set by our provider backends (additive; optional). */
+  servedBy?: ServedBy;
+  /** Upstream-reported model id, preserved verbatim (0G backend only — evidence,
+   * not proof; NOT set on the groq path where the cheat-demo mask is load-bearing). */
+  upstreamModel?: string;
 }
 
 export interface ProviderInfo {
@@ -64,6 +73,8 @@ export interface RequestLogEntry {
   answerPreview: string;
   status: "ok" | "error" | "refunded";
   isAudit?: boolean; // replay issued by the verifier — never an audit candidate itself
+  servedBy?: ServedBy; // compute source as reported by the serving backend
+  upstreamModel?: string; // upstream-reported model (0G path), preserved for provenance
 }
 
 // Cumulative exchange revenue/refund stats (served by GET /stats)

@@ -74,8 +74,25 @@ export default function ExchangeControlRoom() {
       const ev = JSON.parse(msg.data);
       if (ev.type === "providers") setProviders(ev.providers);
       if (ev.type === "request") {
-        setFeed((f) => [ev.entry, ...f].slice(0, 60));
-        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, price: ev.entry.price }]);
+        // The exchange emits this twice per trade: once when the row is created and
+        // again after the agent's payment settles, to attach the inbound tx id. So
+        // upsert on id — blindly prepending renders the same trade twice, which is
+        // indistinguishable from the market genuinely doing double the volume.
+        setFeed((f) => {
+          const i = f.findIndex((e) => e.id === ev.entry.id);
+          if (i >= 0) {
+            const next = [...f];
+            next[i] = ev.entry;
+            return next;
+          }
+          return [ev.entry, ...f].slice(0, 60);
+        });
+        // ...and only chart the first sighting, or the price index double-counts too.
+        setPrices((p) =>
+          p.some((x) => x.ts === ev.entry.ts && x.model === ev.entry.model)
+            ? p
+            : [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, price: ev.entry.price }],
+        );
       }
       if (ev.type === "slashed") {
         setSlash({ provider: ev.provider, amountHbar: ev.amountHbar, reason: ev.reason });
@@ -84,14 +101,6 @@ export default function ExchangeControlRoom() {
       }
       if (ev.type === "verify") setVerifies((v) => [ev, ...v].slice(0, 10));
       if (ev.type === "stats") setStats(ev.stats);
-      if (ev.type === "request" && ev.entry?.inboundRef) {
-        // settle update for an existing row: replace in place
-        setFeed((f) => {
-          const i = f.findIndex((e) => e.id === ev.entry.id);
-          if (i < 0) return f;
-          const next = [...f]; next[i] = ev.entry; return next;
-        });
-      }
       if (ev.type === "bond") {
         setProviders((ps) => ps.map((p) =>
           String(p.wallet ?? "").toLowerCase() === String(ev.wallet ?? "").toLowerCase()
