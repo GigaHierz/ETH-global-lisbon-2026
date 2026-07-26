@@ -127,7 +127,7 @@ export default function ProvidersPage() {
           className="hidden sm:block font-data text-[11px] tracking-[0.1em] uppercase text-on-surface-variant hover:text-on-surface transition-colors">
           GitHub
         </a>
-        <a href={ONBOARD}
+        <a href="/providers"
           className="bg-accent-orange text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
           Join as a Provider
         </a>

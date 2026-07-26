@@ -164,8 +164,8 @@ export default function OnboardPage() {
           GitHub
         </a>
         <a href="/providers"
-          className="bg-primary text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:bg-accent-cyan transition-colors active:scale-95">
-          Why provide
+          className="bg-accent-orange text-on-primary px-4 py-1.5 font-data text-[11px] tracking-[0.1em] font-bold uppercase rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
+          Join as a Provider
         </a>
       </Navbar>
 
@@ -185,6 +185,12 @@ export default function OnboardPage() {
             account is your identity — boot the service and it stakes, registers on the Consensus
             Service, and enters routing on its own.
           </p>
+          <a href="#agent-path"
+            className="mt-6 inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+            <Icon name="smart_toy" className="text-[16px]" />
+            Prefer an agent? Onboard via our MCP server or Claude skill
+            <Icon name="arrow_downward" className="text-[14px]" />
+          </a>
         </section>
 
         {/* ── Steps ── */}
@@ -256,7 +262,7 @@ export default function OnboardPage() {
         </section>
 
         {/* ── Agent path ── */}
-        <section className="px-4 max-w-4xl mx-auto pb-20">
+        <section id="agent-path" className="px-4 max-w-4xl mx-auto pb-20 scroll-mt-20">
           <Card className="p-6 md:p-7">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-accent-orange flex items-center justify-center rounded-sm">
