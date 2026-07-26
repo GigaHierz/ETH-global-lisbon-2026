@@ -157,6 +157,17 @@ export default function ProvidersPage() {
                 Onboard with an agent
               </a>
             </div>
+            {/* Straight to the two artifacts, for anyone who doesn't want to scroll. */}
+            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 justify-center font-data text-[11px] tracking-[0.1em] uppercase font-bold">
+              <a href={`${REPO}/blob/main/.claude/skills/onboarding-a-provider/SKILL.md`} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                <Icon name="auto_awesome" className="text-[14px]" /> Onboarding skill
+              </a>
+              <a href={`${REPO}/blob/main/packages/provider-mcp/README.md`} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                <Icon name="terminal" className="text-[14px]" /> MCP server
+              </a>
+            </div>
           </div>
 
           {/* Economics */}
