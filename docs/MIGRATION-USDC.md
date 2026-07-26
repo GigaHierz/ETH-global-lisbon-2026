@@ -98,35 +98,111 @@ Two consequences worth knowing:
 
 ## Step 3 — per-service variables
 
-Set on **every** Railway service:
+Railway lets you share variables across services *within* a project. If you run one
+service per project there is nothing to share, so **every project needs its own complete
+set** — that is what is listed below. Copy each block wholesale.
 
-| Action | Variable | Value |
-|---|---|---|
-| **ADD** | `SETTLEMENT_ASSET` | `usdc` |
-| ADD *(recommended)* | `HCS_REGISTRY_TOPIC`, `HCS_TRADES_TOPIC`, `HCS_VERDICTS_TOPIC` | ids from step 2 |
+Keys live in your local `.env` (gitignored). Account ids are public and safe to paste
+anywhere; keys are not.
 
-The topic ids fall back to `deployments.json`, which is resolved relative to the process
-working directory — not something a container image guarantees. Setting them explicitly
-removes that dependency.
+**Never set `PORT`** — Railway injects it and the code binds to it.
+**Never set `HEDERA_OPERATOR_KEY`** — no runtime service reads it, and it can drain every
+account. Only the local setup scripts use it.
 
-Then per service:
+### exchange — start command `pnpm exchange:prod`, needs a domain
 
-| Service | Add | Rename | Remove | Unchanged |
-|---|---|---|---|---|
-| **exchange** | `SETTLEMENT_ASSET=usdc` | `EXCHANGE_ASK_HBAR=0.12` → `EXCHANGE_ASK=0.12` | `EXCHANGE_ASK_HBAR` | `HEDERA_EXCHANGE_ID`, `HEDERA_EXCHANGE_KEY` |
-| **agent-server** | `SETTLEMENT_ASSET=usdc` | `AGENT_BUDGET_HBAR=2` → `AGENT_BUDGET=2` | `AGENT_BUDGET_HBAR`, `AGENT_MOCK_BALANCE_HBAR` | `HEDERA_AGENT_ID/KEY`, `GROQ_API_KEY`, `EXCHANGE_URL` |
-| **provider1/2/3** *(+4)* | `SETTLEMENT_ASSET=usdc` | — | — | `PROVIDER_PROFILE`, `PROVIDER_PUBLIC_URL`, `HEDERA_PROVIDER<N>_ID/KEY`, `HEDERA_ESCROW_ID`, `GROQ_API_KEY`, `CHEAT_MODE`, **`STAKE_HBAR`** |
-| **custom provider** | `SETTLEMENT_ASSET=usdc` | `PROVIDER_PRICE_HBAR` → `PROVIDER_PRICE` | `PROVIDER_PRICE_HBAR` | `PROVIDER_NAME`, `PROVIDER_MODEL`, `HEDERA_PROVIDER_ID/KEY` |
-| **verifier** | `SETTLEMENT_ASSET=usdc` | — | — | `HEDERA_VERIFIER_ID/KEY`, `HEDERA_ESCROW_ID/KEY`, `HEDERA_OPERATOR_ID`, `EXCHANGE_URL`, **`SLASH_HBAR`** |
-| **dashboard** (Vercel) | — | — | — | no variables required |
+```
+MOCK_MODE=false
+SETTLEMENT_ASSET=usdc
+HEDERA_EXCHANGE_ID=<exchange account>
+HEDERA_EXCHANGE_KEY=<exchange key>
+EXCHANGE_FEE_BPS=1000
+REFUND_ON_FAILURE=true
+HCS_REGISTRY_TOPIC=<registry topic>
+HCS_TRADES_TOPIC=<trades topic>
+HCS_VERDICTS_TOPIC=<verdicts topic>
+```
+
+Reads the registry topic to discover providers, publishes to trades, and serves all three
+links on `/topics` — hence all three.
+
+### agent-server — start command `pnpm agent-server:prod`, needs a domain
+
+```
+MOCK_MODE=false
+SETTLEMENT_ASSET=usdc
+HEDERA_AGENT_ID=<agent account>
+HEDERA_AGENT_KEY=<agent key>
+GROQ_API_KEY=<your groq key>
+EXCHANGE_URL=https://<exchange domain>
+AGENT_PUBLIC_URL=https://<agent domain>
+AGENT_BUDGET=2
+HCS_REGISTRY_TOPIC=<registry topic>
+```
+
+The agent publishes its own HCS-14 identity to the registry topic, so it needs that id too.
+
+### provider1 / provider2 / provider3 — start command `pnpm provider:prod`, each needs a domain
+
+```
+MOCK_MODE=false
+SETTLEMENT_ASSET=usdc
+PROVIDER_PROFILE=provider1          # provider2 / provider3 on the others
+PROVIDER_PUBLIC_URL=https://<THIS provider's own domain>
+HEDERA_PROVIDER1_ID=<provider1 account>    # match the number to the profile
+HEDERA_PROVIDER1_KEY=<provider1 key>
+HEDERA_ESCROW_ID=<escrow account>
+GROQ_API_KEY=<your groq key>
+CHEAT_MODE=false                    # true ONLY on provider3
+STAKE_HBAR=50
+HCS_REGISTRY_TOPIC=<registry topic>
+```
+
+`PROVIDER_PUBLIC_URL` must be that provider's **own** domain — it is what gets published to
+HCS, so the exchange uses it to reach them. Wrong value and the provider registers, appears
+in the table, and sits permanently `down`.
+
+Match the account number to the profile: `PROVIDER_PROFILE=provider2` needs
+`HEDERA_PROVIDER2_ID/KEY`. Mismatched, the provider signs as the wrong identity.
+
+Providers need no USDC — they only ever receive. They do need HBAR for their 50 ℏ stake.
+
+### verifier — start command `pnpm verifier:prod`, no domain (worker)
+
+```
+MOCK_MODE=false
+SETTLEMENT_ASSET=usdc
+HEDERA_VERIFIER_ID=<verifier account>
+HEDERA_VERIFIER_KEY=<verifier key>
+HEDERA_ESCROW_ID=<escrow account>
+HEDERA_ESCROW_KEY=<escrow key>
+HEDERA_OPERATOR_ID=<operator account id ONLY, never the key>
+EXCHANGE_URL=https://<exchange domain>
+SLASH_HBAR=25
+VERIFY_INTERVAL_MS=15000
+SIMILARITY_THRESHOLD=0.35
+HCS_VERDICTS_TOPIC=<verdicts topic>
+```
+
+This is the only service that gets `HEDERA_ESCROW_KEY` — it moves staked collateral when it
+slashes. The operator id is the treasury a slash pays into; the operator *key* is not needed.
+
+It also **needs a USDC balance**, not just an association: it pays providers for its two
+audit replays. Unfunded, every replay 402s, the audit returns `inconclusive`, and no slash
+ever fires — with no error anywhere.
+
+### dashboard (Vercel)
+
+No environment variables. It reads the settlement symbol from the exchange's `/settlement`
+endpoint and falls back to `$`.
 
 ### Deleting the old keys is not cosmetic
 
 After the rename the code no longer reads `EXCHANGE_ASK_HBAR`, `AGENT_BUDGET_HBAR`,
 `AGENT_MOCK_BALANCE_HBAR`, or `PROVIDER_PRICE_HBAR`. It falls back to defaults that happen
 to be **the same numbers** — so a stale key looks like it is still configuring the service
-while doing nothing. If you have ever tuned one of these away from its default, that tuning
-silently disappears unless you rename it.
+while doing nothing. If you ever tuned one away from its default, that tuning silently
+disappears unless you rename it.
 
 ### While you are in the Vercel settings
 
