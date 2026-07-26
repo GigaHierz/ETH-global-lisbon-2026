@@ -134,6 +134,29 @@ id, and a settled USDC trade — ran on Testnet **2026-07-26** ([docs/PROOF.md](
 Full receipts + Hashscan links: [docs/PROOF.md](docs/PROOF.md) ·
 [docs/TRANSACTIONS.md](docs/TRANSACTIONS.md).
 
+## Network impact
+
+Every unit of marketplace activity is an on-chain Hedera transaction — usage growth *is*
+network growth, with no off-chain batching in between.
+
+| Event | Hedera transactions produced |
+|---|---|
+| An agent or provider onboards | 1 account created + 1 HCS registry message (HCS-14 identity) |
+| A provider lists | 1 HBAR transfer (50 ℏ stake → escrow) + 1 HTS transfer (ARBOND bond) |
+| **One inference request** | **2 settlement transfers (x402, both legs) + 1 HCS trade message** |
+| One audit | up to 2 x402 replay payments + 1 HCS verdict message |
+| One fraud caught | 1 HBAR transfer (escrow → treasury) + HTS freeze + multi-sig wipe + 1 HCS verdict message |
+
+The steady-state load is dominated by the per-request path, so impact scales linearly:
+**3 on-chain transactions per inference call.** A single agent doing 1,000 calls/day generates
+3,000 Hedera transactions/day; 1M routed requests is 3M transactions — 2M settlement transfers
+and 1M HCS messages.
+
+Every participant is a distinct Hedera account with an HCS-14 identity, so the marketplace
+grows accounts as it grows supply and demand. And because the audience is AI-agent and x402
+developers rather than existing crypto users, that growth comes from outside the current
+ecosystem. Business framing: [docs/BUSINESS.md](docs/BUSINESS.md).
+
 ## Documentation
 
 Everything lives in [docs/](docs/README.md). Start there, or jump to:

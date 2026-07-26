@@ -34,6 +34,13 @@ use the documents below.
   the guided zero-to-live walkthrough. Uses the MCP tools when they're connected and the `pnpm`
   commands when they aren't.
 
+## Business and roadmap
+
+- [BUSINESS.md](BUSINESS.md) — the revenue model and unit economics: the 10% taker fee, the
+  listing stake, and slash-funded verification, with every figure taken from the running code.
+- [ROADMAP.md](ROADMAP.md) — what shipped, what is deliberately out of scope, and the order the
+  rest gets built in.
+
 ## Operations
 
 - [DEPLOY.md](DEPLOY.md) — production URLs, per-service configuration, and the demo runbook.
