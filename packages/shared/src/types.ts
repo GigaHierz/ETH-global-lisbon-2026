@@ -88,12 +88,22 @@ export interface ExchangeStats {
   asset: string; // what every amount above is denominated in (USDC / HBAR)
 }
 
+// One verifier comparison. Persisted in the exchange's verify ring buffer so a
+// dashboard that connects late (or reloads) can backfill the audit log, and also
+// carried live over SSE as the `verify` event below.
+export interface VerifyEntry {
+  provider: string;
+  witness: string;
+  similarity: number;
+  verdict: "ok" | "divergent";
+}
+
 // SSE events pushed by the exchange to the dashboard
 export type ExchangeEvent =
   | { type: "request"; entry: RequestLogEntry }
   | { type: "providers"; providers: ProviderRow[] }
   | { type: "slashed"; provider: string; amountHbar: number; reason: string }
-  | { type: "verify"; provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
+  | ({ type: "verify" } & VerifyEntry)
   | { type: "stats"; stats: ExchangeStats }
   | {
       type: "bond";
