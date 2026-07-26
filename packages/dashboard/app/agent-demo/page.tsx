@@ -567,7 +567,7 @@ export default function AgentDemoControlRoom() {
                   title="Fire two questions — one at 0G (NimbusAI), then one that trips the SketchyGPU slash — no typing"
                   className="bg-accent-orange text-on-primary px-6 py-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold whitespace-nowrap disabled:opacity-40 hover:brightness-110 transition-all active:scale-95"
                 >
-                  {demoRunning ? `Demo ${demoStep}/${DEMO_QUESTIONS.length}…` : "▶ Run Demo (0G + slash)"}
+                  {demoRunning ? `Demo ${demoStep}/${DEMO_QUESTIONS.length}…` : "▶ Run Demo"}
                 </button>
               </form>
               {submitError && <p className="px-4 pb-3 font-data text-xs text-hud-error">⚠ {submitError}</p>}
