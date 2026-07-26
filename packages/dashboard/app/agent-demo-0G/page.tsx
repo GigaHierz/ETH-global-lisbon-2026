@@ -86,7 +86,7 @@ function fmtTime(ts: number): string {
   }
 }
 
-export default function AgentDemoControlRoom() {
+export default function AgentDemo0GControlRoom() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [conn, setConn] = useState<Conn>("connecting");
   const [running, setRunning] = useState(false);
@@ -108,6 +108,20 @@ export default function AgentDemoControlRoom() {
   // happens to land in that price tier.
   const [modelPick, setModelPick] = useState("");
   const [models, setModels] = useState<Array<{ model: string; price: number }>>([]);
+  const [agenticId, setAgenticId] = useState<{
+    enabled: boolean;
+    contract: string | null;
+    agenticId: {
+      tokenId: string | null;
+      explorer: string;
+      memoryRoot: string;
+      memoryTx: string;
+      mintTx: string;
+      callCount: number;
+      inherited?: boolean;
+    } | null;
+  } | null>(null);
+  const [minting, setMinting] = useState(false);
 
   const sym = useAssetSymbol();
 
@@ -232,6 +246,29 @@ export default function AgentDemoControlRoom() {
       .catch(() => {});
   }, []);
 
+  // Agentic ID: the agent tokenized on 0G Chain, memory in 0G Storage.
+  function refreshAgenticId() {
+    fetch(`${AGENT}/agentic-id`)
+      .then((r) => r.json())
+      .then(setAgenticId)
+      .catch(() => {});
+  }
+  useEffect(() => {
+    refreshAgenticId();
+  }, []);
+  async function mintAgenticId() {
+    if (minting) return;
+    setMinting(true);
+    try {
+      await fetch(`${AGENT}/agentic-id/mint`, { method: "POST" }).then((r) => r.json());
+      refreshAgenticId();
+    } catch {
+      /* leave the panel as-is; 0G may be unconfigured */
+    } finally {
+      setMinting(false);
+    }
+  }
+
   async function submitGoal(e: React.FormEvent) {
     e.preventDefault();
     const g = goalInput.trim();
@@ -321,14 +358,6 @@ export default function AgentDemoControlRoom() {
   const bought = events.filter((e): e is Extract<AgentEvent, { type: "bought" }> => e.type === "bought");
   const errors = events.filter((e): e is Extract<AgentEvent, { type: "error" }> => e.type === "error");
 
-  // Cumulative across all runs: durable on-chain calls (GET /calls) plus the current
-  // run's live boughts not yet flushed to /calls, deduped by paymentRef. refreshCalls()
-  // on `done` reconciles the two, so a completed run's boughts never double-count.
-  const callRefs = new Set(calls.map((c) => c.paymentRef));
-  const liveBoughts = bought.filter((b) => !callRefs.has(b.paymentRef));
-  const answersBought = calls.length + liveBoughts.length;
-  const spentTotal = [...calls, ...liveBoughts].reduce((sum, x) => sum + x.cost, 0);
-
   const connDot = conn === "live" ? "bg-accent-cyan" : conn === "connecting" ? "bg-accent-orange" : "bg-hud-error";
   const connLabel = conn === "live" ? "Agent Live" : conn === "connecting" ? "Connecting…" : "Agent Offline";
 
@@ -339,8 +368,8 @@ export default function AgentDemoControlRoom() {
         <NavStats
           stats={[
             ["BALANCE", money(sym, balance, 2), "text-primary-fixed-dim"],
-            ["SPENT", money(sym, spentTotal, 2), "text-accent-orange"],
-            ["ANSWERS BOUGHT", String(answersBought), "text-primary-fixed-dim"],
+            ["SPENT", money(sym, budget.spent, 2), "text-accent-orange"],
+            ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
           ]}
         />
         <StatusPill variant="nav" dotClassName={connDot} label={connLabel} />
@@ -411,6 +440,66 @@ export default function AgentDemoControlRoom() {
                 )}
               </div>
             </Card>
+
+            {/* Agentic ID card — the agent tokenized on 0G Chain, memory in 0G Storage */}
+            {agenticId?.enabled && (
+              <Card className="p-5 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Icon name="token" className="text-8xl" />
+                </div>
+                <div className="relative z-10 space-y-3">
+                  <span className="font-data text-[11px] tracking-[0.1em] text-on-surface-variant block">
+                    0G AGENTIC ID · TRADEABLE MEMORY
+                  </span>
+                  {agenticId.agenticId ? (
+                    <>
+                      <a
+                        href={agenticId.contract ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-data text-sm text-primary-fixed-dim hover:underline break-all"
+                      >
+                        Agent #{agenticId.agenticId.tokenId ?? "?"} <Icon name="open_in_new" className="text-[12px]" />
+                      </a>
+                      <div className="font-data text-[10px] text-on-surface-variant break-all">
+                        <span className="text-on-surface-variant/70">memory @ 0G Storage:</span>{" "}
+                        {agenticId.agenticId.memoryRoot.slice(0, 22)}…
+                      </div>
+                      <div className="font-data text-[10px] text-on-surface-variant">
+                        {agenticId.agenticId.callCount} calls · encrypted (AES-256)
+                      </div>
+                      {agenticId.agenticId.inherited && (
+                        <div className="font-data text-[10px] text-accent-cyan flex items-center gap-1">
+                          <Icon name="download" className="text-[12px]" />
+                          inherited memory · {agenticId.agenticId.callCount} calls loaded from 0G
+                        </div>
+                      )}
+                      <button
+                        onClick={mintAgenticId}
+                        disabled={minting}
+                        className="w-full border border-outline-variant text-on-surface-variant px-3 py-1.5 font-data text-[10px] tracking-[0.1em] uppercase disabled:opacity-40 hover:border-accent-cyan hover:text-on-surface transition-colors"
+                      >
+                        {minting ? "syncing…" : "↻ sync memory → 0G"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-body text-[11px] text-on-surface-variant leading-tight">
+                        Mint this agent as an ERC-7857-style Agentic ID on 0G Chain; its encrypted
+                        memory lives in 0G Storage and travels with ownership.
+                      </p>
+                      <button
+                        onClick={mintAgenticId}
+                        disabled={minting}
+                        className="w-full bg-accent-cyan text-on-primary px-3 py-2 font-data text-[10px] tracking-[0.1em] uppercase font-bold disabled:opacity-40 hover:glow-cyan transition-all active:scale-95"
+                      >
+                        {minting ? "minting…" : "mint agentic id"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* ── Main: goal + reasoning stream ── */}
