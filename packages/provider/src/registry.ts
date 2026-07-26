@@ -57,6 +57,15 @@ async function stakeToEscrow(id: string, key: string): Promise<string> {
   }
 }
 
+/** Wallet + agent id with no network calls — an env read and a template string.
+ *  Lets the server bind its port and answer /info before the slow on-chain work
+ *  (staking, HCS registration) has finished. */
+export function providerIdentity(profile: ProviderProfile): { wallet: string; agentId: string } {
+  if (MOCK_MODE) return { wallet: `0.0.mock-${profile.key}`, agentId: `mock-${profile.key}` };
+  const { id } = hederaAccount(profile.hederaRole);
+  return { wallet: id, agentId: `uaid:aid:hedera:testnet:${id}` };
+}
+
 export async function ensureRegistered(
   profile: ProviderProfile,
 ): Promise<{ wallet: string; agentId: string | null; key: string }> {
