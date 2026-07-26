@@ -168,7 +168,7 @@ Everything lives in [docs/](docs/README.md). Start there, or jump to:
 - [DEPLOY.md](docs/DEPLOY.md) — production URLs, per-service config, runbook · [TESTING.md](docs/TESTING.md) — live URLs, buy an inference call
 - [PROOF.md](docs/PROOF.md) · [TRANSACTIONS.md](docs/TRANSACTIONS.md) — on-chain evidence and how native staking/slashing works
 - [FUNDING.md](docs/FUNDING.md) · [MIGRATION-USDC.md](docs/MIGRATION-USDC.md) — settlement funding + the HBAR→USDC migration
-- [RESEARCH.md](docs/RESEARCH.md) · [DEVREL_BRIEF.md](docs/DEVREL_BRIEF.md) · [HEDERAFEEDBACK.md](docs/HEDERAFEEDBACK.md)
+- [RESEARCH.md](docs/RESEARCH.md) · [DEVREL_BRIEF.md](docs/DEVREL_BRIEF.md) · [HEDERAFEEDBACK.md](docs/HEDERAFEEDBACK.md) · [0GFEEDBACK.md](docs/0GFEEDBACK.md)
 
 ## Repository layout
 

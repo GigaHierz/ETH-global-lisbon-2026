@@ -59,3 +59,4 @@ use the documents below.
   identity, Groq model IDs, with sources.
 - [DEVREL_BRIEF.md](DEVREL_BRIEF.md) — narrative, demo beats, and real-vs-mocked breakdown.
 - [HEDERAFEEDBACK.md](HEDERAFEEDBACK.md) — Hedera developer-experience feedback.
+- [0GFEEDBACK.md](0GFEEDBACK.md) — 0G Compute developer-experience feedback.
