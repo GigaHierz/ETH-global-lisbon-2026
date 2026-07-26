@@ -90,9 +90,7 @@ proof): [docs/HEDERA_BOUNTIES.md](docs/HEDERA_BOUNTIES.md).
 |---|---|---|
 | **AI & Agentic Payments** | **Implemented** | Autonomous AI agent making per-request **x402** payments in **native HBAR**; **Hedera Agent Kit** identity; HCS-14-style UAIDs; HCS audit trails |
 | **"No Solidity Allowed"** | **Implemented** | Whole economic loop — identity, stake, slash, HTS bond, scheduled wipe — via **Hedera SDKs** across HCS + HTS + Schedule + Mirror Node, no contracts |
-| **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** |
-| **Cross-Chain Automation (Schedule Service)** | Implemented core + roadmap | **Schedule Service** multi-sig wipe live today; Axelar GMP cross-chain dispatch is the natural extension |
-| **Autonomous On-Chain Automation** | Implemented core | Multi-sig **scheduled transactions** with no keepers/bots (verifier + auditor co-sign) |
+| **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** + a **scheduled token operation** (multi-sig scheduled wipe) |
 
 ## Documentation
 
