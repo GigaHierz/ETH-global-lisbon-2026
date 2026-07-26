@@ -42,6 +42,8 @@ function row(url: string): ProviderRow {
     reputation: 100,
     stakeHbar: 50,
     requestsServed: 0,
+    bondTokens: 100,
+    bondStatus: "active",
   };
 }
 

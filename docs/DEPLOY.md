@@ -19,22 +19,26 @@ service needs, and how to run — and re-arm — the demo on stage.
 **Backends (Railway)**
 | Service | URL |
 |---|---|
-| exchange | `https://agent-router-exchange-production.up.railway.app` |
-| agent-server | `https://agent-router-agent-server-production.up.railway.app` |
-| provider1 (Titan, honest 70B) | `https://agent-router-provider1-production.up.railway.app` |
-| provider2 (Budget, honest 8B) | `https://agent-router-provider2-production.up.railway.app` |
-| provider3 (SketchyGPU, **cheater**) | `https://agent-router-provider3-production.up.railway.app` |
+| exchange | `https://exchange-production-275a.up.railway.app` |
+| agent-server | `https://agent-server-production-01c6.up.railway.app` |
+| provider1 (Titan, honest 70B) | `https://provider1-production.up.railway.app` |
+| provider2 (Budget, honest 8B) | `https://provider2-production.up.railway.app` |
+| provider3 (SketchyGPU, **cheater**) | `https://provider3-production.up.railway.app` |
 | verifier | *(no public domain — outbound-only worker)* |
+
+> The verifier binds no HTTP port. If you give it a Railway domain it answers **502
+> forever** — that is the service working as designed, not a failure. Check it through
+> its logs, or by its effect on the exchange (a provider flipping to `slashed`).
 
 ## Hedera accounts & HCS topics
 | Role | Account | | Topic | Id |
 |---|---|---|---|---|
-| operator | `0.0.9700468` | | registry | `0.0.9744593` |
-| AGENT | `0.0.9746264` | | trades | `0.0.9744594` |
-| EXCHANGE | `0.0.9746267` | | verdicts | `0.0.9744595` |
-| PROVIDER1/2/3 | `0.0.9746268 / 70 / 71` | | | |
-| VERIFIER | `0.0.9746272` | | | |
-| ESCROW | `0.0.9746274` | | | |
+| operator | `0.0.9700474` | | registry | `0.0.9744593` |
+| AGENT | `0.0.9755656` | | trades | `0.0.9744594` |
+| EXCHANGE | `0.0.9755659` | | verdicts | `0.0.9744595` |
+| PROVIDER1/2/3 | `0.0.9755663 / 70 / 71` | | | |
+| VERIFIER | `0.0.9755668` | | | |
+| ESCROW | `0.0.9755672` | | | |
 
 ## Railway — settings common to every service
 - **Source → Branch:** `main`
@@ -49,12 +53,12 @@ variables were renamed, and a stale one falls back to an identical default rathe
 
 | Service | Start Command | Domain | Variables (in addition to shared) |
 |---|---|---|---|
-| **exchange** | `pnpm exchange:prod` | ✅ | `HEDERA_EXCHANGE_ID=0.0.9746267`, `HEDERA_EXCHANGE_KEY`, `EXCHANGE_ASK=0.12` |
-| **agent-server** | `pnpm agent-server:prod` | ✅ | `HEDERA_AGENT_ID=0.0.9746264`, `HEDERA_AGENT_KEY`, `GROQ_API_KEY`, `EXCHANGE_URL=<exchange url>`, `AGENT_BUDGET=2` |
-| **provider1** (honest 70B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider1`, `PROVIDER_PUBLIC_URL=<provider1 url>`, `HEDERA_PROVIDER1_ID=0.0.9746268`, `HEDERA_PROVIDER1_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
-| **provider2** (honest 8B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider2`, `PROVIDER_PUBLIC_URL=<provider2 url>`, `HEDERA_PROVIDER2_ID=0.0.9746270`, `HEDERA_PROVIDER2_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
-| **provider3** (**CHEATER**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider3`, `CHEAT_MODE=true`, `PROVIDER_PUBLIC_URL=<provider3 url>`, `HEDERA_PROVIDER3_ID=0.0.9746271`, `HEDERA_PROVIDER3_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `GROQ_API_KEY` |
-| **verifier** | `pnpm verifier:prod` | ❌ | `HEDERA_VERIFIER_ID=0.0.9746272`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9746274`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700468`, `EXCHANGE_URL=<exchange url>` — **needs a USDC balance**, it pays for its own audit replays |
+| **exchange** | `pnpm exchange:prod` | ✅ | `HEDERA_EXCHANGE_ID=0.0.9755659`, `HEDERA_EXCHANGE_KEY`, `EXCHANGE_ASK=0.12` |
+| **agent-server** | `pnpm agent-server:prod` | ✅ | `HEDERA_AGENT_ID=0.0.9755656`, `HEDERA_AGENT_KEY`, `GROQ_API_KEY`, `EXCHANGE_URL=<exchange url>`, `AGENT_BUDGET=2` |
+| **provider1** (honest 70B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider1`, `PROVIDER_PUBLIC_URL=<provider1 url>`, `HEDERA_PROVIDER1_ID=0.0.9755663`, `HEDERA_PROVIDER1_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
+| **provider2** (honest 8B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider2`, `PROVIDER_PUBLIC_URL=<provider2 url>`, `HEDERA_PROVIDER2_ID=0.0.9755664`, `HEDERA_PROVIDER2_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
+| **provider3** (**CHEATER**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider3`, `CHEAT_MODE=true`, `PROVIDER_PUBLIC_URL=<provider3 url>`, `HEDERA_PROVIDER3_ID=0.0.9755665`, `HEDERA_PROVIDER3_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY` |
+| **verifier** | `pnpm verifier:prod` | ❌ | `HEDERA_VERIFIER_ID=0.0.9755668`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700474`, `EXCHANGE_URL=<exchange url>` — **needs a USDC balance**, it pays for its own audit replays |
 
 Gotchas:
 - Every account must be **associated with USDC** before it can send or receive it, and the
@@ -75,18 +79,18 @@ Gotchas:
 
 ## Pre-flight checks (run before the demo)
 ```bash
-EX=https://agent-router-exchange-production.up.railway.app
-AG=https://agent-router-agent-server-production.up.railway.app
+EX=https://exchange-production-275a.up.railway.app
+AG=https://agent-server-production-01c6.up.railway.app
 
 curl -s $EX/healthz                       # {"ok":true,"mock":false}
-curl -s $AG/healthz                       # agentId: uaid:aid:hedera:testnet:0.0.9746264
+curl -s $AG/healthz                       # agentId: uaid:aid:hedera:testnet:0.0.9755656
 curl -s $EX/providers | python3 -m json.tool | grep -E 'displayName|status'   # who is live
 ```
 The verifier has no HTTP endpoint (worker) — check it via its Railway logs, or by its effect on the
 verdicts topic.
 
 ## Demo runbook (on stage)
-1. **Open** `…/agent-demo`. Show the agent's HCS-14 identity (`uaid:aid:hedera:testnet:0.0.9746264`).
+1. **Open** `…/agent-demo`. Show the agent's HCS-14 identity (`uaid:aid:hedera:testnet:0.0.9755656`).
 2. **Enter a goal → Run.** Watch it plan → buy inference (real HBAR) → synthesize; balance drains,
    each buy has a Hashscan link.
 3. **Switch to** `…/exchange`. Show the provider table, live request feed, price index, and the
@@ -110,9 +114,9 @@ To make the slash happen **live** again:
    (< 0.35), and **slashes live** — watch the SLASHED banner on `…/exchange`.
 
 ## On-chain evidence (example)
-- Fraud verdict + escrow→treasury slash: `hashscan.io/testnet/transaction/0.0.9746274-1785006878-335286651`
+- Fraud verdict + escrow→treasury slash: `hashscan.io/testnet/transaction/0.0.9755672-1785006878-335286651`
 - Verdicts topic: `hashscan.io/testnet/topic/0.0.9744595`
-- Agent account (balance draining per buy): `hashscan.io/testnet/account/0.0.9746264`
+- Agent account (balance draining per buy): `hashscan.io/testnet/account/0.0.9755656`
 
 ## Local dev (reference)
 `pnpm install` (Node 22 required — pnpm 11), set `.env` (`pnpm setup-hedera`), then `pnpm demo` runs

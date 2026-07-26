@@ -30,7 +30,9 @@ const ENV_PATH = resolve(import.meta.dirname, "../.env");
 // ESCROW is the verifier-held stake escrow (no-Solidity staking): providers
 // transfer STAKE_HBAR here at registration; a slash moves it to the treasury
 // (= operator). Its key lives in HEDERA_ESCROW_KEY, loaded by the verifier.
-const ROLES = ["AGENT", "EXCHANGE", "PROVIDER1", "PROVIDER2", "PROVIDER3", "PROVIDER4", "PROVIDER", "VERIFIER", "ESCROW"] as const;
+// AUDITOR is the second signer on the HTS ReputationBond wipe: the token's
+// wipeKey is a 2-of-2 [verifier, auditor], so destroying a bond is multi-sig.
+const ROLES = ["AGENT", "EXCHANGE", "PROVIDER1", "PROVIDER2", "PROVIDER3", "PROVIDER4", "PROVIDER", "VERIFIER", "ESCROW", "AUDITOR"] as const;
 const HBAR_PER_ACCOUNT = 100;
 
 const USDC = TokenId.fromString(USDC_TOKEN_ID);

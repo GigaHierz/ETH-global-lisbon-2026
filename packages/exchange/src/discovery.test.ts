@@ -20,6 +20,8 @@ function seed(rows: Array<Partial<ProviderRow> & { url: string }>) {
       reputation: 100,
       stakeHbar: 50,
       requestsServed: 0,
+      bondTokens: r.bondTokens ?? 100,
+      bondStatus: r.bondStatus ?? "active",
     });
   }
 }
@@ -60,6 +62,7 @@ describe("pickProvider", () => {
         displayName: "bad", model: M70, price: bad as unknown as number,
         wallet: "0.0.bad", agentId: null, url: "bad",
         status: "live", reputation: 100, stakeHbar: 50, requestsServed: 0,
+        bondTokens: 100, bondStatus: "active",
       });
       expect(pickProvider(M70)?.url).toBe("good");
     }

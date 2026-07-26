@@ -37,6 +37,7 @@ import {
 import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
 import { initPayer, paidPost } from "./payer.js";
 import { applySlash } from "./slash.js";
+import { applyBondEvent } from "./bond.js";
 import { quoteFor, pinnedQuote, quoteById, consumeQuote, type Quote } from "./quotes.js";
 import { sendRefund, REFUND_ON_FAILURE } from "./refund.js";
 
@@ -105,6 +106,25 @@ app.post("/slash", (req, res) => {
   providers.set(row.url, row);
   log("exchange", `SLASHED ${row.displayName}: -${amountHbar} ℏ stake. Reason: ${reason}`);
   broadcast({ type: "slashed", provider: row.displayName, amountHbar, reason });
+  broadcast({ type: "providers", providers: providerList() });
+  res.json({ ok: true });
+});
+
+// Verifier reports each HTS ReputationBond transition (frozen → wiped) so the
+// dashboard's Bond column animates alongside the SLASHED banner.
+app.post("/bond-event", (req, res) => {
+  const result = applyBondEvent(providerList(), req.body ?? {});
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  const { row } = result;
+  const { freezeTx, scheduleId, wipeTx } = req.body as {
+    freezeTx?: string | null; scheduleId?: string | null; wipeTx?: string | null;
+  };
+  providers.set(row.url, row);
+  log("exchange", `BOND ${row.displayName}: ${row.bondStatus} (${row.bondTokens} ARBOND)`);
+  broadcast({
+    type: "bond", provider: row.displayName, wallet: row.wallet,
+    bondTokens: row.bondTokens, bondStatus: row.bondStatus, freezeTx, scheduleId, wipeTx,
+  });
   broadcast({ type: "providers", providers: providerList() });
   res.json({ ok: true });
 });

@@ -13,7 +13,7 @@ import {
   type ChatCompletionRequest,
 } from "@agentrouter/shared";
 import { resolveProfile } from "./profiles.js";
-import { complete } from "./groq.js";
+import { complete } from "./backends/index.js";
 import { ensureRegistered } from "./registry.js";
 
 const profile = resolveProfile();
@@ -93,7 +93,7 @@ app.post("/v1/chat/completions", async (req, res) => {
   }
   const t0 = Date.now();
   try {
-    const out = await complete(body, profile.actualModel, profile.advertisedModel, profile.cannedCheat);
+    const out = await complete(profile.backend, body, profile.actualModel, profile.advertisedModel, profile.cannedCheat);
     const ms = Date.now() - t0;
     const cheatNote = profile.actualModel !== profile.advertisedModel ? " (psst: actually served " + profile.actualModel + ")" : "";
     log(TAG, `served ${profile.advertisedModel} in ${ms}ms${cheatNote}`);

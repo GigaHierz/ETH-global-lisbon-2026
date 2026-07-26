@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { DEFAULT_MODEL, SMALL_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
+import { DEFAULT_MODEL, SMALL_MODEL, ZEROG_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
 import { PROFILES, resolveProfile } from "./profiles.js";
 
 const savedArgv = process.argv;
@@ -34,12 +34,22 @@ describe("PROFILES", () => {
     expect(p.port).toBe(PROVIDER_PORTS[2]);
   });
 
-  it("provider4 (NimbusAI) is honest 70b, cheaper than Titan but plays fair", () => {
+  it("provider4 (NimbusAI) honestly resells 0G Compute on its own unique model", () => {
     const p = PROFILES.provider4;
-    expect(p.advertisedModel).toBe(DEFAULT_MODEL);
-    expect(p.actualModel).toBe(DEFAULT_MODEL);
+    expect(p.advertisedModel).toBe(ZEROG_MODEL);
+    expect(p.actualModel).toBe(ZEROG_MODEL); // honest: serves what it advertises
+    expect(p.backend).toBe("0g");
     expect(p.price).toBe(0.06);
     expect(p.port).toBe(PROVIDER_PORTS[3]);
+  });
+
+  it("p1-p3 backends are pinned to groq — the slash arc depends on it", () => {
+    // FROZEN: deterministic same-model Groq outputs are what the verifier compares.
+    expect(PROFILES.provider1.backend).toBe("groq");
+    expect(PROFILES.provider2.backend).toBe("groq");
+    expect(PROFILES.provider3.backend).toBe("groq");
+    // and provider4 must never collide with the 70b arc's model
+    expect(PROFILES.provider4.advertisedModel).not.toBe(DEFAULT_MODEL);
   });
 
   it("provider3 secretly serves the small model when CHEAT_MODE=true", async () => {
@@ -90,13 +100,24 @@ describe("resolveProfile", () => {
     expect(p.cannedCheat).toBe(false);
   });
 
-  it("defaults every custom-profile field when nothing is set", () => {
+  it("defaults a custom profile to the 0G backend and its model", () => {
     process.argv = ["node", "index.ts", "--profile", "custom"];
     const p = resolveProfile();
     expect(p.displayName).toBe("Custom Provider");
-    expect(p.advertisedModel).toBe(DEFAULT_MODEL);
+    expect(p.backend).toBe("0g"); // bring-your-own supply defaults to 0G Compute
+    expect(p.advertisedModel).toBe(ZEROG_MODEL);
     expect(p.price).toBe(0.1);
     expect(p.port).toBe(4025);
+  });
+
+  it("a groq-backed custom profile defaults to the 70b model instead", () => {
+    // The default model follows the backend: picking groq without naming a model
+    // must not leave the provider advertising a 0G model it cannot serve.
+    process.argv = ["node", "index.ts", "--profile", "custom"];
+    vi.stubEnv("PROVIDER_BACKEND", "groq");
+    const p = resolveProfile();
+    expect(p.backend).toBe("groq");
+    expect(p.advertisedModel).toBe(DEFAULT_MODEL);
   });
 
   it("exits when no profile is specified at all", () => {

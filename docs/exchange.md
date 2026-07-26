@@ -12,7 +12,7 @@ center of it. This README explains everything the protocol does, not just this s
 | Landing (protocol overview) | https://eth-global-lisbon-2026-dashboard.vercel.app |
 | Exchange terminal (this service's UI) | https://eth-global-lisbon-2026-dashboard.vercel.app/exchange |
 | Agent demo (autonomous buyer) | https://eth-global-lisbon-2026-dashboard.vercel.app/agent-demo |
-| Exchange API (this service, Railway) | https://agent-router-exchange-production.up.railway.app |
+| Exchange API (this service, Railway) | https://exchange-production-275a.up.railway.app |
 | On-chain receipts | [PROOF.md](PROOF.md) |
 
 ---
@@ -152,9 +152,9 @@ The exchange is the market maker between the two sides — an Express service
 ### Try it against production
 
 ```bash
-curl -s https://agent-router-exchange-production.up.railway.app/providers | jq
+curl -s https://exchange-production-275a.up.railway.app/providers | jq
 
-curl -s -X POST https://agent-router-exchange-production.up.railway.app/v1/chat/completions \
+curl -s -X POST https://exchange-production-275a.up.railway.app/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"What is x402? One sentence."}]}' \
   | jq .agentrouter

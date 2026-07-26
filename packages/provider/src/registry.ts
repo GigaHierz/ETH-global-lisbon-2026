@@ -14,6 +14,8 @@ import {
   log,
   ASSET_LABEL,
   MOCK_MODE,
+  bondTokenId,
+  bondBalance,
 } from "@agentrouter/shared";
 import type { ProviderProfile } from "./profiles.js";
 
@@ -118,5 +120,17 @@ export async function ensureRegistered(
 
   cache[id] = entry;
   writeCache(cache);
+
+  // Best-effort: surface the provider's HTS ReputationBond (ARBOND) balance —
+  // its on-chain reputation, frozen/wiped by the verifier on fraud.
+  if (bondTokenId()) {
+    try {
+      const bond = await bondBalance(id);
+      log(profile.key, `ReputationBond: ${bond} ARBOND`);
+    } catch {
+      /* non-critical */
+    }
+  }
+
   return { wallet: id, agentId, key };
 }
