@@ -5,7 +5,7 @@
 
 import express from "express";
 import cors from "cors";
-import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money, publishToTopic, readTopicMessages, mintAgenticId, updateAgenticIdMemory, agenticIdEnabled, agenticIdLink } from "@agentrouter/shared";
+import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money, publishToTopic, readTopicMessages, mintAgenticId, updateAgenticIdMemory, agenticIdEnabled, agenticIdLink, readAgenticIdMemory, agentNftTokenId, inheritedMemoryRoot } from "@agentrouter/shared";
 import { Budget } from "./budget.js";
 import { groqBrain } from "./brain.js";
 import { makeBuy } from "./buy.js";
@@ -13,7 +13,7 @@ import { routeModel } from "./route-model.js";
 import { initAgentPayer } from "./payer.js";
 import { registerIdentity, type Identity } from "./identity.js";
 import { runGoal, type AgentEvent } from "./loop.js";
-import { uploadMemory, zeroGStorageEnabled } from "./memory-0g.js";
+import { uploadMemory, downloadMemory, zeroGStorageEnabled } from "./memory-0g.js";
 
 // Hosts (Railway/Render/Fly) inject PORT; fall back to AGENT_PORT locally.
 const PORT = parseInt(process.env.PORT || process.env.AGENT_PORT || "4200", 10);
@@ -48,6 +48,9 @@ interface AgenticIdState {
   mintTx: string;
   callCount: number;
   updatedAt: number;
+  // true when this state was rehydrated from 0G on boot (memory inherited via a
+  // token this instance owns) rather than minted/synced by this instance.
+  inherited?: boolean;
 }
 let agenticId: AgenticIdState | null = null;
 
@@ -109,12 +112,66 @@ async function routedBuyFor(goal: string, pick?: string) {
   }
 }
 
+// Read-back: the buy-side of tradeable memory. If this instance is configured to
+// own a minted Agentic ID (ZEROG_AGENT_TOKEN_ID), read that token's memory pointer
+// off 0G Chain, download + decrypt the memory from 0G Storage, and rehydrate the
+// call history — so a fresh instance "wakes up" with the prior agent's experience
+// even though it never ran those calls. This is what makes the memory portable
+// across a sale. Fully guarded: any failure logs and the agent boots cold, exactly
+// as an unconfigured instance would.
+async function inheritMemory() {
+  if (!zeroGStorageEnabled()) return;
+  const tokenId = agentNftTokenId();
+  // Resolve the 0G Storage root: prefer the owned token's on-chain pointer, fall
+  // back to an explicit ZEROG_MEMORY_ROOT override (covers the case where mint
+  // keccak-folded a non-32-byte root, so the chain can't hand it back).
+  let root = inheritedMemoryRoot();
+  if (tokenId && agenticIdEnabled()) {
+    const onchain = await readAgenticIdMemory(tokenId);
+    if (onchain?.memoryRoot) root = onchain.memoryRoot;
+  }
+  if (!root) return;
+
+  type InheritedMemory = { calls?: Call[]; goal?: string | null; snapshotAt?: number };
+  let mem: InheritedMemory | null = null;
+  try {
+    mem = (await downloadMemory(root)) as InheritedMemory | null;
+  } catch (e) {
+    log("agent", `inherit: memory download failed (${(e as Error).message.slice(0, 120)})`);
+    return;
+  }
+  const inherited = Array.isArray(mem?.calls) ? mem!.calls! : [];
+  if (inherited.length === 0) {
+    log("agent", `inherit: memory root ${root.slice(0, 18)}… held no calls`);
+    return;
+  }
+  for (const c of inherited) {
+    calls.push(c);
+    if (calls.length > CALLS_CAP) calls.shift();
+  }
+  agenticId = {
+    tokenId: tokenId ?? null,
+    contract: agenticIdLink() ?? "",
+    explorer: agenticIdLink() ?? "",
+    memoryRoot: root,
+    memoryTx: "",
+    mintTx: "",
+    callCount: calls.length,
+    updatedAt: mem?.snapshotAt ?? Date.now(),
+    inherited: true,
+  };
+  log("agent", `inherited memory — ${inherited.length} calls from token ${tokenId ?? "?"} (root ${root.slice(0, 18)}…)`);
+}
+
 // Everything that touches the network, off the critical path to listening.
 async function boot() {
   await initAgentPayer();
   identity = await registerIdentity({ displayName: "AgentRouter Demo Buyer", endpoint: ENDPOINT });
   account = MOCK_MODE ? "0.0.mock-agent" : hederaAccount("AGENT").id;
   if (!MOCK_MODE) state.balance = await settlementBalance(account);
+  // Inherit prior memory from 0G if this instance owns an Agentic ID. Guarded so a
+  // failed read never blocks the agent from coming up.
+  await inheritMemory().catch((e) => log("agent", `inherit skipped: ${(e as Error).message.slice(0, 120)}`));
   ready = true;
   log("agent", `ready | ${identity.agentId} | balance ${money(state.balance.toFixed(4))}`);
 }
