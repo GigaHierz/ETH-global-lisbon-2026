@@ -209,7 +209,7 @@ export default function Landing() {
                   </div>
                   <div>
                     <div className="font-data text-[11px] font-bold tracking-[0.1em] uppercase text-on-surface">Minimum Hardware</div>
-                    <div className="font-data text-sm text-on-surface-variant">Any box that can reach the Groq API — no local GPU required</div>
+                    <div className="font-data text-sm text-on-surface-variant">Any box that can reach 0G Compute (or Groq) — no local GPU required</div>
                   </div>
                 </Card>
                 <Card className="flex items-center gap-4 p-4">

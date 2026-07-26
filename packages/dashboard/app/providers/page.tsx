@@ -17,10 +17,10 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 }
 
 // Provider economics — sourced from provider/src/profiles.ts and GUIDE.md.
-const STATS = [
-  { icon: "payments", label: "Per 70B request", value: "$0.10" },
+const STATS: Array<{ icon: string; label: string; value: string; href?: string }> = [
+  { icon: "payments", label: "Per request", value: "$0.10" },
   { icon: "savings", label: "Quality bond", value: "50 ℏ" },
-  { icon: "memory", label: "Backend", value: "Groq" },
+  { icon: "memory", label: "Backend", value: "0G Compute", href: "https://pc.0g.ai" },
   { icon: "hub", label: "Registry", value: "HCS on-chain" },
 ];
 
@@ -33,7 +33,7 @@ const STEPS = [
     title: "List your compute",
     items: [
       "Run the provider service on any box — VPS, cloud, or your laptop behind a tunnel.",
-      "Point it at a Groq API key, or run without one for canned demo answers.",
+      "Point it at 0G Compute (the recommended default), Groq, or run without a key for canned demo answers.",
       "Advertise the model you serve and a price in USDC per request.",
     ],
   },
@@ -67,7 +67,7 @@ const REQUIREMENTS = [
   {
     icon: "memory",
     title: "Minimum hardware",
-    body: "Any box — no GPU required. A Groq API key serves real models; without one, canned answers keep you live.",
+    body: "Any box — no GPU required. A 0G Compute key (recommended) or a Groq key serves real models; without one, canned answers keep you live.",
   },
   {
     icon: "account_balance",
@@ -89,11 +89,13 @@ const REQUIREMENTS = [
 // Env vars a custom provider sets — `pnpm provider` reads these (no code edits).
 const ENV_VARS: Array<[string, string, string]> = [
   ["PROVIDER_NAME", "Custom Provider", "Display name shown in the routing table."],
-  ["PROVIDER_MODEL", "llama-3.3-70b-versatile", "The model you advertise — and must actually serve."],
+  ["PROVIDER_MODEL", "0gm-1.0-35b-a3b", "The model you advertise — and must actually serve (0G default; llama-3.3-70b-versatile on groq)."],
   ["PROVIDER_PRICE", "0.10", "Your price per request, in USDC."],
   ["HEDERA_PROVIDER_ID / _KEY", "from pnpm setup-hedera", "Account that stakes, registers, and receives payment."],
   ["PROVIDER_PUBLIC_URL", "http://localhost:4025", "Public address the exchange routes to."],
-  ["GROQ_API_KEY", "—", "Upstream inference. Omitted → canned fallback answers."],
+  ["PROVIDER_BACKEND", "0g", "Supply backend: 0g (recommended) | groq | canned."],
+  ["ZEROG_API_KEY", "—", "0G Compute inference (recommended). Omitted → canned fallback answers."],
+  ["GROQ_API_KEY", "—", "Alternative backend (PROVIDER_BACKEND=groq). Omitted → canned fallback."],
   ["STAKE_HBAR", "50", "Boot-time stake posted to escrow."],
 ];
 
@@ -168,7 +170,16 @@ export default function ProvidersPage() {
                   <Icon name={s.icon} className="text-[18px]" />
                   <span className="font-data text-[11px] font-bold tracking-[0.1em] uppercase">{s.label}</span>
                 </div>
-                <div className="font-data text-xl font-medium text-primary-fixed-dim">{s.value}</div>
+                <div className="font-data text-xl font-medium text-primary-fixed-dim">
+                  {s.href ? (
+                    <a href={s.href} target="_blank" rel="noreferrer"
+                      className="hover:text-accent-cyan transition-colors underline decoration-dotted underline-offset-4">
+                      {s.value}
+                    </a>
+                  ) : (
+                    s.value
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -268,7 +279,7 @@ export default function ProvidersPage() {
               <div>
                 <span className="text-accent-orange"># 2. Add your Hedera keys + advertise a model/price in .env</span><br />
                 <span className="text-on-surface">HEDERA_PROVIDER_ID=0.0.xxxxx · HEDERA_PROVIDER_KEY=0x…</span><br />
-                <span className="text-on-surface">PROVIDER_NAME=Acme · PROVIDER_MODEL=llama-3.3-70b-versatile · PROVIDER_PRICE=0.10</span>
+                <span className="text-on-surface">PROVIDER_NAME=Acme · PROVIDER_BACKEND=0g · PROVIDER_MODEL=0gm-1.0-35b-a3b · PROVIDER_PRICE=0.10</span>
               </div>
               <div>
                 <span className="text-accent-orange"># 3. Make your box reachable</span><br />
@@ -281,7 +292,7 @@ export default function ProvidersPage() {
               <div className="pt-4 mt-4 border-t border-outline-variant">
                 <span className="text-accent-cyan font-bold italic">{"// unpaid request → the paywall answers"}</span><br />
                 <span className="text-on-surface">curl -X POST localhost:4025/v1/chat/completions \</span><br />
-                <span className="text-on-surface ml-4">-d {"'"}{"{"}&quot;model&quot;:&quot;llama-3.3-70b-versatile&quot;,…{"}"}{"'"}</span>
+                <span className="text-on-surface ml-4">-d {"'"}{"{"}&quot;model&quot;:&quot;0gm-1.0-35b-a3b&quot;,…{"}"}{"'"}</span>
               </div>
               <div className="bg-hud-error/10 p-3 border-l-2 border-hud-error">
                 <span className="text-hud-error font-bold">HTTP/1.1 402 Payment Required</span><br />
@@ -348,7 +359,7 @@ export default function ProvidersPage() {
                 <div className="pt-4 mt-4 border-t border-outline-variant">
                   <span className="text-accent-cyan font-bold italic">{"// after your provider is up, one call verifies the lot"}</span><br />
                   <span className="text-on-surface">provision_provider({"{"}</span><br />
-                  <span className="text-on-surface ml-4">name: &quot;Acme Inference&quot;, model: &quot;llama-3.3-70b-versatile&quot;,</span><br />
+                  <span className="text-on-surface ml-4">name: &quot;Acme Inference&quot;, backend: &quot;0g&quot;, model: &quot;0gm-1.0-35b-a3b&quot;,</span><br />
                   <span className="text-on-surface ml-4">price: 0.08, publicUrl: &quot;https://acme.example.com&quot;</span><br />
                   <span className="text-on-surface">{"}"})</span>
                 </div>
