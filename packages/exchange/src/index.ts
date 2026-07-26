@@ -4,6 +4,7 @@ import {
   log,
   MOCK_MODE,
   AUDIT_REQUEST_HEADER,
+  PROMPT_PREVIEW_LIMIT,
   MOCK_PAYMENT_HEADER,
   EXCHANGE_FEE_BPS,
   HEDERA_NETWORK,
@@ -35,6 +36,7 @@ import {
   statsSnapshot,
 } from "./state.js";
 import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
+import { hydrateFromTrades } from "./hydrate.js";
 import { initPayer, paidPost } from "./payer.js";
 import { applySlash } from "./slash.js";
 import { applyBondEvent } from "./bond.js";
@@ -58,6 +60,13 @@ function routeQuote(body: ChatCompletionRequest): Quote | null {
 
 await initPayer();
 startDiscovery();
+
+// Rebuild the settlement feed from the trades topic before serving. Without this a
+// redeploy shows an empty dashboard and zeroed revenue, even though every trade is
+// still on-chain — the container's uptime, not the ledger, decided what you saw.
+hydrateFromTrades()
+  .then((n) => n > 0 && log("exchange", `rehydrated ${n} trades from the HCS trades topic`))
+  .catch(() => {});
 
 const app = express();
 app.use(cors());
@@ -327,7 +336,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       total: quotedTotal,
       latencyMs,
       paymentRef,
-      promptPreview: body.messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, 80) ?? "",
+      promptPreview: body.messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, PROMPT_PREVIEW_LIMIT) ?? "",
       answerPreview: data.choices?.[0]?.message?.content?.slice(0, 80) ?? "",
       status: "ok" as const,
       isAudit,
@@ -404,7 +413,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       latencyMs: Date.now() - t0,
       paymentRef: "-",
       refundRef,
-      promptPreview: body.messages.at(-1)?.content.slice(0, 80) ?? "",
+      promptPreview: body.messages.at(-1)?.content.slice(0, PROMPT_PREVIEW_LIMIT) ?? "",
       answerPreview: (err as Error).message.slice(0, 80),
       status,
       isAudit,

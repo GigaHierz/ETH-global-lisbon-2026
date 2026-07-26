@@ -154,9 +154,20 @@ export default function ProvidersPage() {
                 className="w-full md:w-auto bg-accent-orange text-on-primary px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] transition-all active:scale-95">
                 Join the Provider Waitlist
               </a>
-              <a href="#quickstart"
+              <a href="#agent-onboarding"
                 className="w-full md:w-auto border border-outline-variant bg-surface-container/50 backdrop-blur-md text-on-surface px-10 py-4 font-data text-[11px] tracking-[0.1em] uppercase font-bold rounded-sm hover:bg-surface-variant transition-all">
-                Read the quickstart
+                Onboard with an agent
+              </a>
+            </div>
+            {/* Straight to the two artifacts, for anyone who doesn't want to scroll. */}
+            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 justify-center font-data text-[11px] tracking-[0.1em] uppercase font-bold">
+              <a href={`${REPO}/blob/main/.claude/skills/onboarding-a-provider/SKILL.md`} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                <Icon name="auto_awesome" className="text-[14px]" /> Onboarding skill
+              </a>
+              <a href={`${REPO}/blob/main/packages/provider-mcp/README.md`} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                <Icon name="terminal" className="text-[14px]" /> MCP server
               </a>
             </div>
           </div>
@@ -235,73 +246,6 @@ export default function ProvidersPage() {
           </div>
         </section>
 
-        {/* ── Quickstart ── */}
-        <section id="quickstart" className="py-24 px-4 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-          <div className="flex flex-col h-full justify-center">
-            <h2 className="font-display font-extrabold text-[36px] leading-[42px] md:text-5xl tracking-[-0.04em] mb-6 text-on-surface">
-              Quickstart.
-            </h2>
-            <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
-              The terminal on the right is the whole onboarding. Clone, add your Hedera keys,
-              make your box reachable, and start — the service stakes and registers itself.
-            </p>
-            <div className="space-y-3 font-body text-sm text-on-surface-variant">
-              <div className="flex items-start gap-3">
-                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>No dashboard signup — registration happens on-chain at boot.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>Set your own model, price, and name in <span className="font-data">.env</span> — no code changes.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <Icon name="check_circle" className="text-accent-cyan text-[20px] shrink-0" />
-                <span>Prefer not to type it? An AI agent can drive the whole thing — <a href="#agent-onboarding" className="text-primary-fixed-dim hover:text-accent-cyan transition-colors">see below</a>.</span>
-              </div>
-            </div>
-            <a href={`${REPO}/blob/main/docs/GUIDE.md`} target="_blank" rel="noreferrer"
-              className="mt-8 w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
-              Full setup guide <Icon name="open_in_new" className="text-[14px]" />
-            </a>
-          </div>
-
-          {/* Code terminal */}
-          <div className="bg-surface-obsidian rounded-lg border border-outline/30 shadow-2xl overflow-hidden font-data text-sm">
-            <div className="bg-surface-container px-4 py-3 border-b border-outline-variant flex items-center justify-between">
-              <TerminalDots gapClassName="gap-2" dotClassName="w-3 h-3" />
-              <span className="text-on-surface-variant text-[11px] uppercase tracking-widest">provision.sh — bash</span>
-            </div>
-            <div className="p-6 space-y-4 text-[13px]">
-              <div>
-                <span className="text-accent-orange"># 1. Clone and install</span><br />
-                <span className="text-on-surface">git clone {REPO.replace("https://", "")} &amp;&amp; pnpm install</span>
-              </div>
-              <div>
-                <span className="text-accent-orange"># 2. Add your Hedera keys + advertise a model/price in .env</span><br />
-                <span className="text-on-surface">HEDERA_PROVIDER_ID=0.0.xxxxx · HEDERA_PROVIDER_KEY=0x…</span><br />
-                <span className="text-on-surface">PROVIDER_NAME=Acme · PROVIDER_BACKEND=0g · PROVIDER_MODEL=0gm-1.0-35b-a3b · PROVIDER_PRICE=0.10</span>
-              </div>
-              <div>
-                <span className="text-accent-orange"># 3. Make your box reachable</span><br />
-                <span className="text-on-surface">PROVIDER_PUBLIC_URL=https://your-tunnel-or-vps</span>
-              </div>
-              <div>
-                <span className="text-accent-orange"># 4. Start — stakes 50 ℏ + registers on HCS automatically</span><br />
-                <span className="text-on-surface">pnpm provider</span>
-              </div>
-              <div className="pt-4 mt-4 border-t border-outline-variant">
-                <span className="text-accent-cyan font-bold italic">{"// unpaid request → the paywall answers"}</span><br />
-                <span className="text-on-surface">curl -X POST localhost:4025/v1/chat/completions \</span><br />
-                <span className="text-on-surface ml-4">-d {"'"}{"{"}&quot;model&quot;:&quot;0gm-1.0-35b-a3b&quot;,…{"}"}{"'"}</span>
-              </div>
-              <div className="bg-hud-error/10 p-3 border-l-2 border-hud-error">
-                <span className="text-hud-error font-bold">HTTP/1.1 402 Payment Required</span><br />
-                <span className="text-on-surface-variant text-[12px]">scheme: exact · network: hedera:testnet</span><br />
-                <span className="text-on-surface-variant text-[12px]">amount: 10000000 tinybars · payTo: 0.0.9744152</span>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* ── Agent-driven onboarding ── */}
         <section id="agent-onboarding" className="py-24 px-4 max-w-7xl mx-auto">
@@ -313,16 +257,17 @@ export default function ProvidersPage() {
                 </span>
               </div>
               <h2 className="font-display font-extrabold text-[36px] leading-[42px] md:text-5xl tracking-[-0.04em] mb-6 text-on-surface">
-                Or let an agent do it.
+                Let an agent do it.
               </h2>
               <p className="font-body text-base text-on-surface-variant mb-6 max-w-lg">
-                The repo ships an MCP server and a Claude Code skill for onboarding. The skill walks
-                the setup with you and checks every claim on-chain; the MCP server exposes the
-                Hedera work — account, stake, HCS registration, liveness — as callable tools.
+                Onboarding is agent-native. The repo ships a Claude Code skill that walks the setup
+                with you and checks every claim on-chain, and an MCP server that exposes the Hedera
+                work — account, stake, HCS registration, liveness — as callable tools. Point your
+                client at the repo and ask it to list your compute.
               </p>
               <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
-                It doesn&apos;t replace <span className="font-data text-primary-fixed-dim">pnpm provider</span>.
-                Your service still stakes and registers itself on boot — the tools create the account
+                The tools don&apos;t replace <span className="font-data text-primary-fixed-dim">pnpm provider</span> —
+                your service still stakes and registers itself on boot. They create the account
                 beforehand and confirm you&apos;re routable afterwards. Every tool is idempotent, so a
                 re-run repairs rather than duplicates.
               </p>
@@ -336,10 +281,20 @@ export default function ProvidersPage() {
                   <span>Private keys stay in your <span className="font-data">.env</span>; tools report presence, never values.</span>
                 </div>
               </div>
-              <a href={`${REPO}/blob/main/packages/provider-mcp/README.md`} target="_blank" rel="noreferrer"
-                className="w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
-                MCP server reference <Icon name="open_in_new" className="text-[14px]" />
-              </a>
+              <div className="flex flex-wrap gap-x-8 gap-y-3">
+                <a href={`${REPO}/blob/main/packages/provider-mcp/README.md`} target="_blank" rel="noreferrer"
+                  className="w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                  MCP server reference <Icon name="open_in_new" className="text-[14px]" />
+                </a>
+                <a href={`${REPO}/blob/main/docs/provider.md#listing-your-own-compute`} target="_blank" rel="noreferrer"
+                  className="w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                  Do it by hand <Icon name="open_in_new" className="text-[14px]" />
+                </a>
+                <a href={`${REPO}/blob/main/docs/GUIDE.md`} target="_blank" rel="noreferrer"
+                  className="w-fit inline-flex items-center gap-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold text-primary-fixed-dim hover:text-accent-cyan transition-colors">
+                  Full setup guide <Icon name="open_in_new" className="text-[14px]" />
+                </a>
+              </div>
             </div>
 
             {/* Terminal: wiring + a call */}

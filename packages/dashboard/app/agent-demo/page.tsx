@@ -29,6 +29,17 @@ interface AgentState {
   findings: Finding[];
   events: AgentEvent[];
 }
+// A durable, on-chain record of one inference call the agent bought (from GET /calls).
+interface Call {
+  ts: number;
+  goal: string | null;
+  question: string;
+  answer: string;
+  provider: string;
+  cost: number;
+  paymentRef: string;
+  hashscan: string;
+}
 
 type AgentEvent =
   | { type: "goal"; goal: string }
@@ -54,6 +65,15 @@ type Conn = "connecting" | "live" | "offline";
 
 const DEFAULT_BUDGET: Budget = { cap: 0, spent: 0, remaining: 0 };
 
+function fmtTime(ts: number): string {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
 export default function AgentDemoControlRoom() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [conn, setConn] = useState<Conn>("connecting");
@@ -63,10 +83,24 @@ export default function AgentDemoControlRoom() {
   const [balance, setBalance] = useState<number | null>(null);
   const [budget, setBudget] = useState<Budget>(DEFAULT_BUDGET);
   const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [calls, setCalls] = useState<Call[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // "" = let the agent's router choose. Anything else pins the model, which is how
+  // you demo a specific supply network (0G, say) instead of hoping the prompt
+  // happens to land in that price tier.
+  const [modelPick, setModelPick] = useState("");
+  const [models, setModels] = useState<Array<{ model: string; price: number }>>([]);
 
   const sym = useAssetSymbol();
+
+  // ---- durable "previous calls" (all runs), read from the agent's on-chain topic ----
+  function refreshCalls() {
+    fetch(`${AGENT}/calls?limit=50`)
+      .then((r) => r.json())
+      .then((d: { calls?: Call[] }) => setCalls(d.calls ?? []))
+      .catch(() => {});
+  }
 
   const esRef = useRef<EventSource | null>(null);
   const streamEnd = useRef<HTMLDivElement | null>(null);
@@ -87,6 +121,8 @@ export default function AgentDemoControlRoom() {
       case "done":
         setRunning(false);
         setBudget((b) => ({ ...b, spent: ev.spent, remaining: Math.max(0, b.cap - ev.spent) }));
+        // the run's calls are now durable — pull the refreshed history
+        refreshCalls();
         break;
       case "balance":
         setBalance(ev.amount);
@@ -107,6 +143,8 @@ export default function AgentDemoControlRoom() {
   useEffect(() => {
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    refreshCalls();
 
     fetch(`${AGENT}/identity`)
       .then((r) => r.json())
@@ -161,6 +199,13 @@ export default function AgentDemoControlRoom() {
     streamEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [events.length]);
 
+  useEffect(() => {
+    fetch(`${AGENT}/models`)
+      .then((r) => r.json())
+      .then((m) => Array.isArray(m) && setModels(m))
+      .catch(() => {});
+  }, []);
+
   async function submitGoal(e: React.FormEvent) {
     e.preventDefault();
     const g = goalInput.trim();
@@ -171,7 +216,7 @@ export default function AgentDemoControlRoom() {
       const res = await fetch(`${AGENT}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: g }),
+        body: JSON.stringify(modelPick ? { goal: g, model: modelPick } : { goal: g }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -303,6 +348,20 @@ export default function AgentDemoControlRoom() {
                   placeholder={running ? "agent is working…" : "e.g. Compare the top 3 L1s by throughput and fees"}
                   className="flex-1 bg-surface-obsidian border border-outline-variant px-3 py-2 font-data text-sm text-on-surface outline-none focus:border-accent-cyan disabled:opacity-50 transition-colors"
                 />
+                <select
+                  value={modelPick}
+                  onChange={(e) => setModelPick(e.target.value)}
+                  disabled={running}
+                  title="Pin a model, or let the agent's router pick by prompt"
+                  className="bg-surface-obsidian border border-outline-variant px-2 py-2 font-data text-[11px] text-on-surface-variant outline-none focus:border-accent-cyan disabled:opacity-50 transition-colors max-w-[190px]"
+                >
+                  <option value="">Auto (router)</option>
+                  {models.map((m) => (
+                    <option key={m.model} value={m.model}>
+                      {m.model.replace("-versatile", "").replace("-instant", "")} · {money(sym, m.price, 2)}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={running || submitting || !goalInput.trim()}
@@ -408,6 +467,56 @@ export default function AgentDemoControlRoom() {
                 ))}
 
                 <div ref={streamEnd} />
+              </div>
+            </Card>
+
+            {/* Previous calls — durable, on-chain history across all runs */}
+            <Card className="overflow-hidden">
+              <div className="p-4 border-b border-outline-variant flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Icon name="history" className="text-[16px] text-primary-fixed-dim" />
+                  <span className="font-data text-[11px] tracking-[0.1em]">PREVIOUS CALLS</span>
+                  <span className="font-data text-[10px] text-on-surface-variant">· durable on-chain history</span>
+                </div>
+                <span className="font-data text-[10px] text-on-surface-variant uppercase">
+                  {calls.length} calls · all runs
+                </span>
+              </div>
+
+              <div className="p-5 space-y-3 max-h-[420px] overflow-y-auto">
+                {calls.length === 0 && (
+                  <p className="font-data text-xs py-8 text-center text-on-surface-variant">
+                    no calls yet — completed runs will appear here.
+                  </p>
+                )}
+
+                {calls.map((c, i) => (
+                  <div key={c.paymentRef || i} className="bg-surface-container-lowest border border-outline-variant/50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-data text-xs font-bold text-on-surface truncate">» {c.question}</div>
+                        <div className="font-data text-[10px] text-on-surface-variant truncate mt-0.5">
+                          {c.goal ? `goal: ${c.goal} · ` : ""}{fmtTime(c.ts)}
+                        </div>
+                      </div>
+                      <div className="shrink-0 font-data text-[11px] text-right">
+                        <div>
+                          <span className="text-accent-cyan">{c.provider}</span>
+                          <span className="text-on-surface-variant"> · {money(sym, c.cost, 4)}</span>
+                        </div>
+                        {c.hashscan && (
+                          <a href={c.hashscan} target="_blank" rel="noreferrer"
+                            className="text-on-surface-variant hover:text-accent-cyan transition-colors">
+                            payment tx <Icon name="open_in_new" className="text-[11px]" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {c.answer && (
+                      <p className="mt-2 font-body text-xs text-on-surface-variant leading-relaxed line-clamp-2">{c.answer}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </Card>
           </div>

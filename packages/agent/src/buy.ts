@@ -13,6 +13,8 @@ interface ExchangeCompletion {
     price?: number; // provider's listed price
     fee?: number; // exchange taker fee
     total?: number; // what the agent paid (budget charges this)
+    totalHbar?: number; // legacy field name (pre asset-generic rename)
+    pricePaidHbar?: number; // legacy flat-ask era field
     asset?: string; // what the three amounts above are denominated in
   };
 }
@@ -21,7 +23,9 @@ interface ExchangeCompletion {
 export function parseBuyResult(json: ExchangeCompletion, paymentRef: string): BuyResult {
   const answer = json.choices?.[0]?.message?.content;
   const ar = json.agentrouter;
-  const cost = ar?.total; // the agent is charged the total: provider price + exchange fee
+  // The agent is charged the total (provider price + exchange fee). Fall back
+  // through legacy field names so the agent works against any exchange build.
+  const cost = ar?.total ?? ar?.totalHbar ?? ar?.pricePaidHbar;
   if (typeof answer !== "string" || answer.length === 0) {
     throw new Error("exchange response missing completion content");
   }

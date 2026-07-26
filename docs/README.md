@@ -14,6 +14,9 @@ use the documents below.
   the Hedera SDK / tooling stack.
 - [GUIDE.md](GUIDE.md) — consolidated reference: env vars, demo script, components,
   troubleshooting.
+- [HEDERA_BOUNTIES.md](HEDERA_BOUNTIES.md) — how the project maps to each Hedera prize track
+  (AI & Agentic Payments, Tokenization/HTS, "No Solidity Allowed"), with `file:line` + Hashscan
+  proof.
 
 ## Services
 
