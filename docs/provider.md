@@ -88,6 +88,10 @@ Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) �
 and `PROVIDER_PUBLIC_URL` from `.env` and needs no code edits. It sets `actualModel =
 advertisedModel`, so it is honest by construction — which is what keeps the verifier off you.
 
+The inference itself comes from whichever backend you point at (`PROVIDER_BACKEND=0g` | `groq` |
+`canned`) — "your own compute" means you choose the model, price, and backend and run the
+staking/payment/registration layer, not that the model runs on your local GPU.
+
 Two aids, both optional:
 
 - **[`onboarding-a-provider`](../.claude/skills/onboarding-a-provider/SKILL.md)** — a guided

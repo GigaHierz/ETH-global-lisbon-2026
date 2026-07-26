@@ -9,11 +9,22 @@ description: Use when a developer wants to run, list, register, or sign up their
 
 Walk a would-be provider from a fresh checkout to a **live, registered, payment-serving provider** on AgentRouter, verifying each step on-chain instead of trusting the logs. A provider is an HTTP server that sells LLM inference: it stakes 50 ℏ, registers an HCS-14 identity on the Hedera Consensus Service, and gets paid per request over x402. Settlement is **USDC** by default (`SETTLEMENT_ASSET=hbar` switches to native HBAR); the 50 ℏ quality bond is always HBAR either way.
 
+The inference itself comes from a pluggable backend — **0G Compute** (recommended), **Groq**, or a deterministic **canned** fallback. A provider *resells* that inference behind a staking + payment + registration layer; it does **not** run a model on the operator's own GPU. So "list your compute" means list a model/price/backend you can serve, on any box that can reach the backend — no local GPU required.
+
 **Do the setup WITH the user, one step at a time. After every step, run the verification and show the result before moving on.** Don't dump all the commands at once.
 
 **REQUIRED:** the marketplace side (an exchange, and at least one other provider serving the same model as a verification witness) must be reachable. Locally that's `pnpm exchange` + `pnpm demo`; in production it's the hosted exchange URL.
 
 This repo also ships an MCP server (`packages/provider-mcp`) whose tools automate the account, the stake, the HCS registration and the liveness check. **It does not replace `pnpm provider`** — the service stakes and registers itself on boot. The steps below are the same either way; the MCP just does some of them for you.
+
+## Demo first, then go live (Hedera testnet)
+
+Offer the user a demo before anything touches a chain or costs money. Two phases:
+
+- **Demo — no keys, no funding.** Set `MOCK_MODE=true` (fakes identity, stake, and payment entirely) *or* run `pnpm demo` with `PROVIDER_BACKEND=canned`. Either way the full **402 → paid → completion** loop runs locally with no Hedera account, no stake, and no backend key. This is the fastest way to see the whole thing work. Show them this first.
+- **Go live — Hedera testnet.** The switch is mostly one flag: `MOCK_MODE=false`. Then supply a funded **testnet** Hedera account (Step 2), a reachable public URL (Step 3), and a backend key for real inference — recommend **`PROVIDER_BACKEND=0g`** (0G Compute; key at [pc.0g.ai](https://pc.0g.ai) funded with 0G testnet tokens), with `groq` as the alternative. Boot then performs the real stake + registration.
+
+**This is Hedera *testnet*** — the stake is testnet HBAR, the registry is a testnet HCS topic, and every Hashscan link is `https://hashscan.io/testnet/...`. **There is no mainnet path in this repo; do not tell the user they can flip a switch to mainnet.** "Go live" here means live on testnet.
 
 ## The one rule that must never break
 
@@ -26,6 +37,16 @@ grep -q '^HEDERA_PROVIDER_KEY=.\+' .env && echo "key present" || echo "MISSING"
 **Never open `.env` whole** — no `cat`, no `Read`, no `grep` without `-q`. It holds the provider and operator keys, and pulling it into the transcript leaks them just as surely as printing one. Every check in this skill is a quiet `grep -q` for that reason; keep it that way when debugging.
 
 This covers tool output too. Summarize tool results; don't dump them blindly. `deploy_provider` deliberately returns `"<set-as-railway-secret>"` placeholders in its `railwayConfig` — **relay them as placeholders**, never helpfully substitute the real value when showing the config to the user.
+
+### When you need a key from the user
+
+Some steps need a key only the user has — `ZEROG_API_KEY` (Step 3), `GROQ_API_KEY` (Step 3), or the funded Hedera operator key (Step 2). You may ask for these, but tell the user **how** to provide them safely:
+
+- **They add it to `.env` themselves.** `.env` is gitignored (never committed), so the key stays local. Give them the exact line to add (`ZEROG_API_KEY=<your key>`), and let them paste it into the file — not into this chat.
+- **Never accept a key pasted into the conversation.** If they paste one, tell them to remove it, add it to `.env` instead, and rotate it if it's sensitive — the transcript is not a safe place for a secret.
+- **You only ever check presence**, with `grep -q` (above) — never read or echo the value.
+
+Most keys are written for the user automatically: `pnpm setup-hedera` and the MCP tools write `HEDERA_PROVIDER_*` straight into `.env`, so the user rarely hand-enters that one.
 
 ## Step 0 — which tools do you have?
 
@@ -40,7 +61,11 @@ Rules, no exceptions:
 - Never call an `mcp__agentrouter-provider__*` tool "to see if it works", and never describe a tool call you did not actually make.
 - If a call comes back "no such tool", stop guessing at names — fall back to the `pnpm` commands and tell the user the server is not connected.
 
-If the user wants the tools, read [references/mcp-setup.md](references/mcp-setup.md) and walk them through it.
+**If the tool is absent, offer to wire it up before you start Step 1** — don't wait to be asked. Put the choice to the user plainly:
+
+> I can run this setup two ways: with plain `pnpm` commands, or by wiring up the AgentRouter MCP server so I do the Hedera work (create the account, stake, register, check liveness) as tool calls for you. The MCP needs `pnpm install` and a **one-time approval in `/mcp`** — I can't approve it for myself. Want to set it up, or go with `pnpm`?
+
+If they want it, follow [references/mcp-setup.md](references/mcp-setup.md), then **re-run this Step 0 check** — the tools only count as connected once they appear in your tool list after the `/mcp` approval. If they'd rather not, the `pnpm` path below is complete on its own; don't push.
 
 ## Steps (verify each before continuing)
 
@@ -56,6 +81,8 @@ The provider account stakes, registers, and receives payment. Either:
 - Run `pnpm setup-hedera` (needs a funded testnet operator in `.env` from portal.hedera.com) — it writes `HEDERA_PROVIDER_ID`/`HEDERA_PROVIDER_KEY`, or
 - Paste an existing testnet account into those two vars.
 
+The operator key is a secret the user supplies — have them add it to `.env` themselves, never into the chat (see [When you need a key from the user](#when-you-need-a-key-from-the-user)).
+
 **With MCP:** `create_provider_account({ role: "PROVIDER" })` — creates, funds, and writes the same vars. It returns `alreadyExisted: true` if the account is already there, which is a pass, not a skip.
 
 **Verify (presence only):**
@@ -70,7 +97,7 @@ Set these in `.env` (the `custom` profile reads them — no code edits):
 - `PROVIDER_MODEL` — a model id you can actually serve on your backend. **You must serve what you advertise** (see Guardrails).
 - `PROVIDER_PRICE` — your price per request, denominated in the settlement asset (**USDC** by default; `SETTLEMENT_ASSET=hbar` switches the whole system to HBAR). The exchange routes the *cheapest* live provider for a model, so price to win the traffic you want.
 - `PROVIDER_PUBLIC_URL` — your step-1 URL.
-- `PROVIDER_BACKEND` — where inference actually comes from: `0g` (0G Compute, the **recommended default** for bring-your-own supply — get a key at [pc.0g.ai](https://pc.0g.ai) and fund it with 0G testnet tokens, then set `ZEROG_API_KEY`), `groq` (needs `GROQ_API_KEY` from [console.groq.com/keys](https://console.groq.com/keys)), or `canned`. Omit the backend's key and you fall back to deterministic **canned** answers — fine for testing, and still honest about the advertised model. If you set `PROVIDER_BACKEND=0g` but leave `PROVIDER_MODEL` unset, you serve the default 0G model (`0gm-1.0-35b-a3b`).
+- `PROVIDER_BACKEND` — where inference actually comes from: `0g` (0G Compute, the **recommended default** for real inference — get a key at [pc.0g.ai](https://pc.0g.ai) and fund it with 0G testnet tokens, then set `ZEROG_API_KEY`), `groq` (needs `GROQ_API_KEY` from [console.groq.com/keys](https://console.groq.com/keys)), or `canned`. Omit the backend's key and you fall back to deterministic **canned** answers — fine for the demo phase, and still honest about the advertised model. If you set `PROVIDER_BACKEND=0g` but leave `PROVIDER_MODEL` unset, you serve the default 0G model (`0gm-1.0-35b-a3b`). `ZEROG_API_KEY`/`GROQ_API_KEY` are secrets the user supplies — have them add the key to `.env` themselves, never into the chat (see [When you need a key from the user](#when-you-need-a-key-from-the-user)).
 
 **`PROVIDER_PUBLIC_URL` must be in `.env`** — not just exported in your shell, and not just known to the MCP server. `pnpm provider` reads `.env` at process start, in whatever shell you launch it from. If it's missing there, the service falls back to `http://localhost:4025` and the exchange can't reach you.
 
@@ -87,6 +114,8 @@ grep -qE '^PROVIDER_PUBLIC_URL=https?://(localhost|127\.0\.0\.1|\[::1\])([:/]|$)
 pnpm provider          # from the repo root; profile "custom" reads the vars above
 ```
 On boot it transfers `STAKE_HBAR` (50 ℏ — always HBAR, whatever the settlement asset) to the escrow account and publishes its registration to the HCS registry topic. **Booting the service is what performs the first stake and registration** — the MCP tools don't replace it. (On a remote box the same is true of `pnpm provider:prod`; see the remote-deploy section.)
+
+To rehearse this without spending anything, boot with `MOCK_MODE=true` first (see [Demo first, then go live](#demo-first-then-go-live-hedera-testnet)) — same flow, no real stake or payment — then flip to `MOCK_MODE=false` for the real testnet run below.
 
 **It binds the port first and registers in the background**, deliberately: a slow on-chain call before `listen` would leave the platform staring at a service that never answers. So `/healthz` starts returning `{"ok":true}` *before* the stake and registration have landed. Two consequences worth holding on to:
 
