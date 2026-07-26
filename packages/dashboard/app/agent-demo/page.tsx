@@ -181,23 +181,32 @@ export default function AgentDemoControlRoom() {
       .then((id: Identity) => { if (!cancelled) setIdentity(id); })
       .catch(() => {});
 
-    fetch(`${AGENT}/state`)
-      .then((r) => r.json())
-      .then((s: AgentState) => {
-        if (cancelled) return;
-        setRunning(s.running);
-        setGoal(s.goal);
-        setBalance(s.balance);
-        setBudget(s.budget ?? DEFAULT_BUDGET);
-        setEvents(s.events ?? []);
-      })
-      .catch(() => {});
+    // Pull the backend's authoritative run state. The SSE stream carries no
+    // backlog, so events delivered while the connection was down are gone from
+    // the live `events` array — and "ANSWERS BOUGHT" is derived from that array.
+    // Re-hydrating on every (re)connect resyncs the count (and budget/balance) to
+    // the server's `state.events`, which does retain every `bought`.
+    function hydrateState() {
+      fetch(`${AGENT}/state`)
+        .then((r) => r.json())
+        .then((s: AgentState) => {
+          if (cancelled) return;
+          setRunning(s.running);
+          setGoal(s.goal);
+          setBalance(s.balance);
+          setBudget(s.budget ?? DEFAULT_BUDGET);
+          setEvents(s.events ?? []);
+        })
+        .catch(() => {});
+    }
+
+    hydrateState();
 
     function connect() {
       if (cancelled) return;
       const es = new EventSource(`${AGENT}/events`);
       esRef.current = es;
-      es.onopen = () => { if (!cancelled) setConn("live"); };
+      es.onopen = () => { if (!cancelled) { setConn("live"); hydrateState(); } };
       es.onmessage = (msg) => {
         let ev: AgentEvent;
         try { ev = JSON.parse(msg.data); } catch { return; }
