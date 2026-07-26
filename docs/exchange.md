@@ -138,7 +138,7 @@ The exchange is the market maker between the two sides — an Express service
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/v1/chat/completions` | **The product.** OpenAI-shaped request in; routed, paid, answered. Response adds `agentrouter: { provider, providerWallet, agentId, pricePaidHbar, latencyMs, paymentRef }` — `paymentRef` is a real Hedera tx id |
+| POST | `/v1/chat/completions` | **The product.** OpenAI-shaped request in; routed, paid, answered. Response adds `agentrouter: { provider, providerWallet, agentId, quoteId, priceHbar, feeHbar, totalHbar, latencyMs, paymentRef }` — `paymentRef` is a real Hedera tx id |
 | GET | `/providers` | Routing table: displayName, model, priceHbar, stakeHbar, reputation, status `live/down/slashed`, HCS-14 agentId, wallet |
 | GET | `/log?limit=N` | Recent request log with prompt/answer previews + payment refs |
 | GET | `/price-index` | Price points per settled request (the dashboard's chart series) |

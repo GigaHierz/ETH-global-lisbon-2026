@@ -107,12 +107,15 @@ async function main() {
         body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       });
       const raw = await res.text();
-      let routed: { provider: string; pricePaidHbar: number } | undefined;
+      // The exchange returns priceHbar/feeHbar/totalHbar; pricePaidHbar is the legacy
+      // flat-ask name kept as a fallback (same as packages/agent/src/buy.ts).
+      type Routed = { provider: string; priceHbar?: number; pricePaidHbar?: number };
+      let routed: Routed | undefined;
       try {
-        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; pricePaidHbar: number } }).agentrouter;
+        routed = (JSON.parse(raw) as { agentrouter?: Routed }).agentrouter;
       } catch { /* non-JSON error body — reported below */ }
       if (res.ok && routed) {
-        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.pricePaidHbar} ℏ/req)`);
+        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.priceHbar ?? routed.pricePaidHbar} ℏ/req)`);
       } else {
         console.log(`  reroute check failed: exchange answered HTTP ${res.status} — ${raw.slice(0, 120)}`);
       }
