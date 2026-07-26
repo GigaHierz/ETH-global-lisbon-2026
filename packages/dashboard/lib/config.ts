@@ -10,7 +10,7 @@ export const EXCHANGE =
 export const AGENT =
   (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("api")) ||
   process.env.NEXT_PUBLIC_AGENT_URL ||
-  "https://agent-server-production-01c6.up.railway.app";
+  "https://agent-server-production-6029.up.railway.app";
 
 // Every price the exchange reports is denominated in its settlement asset: USDC by
 // default, HBAR behind SETTLEMENT_ASSET=hbar. See lib/settlement.ts for the live lookup.

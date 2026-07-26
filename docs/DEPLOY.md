@@ -20,11 +20,20 @@ service needs, and how to run — and re-arm — the demo on stage.
 | Service | URL |
 |---|---|
 | exchange | `https://exchange-production-275a.up.railway.app` |
-| agent-server | `https://agent-server-production-01c6.up.railway.app` |
+| agent-server | `https://agent-server-production-6029.up.railway.app` |
 | provider1 (Titan, honest 70B) | `https://provider1-production.up.railway.app` |
 | provider2 (Budget, honest 8B) | `https://provider2-production.up.railway.app` |
 | provider3 (SketchyGPU, **cheater**) | `https://provider3-production.up.railway.app` |
 | verifier | *(no public domain — outbound-only worker)* |
+
+> **If a service returns 502 with `x-railway-fallback: true` while Railway shows it
+> online, check the domain's target port before anything else.** A Railway domain
+> remembers the port it was created against; changing the service's `PORT` variable
+> afterwards does not re-point it, so the edge knocks on a port nothing is listening
+> on. The container is healthy, the logs are clean, and the only symptom is a generic
+> 502 — plus CORS errors in the browser, because Railway's fallback page carries no
+> `Access-Control-Allow-Origin`. Fix by updating the domain's port or deleting and
+> recreating the domain.
 
 > The verifier binds no HTTP port. If you give it a Railway domain it answers **502
 > forever** — that is the service working as designed, not a failure. Check it through
@@ -80,7 +89,7 @@ Gotchas:
 ## Pre-flight checks (run before the demo)
 ```bash
 EX=https://exchange-production-275a.up.railway.app
-AG=https://agent-server-production-01c6.up.railway.app
+AG=https://agent-server-production-6029.up.railway.app
 
 curl -s $EX/healthz                       # {"ok":true,"mock":false}
 curl -s $AG/healthz                       # agentId: uaid:aid:hedera:testnet:0.0.9755656
