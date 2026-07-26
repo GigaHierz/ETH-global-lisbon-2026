@@ -112,6 +112,8 @@ export type ExchangeEvent =
   | { type: "request"; entry: RequestLogEntry }
   | { type: "providers"; providers: ProviderRow[] }
   | { type: "slashed"; provider: string; amountHbar: number; reason: string }
+  // Demo control: a slashed provider was restored to live (clears the SLASHED banner).
+  | { type: "reset"; provider: string }
   | ({ type: "verify" } & VerifyEntry)
   | { type: "stats"; stats: ExchangeStats }
   | {

@@ -35,9 +35,10 @@ service needs, and how to run — and re-arm — the demo on stage.
 > `Access-Control-Allow-Origin`. Fix by updating the domain's port or deleting and
 > recreating the domain.
 
-> The verifier binds no HTTP port. If you give it a Railway domain it answers **502
-> forever** — that is the service working as designed, not a failure. Check it through
-> its logs, or by its effect on the exchange (a provider flipping to `slashed`).
+> The verifier is an outbound worker but **does** bind a small HTTP control server
+> (`GET /healthz`, `POST /demo/real-slash`) on the injected `PORT`. Give it a Railway
+> domain **only if** you want the dashboard's "Real slash" button to reach it; the audit
+> loop itself needs no domain. Guard the endpoint with `DEMO_TOKEN` before exposing it.
 
 ## Hedera accounts & HCS topics
 | Role | Account | | Topic | Id |
@@ -62,13 +63,13 @@ variables were renamed, and a stale one falls back to an identical default rathe
 
 | Service | Start Command | Domain | Variables (in addition to shared) |
 |---|---|---|---|
-| **exchange** | `pnpm exchange:prod` | ✅ | `HEDERA_EXCHANGE_ID=0.0.9755659`, `HEDERA_EXCHANGE_KEY`, `EXCHANGE_ASK=0.12` |
+| **exchange** | `pnpm exchange:prod` | ✅ | `HEDERA_EXCHANGE_ID=0.0.9755659`, `HEDERA_EXCHANGE_KEY`, `EXCHANGE_ASK=0.12`, `DEMO_TOKEN=<shared demo secret>` (guards `/demo/slash` + `/demo/reset`) |
 | **agent-server** | `pnpm agent-server:prod` | ✅ | `HEDERA_AGENT_ID=0.0.9755656`, `HEDERA_AGENT_KEY`, `GROQ_API_KEY`, `EXCHANGE_URL=<exchange url>`, `AGENT_BUDGET=2` |
 | **provider1** (honest 70B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider1`, `PROVIDER_PUBLIC_URL=<provider1 url>`, `HEDERA_PROVIDER1_ID=0.0.9755663`, `HEDERA_PROVIDER1_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
 | **provider2** (honest 8B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider2`, `PROVIDER_PUBLIC_URL=<provider2 url>`, `HEDERA_PROVIDER2_ID=0.0.9755664`, `HEDERA_PROVIDER2_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
 | **provider3** (**CHEATER**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider3`, `CHEAT_MODE=true`, `PROVIDER_PUBLIC_URL=<provider3 url>`, `HEDERA_PROVIDER3_ID=0.0.9755665`, `HEDERA_PROVIDER3_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY` |
 | **provider4** (NimbusAI, **0G Compute**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider4`, `PROVIDER_PUBLIC_URL=<provider4 url>`, `HEDERA_PROVIDER4_ID`, `HEDERA_PROVIDER4_KEY` (both from `pnpm setup-hedera`), `HEDERA_ESCROW_ID=0.0.9755672`, `ZEROG_API_KEY`, `ZEROG_TRUST_MODE=verified` — serves real TEE-attested 0G inference of `0gm-1.0-35b-a3b`; backend is pinned to `0g`, so no `GROQ_API_KEY` needed (canned fallback if `ZEROG_API_KEY` is absent). Unique model on the exchange, so it doesn't touch the p1/p3 slash arc. |
-| **verifier** | `pnpm verifier:prod` | ❌ | `HEDERA_VERIFIER_ID=0.0.9755668`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700474`, `EXCHANGE_URL=<exchange url>` — **needs a USDC balance**, it pays for its own audit replays |
+| **verifier** | `pnpm verifier:prod` | ⚠️ optional (needed only for the "Real slash" button) | `HEDERA_VERIFIER_ID=0.0.9755668`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700474`, `EXCHANGE_URL=<exchange url>`, `DEMO_TOKEN=<same shared demo secret>` — **needs a USDC balance**, it pays for its own audit replays |
 
 Gotchas:
 - Every account must be **associated with USDC** before it can send or receive it, and the
@@ -117,8 +118,30 @@ box stake itself on first boot.
 - Root Directory `packages/dashboard`, Production Branch `main`. Auto-deploys on push to `main`.
 - No env vars required — the dashboard defaults to the Railway URLs (overridable by
   `NEXT_PUBLIC_AGENT_URL` / `NEXT_PUBLIC_EXCHANGE_URL`, or the `?api=<url>` query param).
+- **For the demo slash buttons** (see below), add `NEXT_PUBLIC_VERIFIER_URL=<verifier domain>`
+  and `NEXT_PUBLIC_DEMO_TOKEN=<same shared demo secret>`. Both are also overridable per-tab with
+  `?vapi=<url>` and `?demoToken=<token>`. Note `NEXT_PUBLIC_DEMO_TOKEN` ships to the browser — it
+  deters casual abuse at the venue, it is not a real secret.
 - Use the **canonical** domain (`…dashboard.vercel.app`) for the demo — the `…-git-<branch>-…` preview
   aliases have Deployment Protection (they redirect to a Vercel login).
+
+## One-click slash demo (the `…/exchange` "Demo controls" card)
+For a repeatable booth demo that never depends on the verifier's random ~6–24s timer:
+
+- **⚡ Run slash demo** → `POST {exchange}/demo/reset` then `POST {exchange}/demo/slash`. Restores the
+  cheater to a clean baseline, then stages the **exact** SSE sequence a real audit emits (divergent
+  verdict → SLASHED banner → stake −25 ℏ → bond WIPED). Instant, in-memory, infinitely repeatable,
+  **no chain writes**. Press it as many times as you like.
+- **↺ Reset** → `POST {exchange}/demo/reset`. Restores SketchyGPU to live / 100 % / 50 ℏ / bond active
+  and clears the banner (via a `reset` SSE event).
+- **⛓ Real slash** → `POST {verifier}/demo/real-slash`. Runs the genuine on-chain enforcement (seize
+  25 ℏ escrow→treasury, 2-of-2 multi-sig HTS bond wipe + freeze, HCS + 0G fraud verdict) and returns
+  live Hashscan tx links. Use this when a judge wants a real transaction. A *fresh* real slash after
+  one still needs the redeploy/re-provision below (the bond is already wiped on-chain).
+
+All three are guarded by `DEMO_TOKEN` (sent as the `x-demo-token` header). Target the cheater by
+display name `SketchyGPU Labs`, overridable with `DEMO_CHEATER_WALLET`. Staged delay is tunable with
+`DEMO_SLASH_DELAY_MS` (default 1200 ms).
 
 ## Pre-flight checks (run before the demo)
 ```bash
@@ -129,8 +152,9 @@ curl -s $EX/healthz                       # {"ok":true,"mock":false}
 curl -s $AG/healthz                       # agentId: uaid:aid:hedera:testnet:0.0.9755656
 curl -s $EX/providers | python3 -m json.tool | grep -E 'displayName|status'   # who is live
 ```
-The verifier has no HTTP endpoint (worker) — check it via its Railway logs, or by its effect on the
-verdicts topic.
+The verifier's audit loop is a worker — check it via its Railway logs, or by its effect on the
+verdicts topic. Its `POST /demo/real-slash` control endpoint (if you gave it a domain) has a
+`GET /healthz` you can curl.
 
 ## Demo runbook (on stage)
 1. **Open** `…/agent-demo`. Show the agent's HCS-14 identity (`uaid:aid:hedera:testnet:0.0.9755656`).
@@ -144,6 +168,10 @@ verdicts topic.
 5. **Prove it on-chain:** open the verdict/slash tx and the verdicts topic on Hashscan.
 
 ## Re-arming the cheater (to show the slash LIVE)
+> **For a repeatable booth demo, prefer the "Demo controls" card above** — the staged **⚡ Run slash
+> demo** button resets and re-slashes on every press with no redeploy. The steps below are only for
+> reproducing a *fresh genuine on-chain* slash (e.g. after using **⛓ Real slash**).
+
 Once SketchyGPU is slashed it stays out of routing, and both the exchange and verifier remember it.
 To make the slash happen **live** again:
 

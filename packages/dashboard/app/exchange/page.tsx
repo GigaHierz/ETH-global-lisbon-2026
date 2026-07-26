@@ -10,7 +10,7 @@ import Card from "@/components/Card";
 import NavStats from "@/components/NavStats";
 import StatusPill from "@/components/StatusPill";
 import Footer from "@/components/Footer";
-import { EXCHANGE } from "@/lib/config";
+import { EXCHANGE, VERIFIER, DEMO_TOKEN } from "@/lib/config";
 import { useAssetSymbol } from "@/lib/settlement";
 import { amount, money, sumOf } from "@/lib/format";
 import { CHART, SERIES_HEX } from "@/lib/chart";
@@ -61,6 +61,78 @@ export default function ExchangeControlRoom() {
   const slashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sym = useAssetSymbol();
 
+  // ---- demo controls: one-click staged slash + reset, and an on-demand real slash ----
+  type DemoBusy = null | "slash" | "reset" | "real";
+  const [demoBusy, setDemoBusy] = useState<DemoBusy>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const [realSlash, setRealSlash] = useState<{
+    provider: string;
+    hashscan: { slash: string | null; wipe: string | null; freeze: string | null };
+  } | null>(null);
+
+  const demoHeaders: Record<string, string> = {
+    "content-type": "application/json",
+    ...(DEMO_TOKEN ? { "x-demo-token": DEMO_TOKEN } : {}),
+  };
+
+  async function demoPost(base: string, path: string): Promise<Record<string, unknown>> {
+    const res = await fetch(`${base}${path}`, { method: "POST", headers: demoHeaders, body: "{}" });
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) throw new Error((body.error as string) || `HTTP ${res.status}`);
+    return body;
+  }
+
+  // Primary booth button: reset then slash, so every press replays the full
+  // live → slashed transition even if the cheater is already slashed on screen.
+  async function runSlashDemo() {
+    if (demoBusy) return;
+    setDemoBusy("slash");
+    setDemoError(null);
+    setRealSlash(null);
+    try {
+      await demoPost(EXCHANGE, "/demo/reset");
+      await demoPost(EXCHANGE, "/demo/slash"); // SSE drives banner/table/bond/verdict
+    } catch (e) {
+      setDemoError((e as Error).message);
+    } finally {
+      setDemoBusy(null);
+    }
+  }
+
+  async function resetDemo() {
+    if (demoBusy) return;
+    setDemoBusy("reset");
+    setDemoError(null);
+    setRealSlash(null);
+    try {
+      await demoPost(EXCHANGE, "/demo/reset");
+    } catch (e) {
+      setDemoError((e as Error).message);
+    } finally {
+      setDemoBusy(null);
+    }
+  }
+
+  // Secondary: a genuine on-chain slash via the verifier — real Hedera tx links.
+  async function runRealSlash() {
+    if (demoBusy) return;
+    setDemoBusy("real");
+    setDemoError(null);
+    try {
+      const body = await demoPost(VERIFIER, "/demo/real-slash");
+      setRealSlash({
+        provider: String(body.provider ?? "provider"),
+        hashscan: (body.hashscan as { slash: string | null; wipe: string | null; freeze: string | null }) ?? {
+          slash: null, wipe: null, freeze: null,
+        },
+      });
+    } catch (e) {
+      setDemoError((e as Error).message);
+    } finally {
+      setDemoBusy(null);
+    }
+  }
+
   useEffect(() => {
     fetch(`${EXCHANGE}/providers`).then((r) => r.json()).then(setProviders).catch(() => {});
     fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()).then((l) => setFeed(l.reverse())).catch(() => {});
@@ -101,6 +173,12 @@ export default function ExchangeControlRoom() {
         setSlash({ provider: ev.provider, amountHbar: ev.amountHbar, reason: ev.reason });
         if (slashTimer.current) clearTimeout(slashTimer.current);
         slashTimer.current = setTimeout(() => setSlash(null), 30000);
+      }
+      if (ev.type === "reset") {
+        // The cheater was restored to live — clear the banner immediately so the next
+        // demo run starts from a clean slate rather than waiting out the 30s auto-clear.
+        if (slashTimer.current) clearTimeout(slashTimer.current);
+        setSlash(null);
       }
       if (ev.type === "verify") setVerifies((v) => [ev, ...v].slice(0, 10));
       if (ev.type === "stats") setStats(ev.stats);
@@ -218,6 +296,63 @@ export default function ExchangeControlRoom() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* ── Sidebar ── */}
           <div className="lg:col-span-3 space-y-6">
+            {/* Demo controls — one-click slash story + a real on-chain slash */}
+            <Card className="p-5 relative overflow-hidden border-accent-orange/40">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Icon name="bolt" className="text-8xl" />
+              </div>
+              <div className="relative z-10 space-y-3">
+                <span className="font-data text-[11px] tracking-[0.1em] text-accent-orange block">DEMO CONTROLS</span>
+                <button
+                  onClick={runSlashDemo}
+                  disabled={demoBusy !== null}
+                  className="w-full bg-hud-error text-white px-3 py-2.5 font-data text-[11px] tracking-[0.1em] uppercase font-bold disabled:opacity-40 hover:brightness-110 transition-all active:scale-95"
+                >
+                  {demoBusy === "slash" ? "slashing…" : "⚡ Run slash demo"}
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={resetDemo}
+                    disabled={demoBusy !== null}
+                    className="flex-1 border border-outline-variant text-on-surface-variant px-3 py-1.5 font-data text-[10px] tracking-[0.1em] uppercase disabled:opacity-40 hover:border-accent-cyan hover:text-on-surface transition-colors"
+                  >
+                    {demoBusy === "reset" ? "resetting…" : "↺ Reset"}
+                  </button>
+                  <button
+                    onClick={runRealSlash}
+                    disabled={demoBusy !== null}
+                    title="Trigger a genuine on-chain slash via the verifier (real Hedera tx)"
+                    className="flex-1 border border-accent-orange/60 text-accent-orange px-3 py-1.5 font-data text-[10px] tracking-[0.1em] uppercase disabled:opacity-40 hover:bg-accent-orange/10 transition-colors"
+                  >
+                    {demoBusy === "real" ? "on-chain…" : "⛓ Real slash"}
+                  </button>
+                </div>
+                <p className="font-body text-[10px] text-on-surface-variant leading-tight">
+                  Staged slash is instant &amp; repeatable. Real slash seizes stake and wipes the HTS bond on Hedera.
+                </p>
+                {demoError && <p className="font-data text-[10px] text-hud-error">⚠ {demoError}</p>}
+                {realSlash && (
+                  <div className="pt-2 border-t border-outline-variant space-y-1">
+                    <span className="font-data text-[10px] text-accent-cyan block">✓ REAL SLASH — {realSlash.provider}</span>
+                    {([
+                      ["stake seized", realSlash.hashscan.slash],
+                      ["bond wiped", realSlash.hashscan.wipe],
+                      ["bond frozen", realSlash.hashscan.freeze],
+                    ] as const).map(([label, href]) =>
+                      href ? (
+                        <a key={label} href={href} target="_blank" rel="noreferrer"
+                          className="font-data text-[10px] text-primary-fixed-dim hover:text-accent-cyan block">
+                          {label} <Icon name="open_in_new" className="text-[10px]" />
+                        </a>
+                      ) : (
+                        <span key={label} className="font-data text-[10px] text-on-surface-variant/60 block">{label}: no tx (mock/off-chain)</span>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+            </Card>
+
             {/* Session card */}
             <Card className="p-5 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">

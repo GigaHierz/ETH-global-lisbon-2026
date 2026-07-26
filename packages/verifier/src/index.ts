@@ -28,6 +28,7 @@ import {
   type RequestLogEntry,
   type ChatCompletionResponse,
 } from "@agentrouter/shared";
+import { createServer, type IncomingMessage } from "node:http";
 import { selectAuditCandidate } from "./audit-selection.js";
 import { DEFAULT_SIMILARITY_THRESHOLD } from "./similarity.js";
 import { classifyReplayOutcomes, shouldEnforceSlash, type ReplayOutcome } from "./verification.js";
@@ -191,13 +192,15 @@ async function postBondEvent(body: Record<string, unknown>) {
 // single party can do it alone. In real mode both signatures run here for the
 // end-to-end demo; in production the auditor is an independent signer. All chain
 // calls are no-ops in mock mode.
-async function enforceBond(wallet: string, displayName: string) {
+type BondEnforcement = { wipeTx: string | null; freezeTx: string | null; bondStatus: "active" | "frozen" | "wiped" };
+
+async function enforceBond(wallet: string, displayName: string): Promise<BondEnforcement> {
   const onChain = !MOCK_MODE && !!bondTokenId();
   // Only surface bond enforcement when it's real (on-chain) or in the mock demo.
   // In real mode without a configured bond token (`pnpm setup-hts` not run), the
   // feature is simply off — never post a wiped event for a bond that doesn't
   // exist on-chain.
-  if (!MOCK_MODE && !onChain) return;
+  if (!MOCK_MODE && !onChain) return { wipeTx: null, freezeTx: null, bondStatus: "active" };
 
   let wipeTx: string | null = null;
   let freezeTx: string | null = null;
@@ -226,6 +229,49 @@ async function enforceBond(wallet: string, displayName: string) {
     bondTokens: wipeTx ? 0 : BOND_AMOUNT,
     wipeTx,
   });
+  return { wipeTx, freezeTx, bondStatus };
+}
+
+// The enforcement half of a fraud finding: on-chain HBAR slash, HCS + 0G fraud
+// verdict, exchange de-listing, and the HTS bond wipe. Extracted so the audit loop
+// and the /demo/real-slash control endpoint drive the identical on-chain sequence.
+async function enforceRealSlash(
+  target: ProviderRow,
+  witnessName: string,
+  similarity: number,
+  opts: { tradeId?: string; servedBy?: string } = {},
+): Promise<{ slashTx: string | null } & BondEnforcement> {
+  const sim = similarity;
+  const tx = await slashOnChain(target.wallet);
+  await publishVerdict({
+    type: "verdict", verdict: "fraud", provider: target.displayName, account: target.wallet,
+    agentId: target.agentId, witness: witnessName, model: target.model,
+    similarity: Number(sim.toFixed(3)), threshold: THRESHOLD,
+    slashHbar: SLASH_HBAR, slashTx: tx,
+    hcs14: { feedback: { value: -100, tag1: "model-fraud", tag2: "agentrouter" } },
+  });
+  // Mirror the fraud verdict onto 0G Chain (no-op without ZEROG_CHAIN_KEY + registry).
+  await recordVerdictOnZeroG({
+    tradeId: opts.tradeId ?? `manual-${target.wallet}`,
+    provider: target.displayName,
+    model: target.model,
+    servedBy: opts.servedBy ?? "",
+    teeAttested: false,
+    verdict: "fraud",
+  }).catch(() => {});
+  await fetch(`${EXCHANGE}/slash`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      wallet: target.wallet,
+      amountHbar: SLASH_HBAR,
+      reason: `advertised ${target.model}, answers diverge from witness (${(sim * 100).toFixed(0)}% similarity)${tx ? ` · tx ${tx.slice(0, 10)}…` : ""}`,
+    }),
+  });
+  log("verifier", `⚡ ${target.displayName} slashed and removed from routing`);
+  // Additive HTS enforcement: destroy the bond with a 2-of-2 multi-sig wipe.
+  const bond = await enforceBond(target.wallet, target.displayName);
+  return { slashTx: tx, ...bond };
 }
 
 async function auditOnce() {
@@ -347,37 +393,10 @@ async function auditOnce() {
     log("verifier", `   witness: "${b.slice(0, 100)}"`);
     log("verifier", `   SLASHING ${target.displayName} (${target.wallet})`);
 
-    const tx = await slashOnChain(target.wallet);
-    await publishVerdict({
-      type: "verdict", verdict: "fraud", provider: target.displayName, account: target.wallet,
-      agentId: target.agentId, witness: witness.displayName, model: target.model,
-      similarity: Number(sim.toFixed(3)), threshold: THRESHOLD,
-      slashHbar: SLASH_HBAR, slashTx: tx,
-      hcs14: { feedback: { value: -100, tag1: "model-fraud", tag2: "agentrouter" } },
-    });
-    // Mirror the fraud verdict onto 0G Chain (no-op without ZEROG_CHAIN_KEY +
-    // registry) so the on-chain verification trail lives on 0G, not just Hedera.
-    await recordVerdictOnZeroG({
+    await enforceRealSlash(target, witness.displayName, sim, {
       tradeId: candidate.id,
-      provider: target.displayName,
-      model: target.model,
-      servedBy: candidate.servedBy ?? "",
-      teeAttested: false,
-      verdict: "fraud",
-    }).catch(() => {});
-    await fetch(`${EXCHANGE}/slash`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        wallet: target.wallet,
-        amountHbar: SLASH_HBAR,
-        reason: `advertised ${target.model}, answers diverge from witness (${(sim * 100).toFixed(0)}% similarity)${tx ? ` · tx ${tx.slice(0, 10)}…` : ""}`,
-      }),
+      servedBy: candidate.servedBy ?? undefined,
     });
-    log("verifier", `⚡ ${target.displayName} slashed and removed from routing`);
-
-    // Additive HTS enforcement: destroy the bond with a 2-of-2 multi-sig wipe.
-    await enforceBond(target.wallet, target.displayName);
   } catch (err) {
     log("verifier", `audit error: ${(err as Error).message.slice(0, 150)}`);
   } finally {
@@ -400,3 +419,88 @@ function scheduleNextAudit() {
   }, delay);
 }
 void auditOnce().finally(scheduleNextAudit);
+
+// ---- demo control surface ----
+// The verifier is otherwise outbound-only. This adds one narrow, token-guarded HTTP
+// route so a dashboard button can trigger a *real* on-chain slash of the cheater on
+// demand — a genuine Hedera tx for judges — reusing the exact enforcement the audit
+// loop runs. Built on node:http to avoid pulling in a web framework for one route.
+const DEMO_TOKEN = process.env.DEMO_TOKEN;
+const DEMO_CHEATER_NAME = process.env.DEMO_CHEATER_NAME || "SketchyGPU Labs";
+const CONTROL_PORT = parseInt(process.env.PORT || process.env.VERIFIER_PORT || "4200", 10);
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST, GET, OPTIONS",
+  "access-control-allow-headers": "content-type, x-demo-token",
+};
+
+function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (c) => {
+      data += c;
+      if (data.length > 1e6) req.destroy();
+    });
+    req.on("end", () => {
+      try {
+        resolve(data ? (JSON.parse(data) as Record<string, unknown>) : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+const hashscanLink = (tx: string | null) => (tx ? `https://hashscan.io/testnet/transaction/${tx}` : null);
+
+createServer(async (req, res) => {
+  const send = (code: number, body: unknown) => {
+    res.writeHead(code, { "content-type": "application/json", ...CORS });
+    res.end(JSON.stringify(body));
+  };
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, CORS);
+    return res.end();
+  }
+  if (req.method === "GET" && req.url === "/healthz") return send(200, { ok: true, role: "verifier" });
+
+  if (req.method === "POST" && req.url === "/demo/real-slash") {
+    if (DEMO_TOKEN && req.headers["x-demo-token"] !== DEMO_TOKEN) return send(401, { error: "invalid demo token" });
+    try {
+      const body = await readJson(req).catch(() => ({} as Record<string, unknown>));
+      const providers = (await fetch(`${EXCHANGE}/providers`).then((r) => r.json())) as ProviderRow[];
+      const wallet =
+        (typeof body.wallet === "string" && body.wallet) ||
+        process.env.DEMO_CHEATER_WALLET ||
+        providers.find((p) => p.displayName === DEMO_CHEATER_NAME)?.wallet;
+      const target = wallet ? providers.find((p) => p.wallet === wallet) : undefined;
+      if (!target) return send(404, { error: "cheater provider not found in routing table" });
+      const witness = providers.find(
+        (p) => p.model === target.model && p.wallet !== target.wallet && p.status !== "slashed",
+      );
+      log("verifier", `🔴 DEMO real-slash requested for ${target.displayName} (${target.wallet})`);
+      slashedWallets.add(target.wallet);
+      const result = await enforceRealSlash(target, witness?.displayName ?? "witness", 0.11, {
+        tradeId: `manual-${target.wallet}`,
+      });
+      return send(200, {
+        ok: true,
+        provider: target.displayName,
+        wallet: target.wallet,
+        slashHbar: SLASH_HBAR,
+        bondStatus: result.bondStatus,
+        hashscan: {
+          slash: hashscanLink(result.slashTx),
+          wipe: hashscanLink(result.wipeTx),
+          freeze: hashscanLink(result.freezeTx),
+        },
+      });
+    } catch (err) {
+      log("verifier", `real-slash endpoint error: ${(err as Error).message.slice(0, 150)}`);
+      return send(500, { error: (err as Error).message });
+    }
+  }
+
+  send(404, { error: "not found" });
+}).listen(CONTROL_PORT, () => log("verifier", `demo control on :${CONTROL_PORT} — POST /demo/real-slash (guarded=${!!DEMO_TOKEN})`));

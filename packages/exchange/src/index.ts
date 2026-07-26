@@ -42,6 +42,7 @@ import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
 import { hydrateFromTrades } from "./hydrate.js";
 import { initPayer, paidPost } from "./payer.js";
 import { applySlash } from "./slash.js";
+import { applyReset, resolveCheaterWallet, demoTokenOk } from "./demo.js";
 import { applyBondEvent } from "./bond.js";
 import { quoteFor, pinnedQuote, quoteById, consumeQuote, type Quote } from "./quotes.js";
 import { sendRefund, REFUND_ON_FAILURE } from "./refund.js";
@@ -127,6 +128,74 @@ app.post("/slash", (req, res) => {
   broadcast({ type: "slashed", provider: row.displayName, amountHbar, reason });
   broadcast({ type: "providers", providers: providerList() });
   res.json({ ok: true });
+});
+
+// ---- demo controls: one-click staged slash + reset, guarded by DEMO_TOKEN ----
+// These drive the dashboard's slash story on demand without touching the chain: the
+// staged slash reproduces the exact SSE sequence the verifier's real audit emits
+// (verify → slashed → bond wiped), and reset restores the cheater so the show can
+// run again. The real on-chain slash lives in the verifier's /demo/real-slash.
+const DEMO_SLASH_HBAR = 25;
+const DEMO_SLASH_DELAY_MS = parseInt(process.env.DEMO_SLASH_DELAY_MS || "1200", 10);
+const DEMO_SIMILARITY = 0.11; // matches the real 8b-vs-70b divergence seen in the live demo
+
+// POST /demo/slash — reset the cheater to a clean baseline, then stage the full slash.
+app.post("/demo/slash", async (req, res) => {
+  if (!demoTokenOk(req.header("x-demo-token"))) return res.status(401).json({ error: "invalid demo token" });
+  const wallet = resolveCheaterWallet(providerList(), (req.body ?? {}).wallet);
+  if (!wallet) return res.status(404).json({ error: "cheater provider not found in routing table" });
+
+  // 1. clean baseline so every press shows the same live → slashed transition
+  const reset = applyReset(providerList(), { wallet });
+  if (!reset.ok) return res.status(reset.status).json({ error: reset.error });
+  providers.set(reset.row.url, reset.row);
+  broadcast({ type: "providers", providers: providerList() });
+
+  // 2. the audit beat, then the slash — a short delay so the audience sees the flip
+  await new Promise((r) => setTimeout(r, DEMO_SLASH_DELAY_MS));
+  const witness = providerList().find(
+    (p) => p.model === reset.row.model && p.wallet !== reset.row.wallet && p.status === "live",
+  );
+  pushVerify({
+    provider: reset.row.displayName,
+    witness: witness?.displayName ?? "witness",
+    similarity: DEMO_SIMILARITY,
+    verdict: "divergent",
+  });
+
+  const reason = `advertised ${reset.row.model}, answers diverge from witness (${Math.round(DEMO_SIMILARITY * 100)}% similarity)`;
+  const slash = applySlash(providerList(), { wallet, amountHbar: DEMO_SLASH_HBAR, reason });
+  if (!slash.ok) return res.status(slash.status).json({ error: slash.error });
+  slash.row.bondStatus = "wiped";
+  slash.row.bondTokens = 0;
+  providers.set(slash.row.url, slash.row);
+  log("exchange", `DEMO staged slash: ${slash.row.displayName} (-${DEMO_SLASH_HBAR} ℏ, bond wiped)`);
+  broadcast({ type: "slashed", provider: slash.row.displayName, amountHbar: DEMO_SLASH_HBAR, reason });
+  broadcast({
+    type: "bond", provider: slash.row.displayName, wallet: slash.row.wallet,
+    bondTokens: 0, bondStatus: "wiped", freezeTx: null, wipeTx: null,
+  });
+  broadcast({ type: "providers", providers: providerList() });
+  res.json({ ok: true, provider: slash.row.displayName, wallet, amountHbar: DEMO_SLASH_HBAR });
+});
+
+// POST /demo/reset — restore the cheater to live and clear the SLASHED banner.
+app.post("/demo/reset", (req, res) => {
+  if (!demoTokenOk(req.header("x-demo-token"))) return res.status(401).json({ error: "invalid demo token" });
+  const wallet = resolveCheaterWallet(providerList(), (req.body ?? {}).wallet);
+  if (!wallet) return res.status(404).json({ error: "cheater provider not found in routing table" });
+  const result = applyReset(providerList(), { wallet });
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  const { row } = result;
+  providers.set(row.url, row);
+  log("exchange", `DEMO reset: ${row.displayName} restored to live (${row.stakeHbar} ℏ, bond active)`);
+  broadcast({
+    type: "bond", provider: row.displayName, wallet: row.wallet,
+    bondTokens: row.bondTokens, bondStatus: "active", freezeTx: null, wipeTx: null,
+  });
+  broadcast({ type: "reset", provider: row.displayName });
+  broadcast({ type: "providers", providers: providerList() });
+  res.json({ ok: true, provider: row.displayName, wallet });
 });
 
 // Verifier reports each HTS ReputationBond transition (frozen → wiped) so the
