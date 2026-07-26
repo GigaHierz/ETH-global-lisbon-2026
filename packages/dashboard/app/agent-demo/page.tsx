@@ -65,6 +65,18 @@ type Conn = "connecting" | "live" | "offline";
 
 const DEFAULT_BUDGET: Budget = { cap: 0, spent: 0, remaining: 0 };
 
+// One-click demo: fire one question at each live provider, in this order, so the
+// SketchyGPU slash is the climax. Pinning `model` bypasses the agent's prompt
+// router (agent-server /run) — the exchange then routes to the cheapest live
+// provider for that model: 0G→NimbusAI, 70b→SketchyGPU (cheater), 8b→Budget.
+// The verifier reviews SketchyGPU against the honest 70b witness (Titan) and
+// slashes it live within ~15s. Edit the goals here to change what's asked on stage.
+const DEMO_QUESTIONS: Array<{ goal: string; model: string }> = [
+  { goal: "Give a concise overview of how proof-of-stake secures a blockchain.", model: "0gm-1.0-35b-a3b" },
+  { goal: "What is the capital of Portugal?", model: "llama-3.1-8b-instant" },
+  { goal: "Prove step by step that the square root of 2 is irrational, explaining each step.", model: "llama-3.3-70b-versatile" },
+];
+
 function fmtTime(ts: number): string {
   if (!ts) return "";
   try {
@@ -86,6 +98,11 @@ export default function AgentDemoControlRoom() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // One-click demo sequence: fires DEMO_QUESTIONS one after another (each /run is
+  // single-flight, so we wait for each to finish before the next). demoStep drives
+  // the "2/3" progress label.
+  const [demoRunning, setDemoRunning] = useState(false);
+  const [demoStep, setDemoStep] = useState(0);
   // "" = let the agent's router choose. Anything else pins the model, which is how
   // you demo a specific supply network (0G, say) instead of hoping the prompt
   // happens to land in that price tier.
@@ -271,6 +288,54 @@ export default function AgentDemoControlRoom() {
     }
   }
 
+  // Fire the DEMO_QUESTIONS in order, one provider each, with no typing. /run is
+  // single-flight (409 while a run is active), so between goals we poll /state until
+  // the agent is idle before firing the next. A ~90s cap per goal keeps a wedged run
+  // from hanging the whole sequence.
+  async function runDemoSequence() {
+    if (running || demoRunning || submitting) return;
+    setSubmitError(null);
+    setDemoRunning(true);
+    try {
+      for (let i = 0; i < DEMO_QUESTIONS.length; i++) {
+        const { goal: g, model } = DEMO_QUESTIONS[i];
+        setDemoStep(i + 1);
+        // reset the local view for the new run; SSE repopulates it
+        setEvents([]);
+        setGoal(g);
+        setRunning(true);
+        const res = await fetch(`${AGENT}/run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goal: g, model }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setSubmitError(body.error || `demo run ${i + 1} rejected (${res.status})`);
+          break;
+        }
+        // wait for this run to finish before firing the next (poll /state, ~90s cap)
+        const deadline = Date.now() + 90_000;
+        // give the server a beat to flip running→true before we start polling
+        await new Promise((r) => setTimeout(r, 1500));
+        while (Date.now() < deadline) {
+          try {
+            const s = (await (await fetch(`${AGENT}/state`)).json()) as AgentState;
+            if (!s.running) break;
+          } catch {
+            /* transient — keep polling */
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+    } catch {
+      setSubmitError("agent-server unreachable");
+    } finally {
+      setDemoRunning(false);
+      setDemoStep(0);
+    }
+  }
+
   const uaid = identity?.agentId || "uaid:aid:hedera:testnet:0.0.9746264";
   const idHashscan = identity?.hashscan;
 
@@ -434,14 +499,14 @@ export default function AgentDemoControlRoom() {
                 <input
                   value={goalInput}
                   onChange={(e) => setGoalInput(e.target.value)}
-                  disabled={running}
-                  placeholder={running ? "agent is working…" : "e.g. Compare the top 3 L1s by throughput and fees"}
+                  disabled={running || demoRunning}
+                  placeholder={demoRunning ? "running demo…" : running ? "agent is working…" : "e.g. Compare the top 3 L1s by throughput and fees"}
                   className="flex-1 bg-surface-obsidian border border-outline-variant px-3 py-2 font-data text-sm text-on-surface outline-none focus:border-accent-cyan disabled:opacity-50 transition-colors"
                 />
                 <select
                   value={modelPick}
                   onChange={(e) => setModelPick(e.target.value)}
-                  disabled={running}
+                  disabled={running || demoRunning}
                   title="Pin a model, or let the agent's router pick by prompt"
                   className="bg-surface-obsidian border border-outline-variant px-2 py-2 font-data text-[11px] text-on-surface-variant outline-none focus:border-accent-cyan disabled:opacity-50 transition-colors max-w-[190px]"
                 >
@@ -454,10 +519,19 @@ export default function AgentDemoControlRoom() {
                 </select>
                 <button
                   type="submit"
-                  disabled={running || submitting || !goalInput.trim()}
+                  disabled={running || demoRunning || submitting || !goalInput.trim()}
                   className="bg-accent-cyan text-on-primary px-6 py-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold disabled:opacity-40 hover:glow-cyan transition-all active:scale-95"
                 >
                   {running ? "Running…" : submitting ? "…" : "Run"}
+                </button>
+                <button
+                  type="button"
+                  onClick={runDemoSequence}
+                  disabled={running || demoRunning || submitting}
+                  title="Fire one question at each live provider (0G, cheater, honest) — no typing"
+                  className="bg-accent-orange text-on-primary px-6 py-2 font-data text-[11px] tracking-[0.1em] uppercase font-bold whitespace-nowrap disabled:opacity-40 hover:brightness-110 transition-all active:scale-95"
+                >
+                  {demoRunning ? `Demo ${demoStep}/${DEMO_QUESTIONS.length}…` : "▶ Run Demo (3 providers)"}
                 </button>
               </form>
               {submitError && <p className="px-4 pb-3 font-data text-xs text-hud-error">⚠ {submitError}</p>}
