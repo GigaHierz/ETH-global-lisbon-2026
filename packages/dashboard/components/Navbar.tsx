@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -28,8 +29,9 @@ export default function Navbar({ children }: { children?: ReactNode }) {
         <div className="flex items-center gap-8">
           <Link
             href="/"
-            className="font-display text-2xl font-bold text-accent-cyan tracking-tighter hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 font-display text-2xl font-bold text-accent-cyan tracking-tighter hover:opacity-80 transition-opacity"
           >
+            <Image src="/logo.png" alt="AgentRouter logo" width={32} height={32} priority className="rounded-md" />
             AgentRouter
           </Link>
           <nav className="hidden lg:flex items-center gap-6 font-data text-sm">

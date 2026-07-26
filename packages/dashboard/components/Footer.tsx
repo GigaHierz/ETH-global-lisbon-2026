@@ -39,7 +39,11 @@ export default function Footer() {
     <footer className="bg-surface-obsidian border-t border-outline-variant w-full py-12">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 px-6 max-w-[1440px] mx-auto">
         <div className="flex flex-col gap-4">
-          <span className="font-data text-primary-fixed-dim font-bold text-lg">AgentRouter</span>
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="AgentRouter logo" width={28} height={28} className="rounded-md" />
+            <span className="font-data text-primary-fixed-dim font-bold text-lg">AgentRouter</span>
+          </div>
           <p className="font-body text-sm text-on-surface-variant">The decentralized economy for AI intelligence.</p>
           <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-surface-container border border-outline-variant rounded-sm w-fit">
             <div className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
