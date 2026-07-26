@@ -73,10 +73,41 @@ pnpm provider1      # :4021  Titan Compute (honest 70b)
 pnpm provider2      # :4022  Budget Inference Co (honest 8b)
 pnpm provider3      # :4023  SketchyGPU Labs (cheater, CHEAT_MODE=true)
 pnpm provider4      # :4024  NimbusAI (honest 70b)
+pnpm provider       # :4025  your own compute (profile "custom", configured from .env)
 curl -s localhost:4024/info   # sanity: name, model, price, wallet
 ```
 
 Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) — same flow, same UI.
+
+## Listing your own compute
+
+`provider1`–`provider4` are the demo personalities. **`custom` is the bring-your-own profile**:
+`pnpm provider` reads `PROVIDER_NAME`, `PROVIDER_MODEL`, `PROVIDER_PRICE`, `PROVIDER_BACKEND`
+and `PROVIDER_PUBLIC_URL` from `.env` and needs no code edits. It sets `actualModel =
+advertisedModel`, so it is honest by construction — which is what keeps the verifier off you.
+
+Two aids, both optional:
+
+- **[`onboarding-a-provider`](../.claude/skills/onboarding-a-provider/SKILL.md)** — a guided
+  walkthrough that does the setup one step at a time and verifies each step on-chain (a Hashscan
+  link, the routing-table row, a real `402`) instead of trusting log lines.
+- **[`@agentrouter/provider-mcp`](../packages/provider-mcp/README.md)** — the Hedera work as
+  idempotent MCP tools: `create_provider_account`, `stake_collateral`, `register_provider`,
+  `deploy_provider`, `verify_provider_live`, and a `provision_provider` orchestrator. A project
+  `.mcp.json` ships at the repo root, so an MCP client only has to approve it once.
+
+The tools do **not** replace `pnpm provider` — the service stakes and registers itself on boot.
+They create the account beforehand and confirm you are discoverable afterwards. Two things are
+worth knowing before you start, because both fail quietly:
+
+- **`PROVIDER_PUBLIC_URL` must be in `.env`**, not merely exported in your shell. The service
+  re-reads `.env` on every boot; if it is missing, the service registers
+  `http://localhost:<port>` over whatever was there and the exchange — last-write-wins on the
+  registry topic — marks you `down`.
+- **The port opens before registration finishes.** The service binds first and registers in the
+  background, so a healthy `/healthz` is not evidence that you are registered. Wait for the
+  `registered on HCS registry topic` line; a failed registration leaves the service serving
+  rather than exiting.
 
 ## HTTP API
 
