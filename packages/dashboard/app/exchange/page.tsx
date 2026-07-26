@@ -35,10 +35,16 @@ interface TopicInfo { id: string | null; hashscan: string | null }
 interface VerifyEvent { provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
 interface ExchangeStats { totalVolume: number; requests: number; feeRevenue: number; refunds: number; refundFailures: number; feeBps: number; asset?: string }
 
-const hashscanTx = (ref: string) =>
-  ref.includes("@") ? `https://hashscan.io/testnet/transaction/${ref}` : null;
-const hashscanAccount = (id: string) =>
-  id.startsWith("0.0.") ? `https://hashscan.io/testnet/account/${id}` : null;
+// Same rule as lib/format: these take wire data, so they must tolerate a missing
+// or non-string value rather than throwing inside a .map and unmounting the route.
+const hashscanTx = (ref: unknown) =>
+  typeof ref === "string" && ref.includes("@")
+    ? `https://hashscan.io/testnet/transaction/${ref}`
+    : null;
+const hashscanAccount = (id: unknown) =>
+  typeof id === "string" && id.startsWith("0.0.")
+    ? `https://hashscan.io/testnet/account/${id}`
+    : null;
 
 export default function ExchangeControlRoom() {
   const [providers, setProviders] = useState<ProviderRow[]>([]);
@@ -88,7 +94,7 @@ export default function ExchangeControlRoom() {
       }
       if (ev.type === "bond") {
         setProviders((ps) => ps.map((p) =>
-          p.wallet.toLowerCase() === String(ev.wallet).toLowerCase()
+          String(p.wallet ?? "").toLowerCase() === String(ev.wallet ?? "").toLowerCase()
             ? { ...p, bondTokens: ev.bondTokens, bondStatus: ev.bondStatus }
             : p,
         ));
@@ -439,7 +445,7 @@ export default function ExchangeControlRoom() {
                       <tr key={r.id} className={`row-in hover:bg-surface-variant/50 ${r.status === "refunded" ? "bg-accent-orange/5" : ""}`}>
                         <td className="px-4 py-3 text-on-surface-variant">{new Date(r.ts).toLocaleTimeString()}</td>
                         <td className={`px-4 py-3 ${r.status === "error" ? "text-hud-error" : "text-primary-fixed-dim"}`}>{r.provider}</td>
-                        <td className="px-4 py-3 opacity-70">{r.model.replace("-versatile", "").replace("-instant", "")}</td>
+                        <td className="px-4 py-3 opacity-70">{String(r.model ?? "—").replace("-versatile", "").replace("-instant", "")}</td>
                         <td className="px-4 py-3 text-on-surface-variant max-w-[220px] truncate">{r.promptPreview}</td>
                         <td className="px-4 py-3 text-right">{amount(r.price, 3)}</td>
                         <td className="px-4 py-3 text-right text-accent-orange">{amount(r.fee, 3)}</td>
