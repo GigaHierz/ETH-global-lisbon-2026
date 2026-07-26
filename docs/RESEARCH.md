@@ -84,15 +84,38 @@ Spec: https://hol.org/docs/standards/hcs-14/
 4. MOCK_MODE=true is a first-class path: in-memory ledger/registry/stakes, no RPC, canned Groq responses if no key.
 
 
-## 0G Compute (verified 2026-07-26)
+## 0G stack (verified 2026-07-26)
 
-- **Compute Router** (recommended consumer path): `https://router-api.0g.ai/v1` —
-  OpenAI-compatible; `GET /v1/models` is public (23 models live incl. in-house
-  `0gm-1.0-35b-a3b`, deepseek-v4, qwen3.x, glm-5); completions require
-  `Authorization: Bearer <ZEROG_API_KEY>` from https://pc.0g.ai (funded with 0G
-  testnet tokens). Probed live: unauthenticated completion → `missing_authorization`.
-- **Direct SDK**: `@0gfoundation/0g-compute-ts-sdk` — wallet-signed per-provider
-  requests on the 0G chain, TEE-verified responses, fine-tuning. Future work: TEE
-  attestation could upgrade our optimistic verifier to hard proof for 0G-backed
-  providers.
-- Provider4 (NimbusAI) advertises `0gm-1.0-35b-a3b` (pinned from the live list).
+Full prize-track mapping in [0G_BOUNTIES.md](0G_BOUNTIES.md). Network: 0G Galileo testnet,
+chain **16602**, RPC `https://evmrpc-testnet.0g.ai`, explorer `https://chainscan-galileo.0g.ai`,
+faucet `https://faucet.0g.ai` (0.1 0G/wallet/day).
+
+### 0G Compute (inference)
+- **Compute Router** (default path): `https://router-api.0g.ai/v1` — OpenAI-compatible; `GET
+  /v1/models` is public (in-house `0gm-1.0-35b-a3b`, deepseek, qwen3.x, glm-5…); completions require
+  `Authorization: Bearer <ZEROG_API_KEY>` from https://pc.0g.ai. TEE via the
+  `X-0G-Provider-Trust-Mode: verified` header. Implemented: `packages/provider/src/backends/zerog.ts`
+  (`completeViaRouter`). Provider4 (NimbusAI) advertises `0gm-1.0-35b-a3b`.
+- **Broker SDK** (opt-in, real TEE verification): `@0gfoundation/0g-compute-ts-sdk` v0.9.0
+  (`@0glabs/0g-serving-broker` is the deprecated name) — `createZGComputeNetworkBroker(wallet)`,
+  `listService()` → filter `verifiability === "TeeML"`, `acknowledgeProviderSigner`,
+  `getRequestHeaders`, `processResponse` (verify TEE-signed response via the `ZG-Res-Key` chatID).
+  Contracts auto-detected from chain 16602. Implemented behind `ZEROG_BROKER_ENABLED=1`:
+  `packages/provider/src/backends/zerog.ts` (`completeViaBroker`); verifier hard-proof short-circuit
+  in `packages/verifier/src/index.ts`.
+
+### 0G Chain (verification + Agentic ID) — EVM, Solidity
+- `packages/onchain-0g` (Foundry): `VerdictRegistry.sol` (on-chain verdict log) + `AgentNFT.sol`
+  (ERC-7857-style Agentic ID). Deploy: `forge script script/Deploy.s.sol --rpc-url $ZEROG_CHAIN_RPC
+  --private-key $ZEROG_CHAIN_KEY --broadcast`. Writers via `viem`: `packages/shared/src/zerog.ts`
+  (`recordVerdictOnZeroG`, `mintAgenticId`, `updateAgenticIdMemory`).
+- Live **ERC-8004 IdentityRegistry** `0x8004A818BFB912233c491871b3d84c89A494BD9e` (name
+  `AgentIdentity`, unverified source — static-call `register` before broadcasting). Optional
+  discoverability path.
+
+### 0G Storage (encrypted memory)
+- `@0gfoundation/0g-storage-ts-sdk` v1.2.10 (has built-in AES-256; the older `@0glabs/0g-ts-sdk`
+  0.3.3 does not) — `new Indexer(url)`, `new MemData(buffer)`, `indexer.upload(file, rpc, signer,
+  { encryption: { type: "aes256", key } })` → `{ rootHash, txHash }`; `downloadToBlob(root, { proof,
+  decryption })`. Indexer `https://indexer-storage-testnet-turbo.0g.ai`. Implemented:
+  `packages/agent/src/memory-0g.ts`.

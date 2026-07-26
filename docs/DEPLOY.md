@@ -67,6 +67,7 @@ variables were renamed, and a stale one falls back to an identical default rathe
 | **provider1** (honest 70B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider1`, `PROVIDER_PUBLIC_URL=<provider1 url>`, `HEDERA_PROVIDER1_ID=0.0.9755663`, `HEDERA_PROVIDER1_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
 | **provider2** (honest 8B) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider2`, `PROVIDER_PUBLIC_URL=<provider2 url>`, `HEDERA_PROVIDER2_ID=0.0.9755664`, `HEDERA_PROVIDER2_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY`, `CHEAT_MODE=false` |
 | **provider3** (**CHEATER**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider3`, `CHEAT_MODE=true`, `PROVIDER_PUBLIC_URL=<provider3 url>`, `HEDERA_PROVIDER3_ID=0.0.9755665`, `HEDERA_PROVIDER3_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `GROQ_API_KEY` |
+| **provider4** (NimbusAI, **0G Compute**) | `pnpm provider:prod` | ✅ | `PROVIDER_PROFILE=provider4`, `PROVIDER_PUBLIC_URL=<provider4 url>`, `HEDERA_PROVIDER4_ID`, `HEDERA_PROVIDER4_KEY` (both from `pnpm setup-hedera`), `HEDERA_ESCROW_ID=0.0.9755672`, `ZEROG_API_KEY`, `ZEROG_TRUST_MODE=verified` — serves real TEE-attested 0G inference of `0gm-1.0-35b-a3b`; backend is pinned to `0g`, so no `GROQ_API_KEY` needed (canned fallback if `ZEROG_API_KEY` is absent). Unique model on the exchange, so it doesn't touch the p1/p3 slash arc. |
 | **verifier** | `pnpm verifier:prod` | ❌ | `HEDERA_VERIFIER_ID=0.0.9755668`, `HEDERA_VERIFIER_KEY`, `HEDERA_ESCROW_ID=0.0.9755672`, `HEDERA_ESCROW_KEY`, `HEDERA_OPERATOR_ID=0.0.9700474`, `EXCHANGE_URL=<exchange url>` — **needs a USDC balance**, it pays for its own audit replays |
 
 Gotchas:
@@ -78,6 +79,29 @@ Gotchas:
 - Match the account to the profile (`provider3` → `HEDERA_PROVIDER3_*`).
 - The Dockerfile's default CMD is `agent-server:prod`, so **every non-agent service must set its own
   Start Command** or it'll run the agent by mistake.
+
+### 0G integration variables (additive — optional per service)
+
+The Hedera vars above are unchanged. To make the **deployed** services use 0G live (not just local),
+add these to each service's Railway Variables. All are no-ops if absent, so you can roll them out one
+service at a time. Values come from your local `.env` (contract addresses are already deployed on
+Galileo, chain 16602). **Never commit them.**
+
+| Service | Add these variables | Effect |
+|---|---|---|
+| **a 0G provider** (`PROVIDER_PROFILE=provider4` or `custom` with `PROVIDER_BACKEND=0g`) | `ZEROG_API_KEY` (from pc.0g.ai), `ZEROG_TRUST_MODE=verified` | serves **real TEE-attested 0G Compute** inference (else canned fallback) |
+| **exchange** | `ZEROG_CHAIN_KEY`, `ZEROG_VERDICT_REGISTRY`, `ZEROG_CHAIN_RPC`, `ZEROG_CHAIN_ID=16602`, `ZEROG_EXPLORER` | mirrors each 0G-served trade's provenance to the on-chain `VerdictRegistry` |
+| **verifier** | `ZEROG_CHAIN_KEY`, `ZEROG_VERDICT_REGISTRY`, `ZEROG_CHAIN_RPC`, `ZEROG_CHAIN_ID=16602` | writes fraud/verified verdicts to `VerdictRegistry` on 0G Chain |
+| **agent-server** | `ZEROG_CHAIN_KEY`, `ZEROG_AGENT_NFT`, `ZEROG_MEMORY_SECRET`, `ZEROG_STORAGE_INDEXER`, `ZEROG_CHAIN_RPC`, `ZEROG_CHAIN_ID=16602`, `ZEROG_EXPLORER` | `POST /agentic-id/mint` mints the Agentic ID + uploads AES-256-encrypted memory to 0G Storage |
+| **dashboard (Vercel)** | *(none)* | reads the agent-server API; the Agentic-ID panel appears once the agent-server has the vars |
+
+The single `ZEROG_CHAIN_KEY` (a funded Galileo wallet, `https://faucet.0g.ai`) is reused for the
+compute broker, contract writes, the Agentic-ID mint, and 0G Storage. `ZEROG_MEMORY_SECRET` is a
+passphrase you choose (e.g. `openssl rand -hex 32`) — keep it constant, since changing it makes
+previously-uploaded memory undecryptable. Deployed addresses live in `deployments.json` (`zerogChain`).
+Deploy/redeploy the contracts with `forge script script/Deploy.s.sol` (see
+[`../packages/onchain-0g/README.md`](../packages/onchain-0g/README.md)). Full mapping:
+[0G_BOUNTIES.md](0G_BOUNTIES.md).
 
 Deploying a *new* provider rather than one of the demo four? Use `PROVIDER_PROFILE=custom` with
 `PROVIDER_NAME` / `PROVIDER_MODEL` / `PROVIDER_PRICE` — see
