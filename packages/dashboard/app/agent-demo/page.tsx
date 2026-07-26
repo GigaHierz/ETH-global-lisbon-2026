@@ -9,9 +9,11 @@ import StatusPill from "@/components/StatusPill";
 import Footer from "@/components/Footer";
 import TerminalDots from "@/components/TerminalDots";
 import { AGENT } from "@/lib/config";
+import { useAssetSymbol } from "@/lib/settlement";
+import { amount, money } from "@/lib/format";
 
 // ---- types mirrored from the agent-server contract (dashboard is standalone) ----
-interface Budget { capHbar: number; spentHbar: number; remainingHbar: number }
+interface Budget { cap: number; spent: number; remaining: number }
 interface Finding { q: string; a: string }
 interface Identity {
   agentId: string;
@@ -22,7 +24,7 @@ interface Identity {
 interface AgentState {
   running: boolean;
   goal: string | null;
-  balanceHbar: number;
+  balance: number;
   budget: Budget;
   findings: Finding[];
   events: AgentEvent[];
@@ -35,22 +37,22 @@ type AgentEvent =
       type: "bought";
       question: string;
       answer: string;
-      costHbar: number;
+      cost: number;
       provider: string;
       paymentRef: string;
-      remainingHbar: number;
+      remaining: number;
       hashscan: string;
     }
-  | { type: "budget-exhausted"; remainingHbar: number }
+  | { type: "budget-exhausted"; remaining: number }
   | { type: "synthesis"; answer: string }
-  | { type: "done"; spentHbar: number; findings: number }
-  | { type: "balance"; hbar: number }
+  | { type: "done"; spent: number; findings: number }
+  | { type: "balance"; amount: number; asset?: string }
   | { type: "identity"; agentId: string; hashscan: string }
   | { type: "error"; message: string };
 
 type Conn = "connecting" | "live" | "offline";
 
-const DEFAULT_BUDGET: Budget = { capHbar: 0, spentHbar: 0, remainingHbar: 0 };
+const DEFAULT_BUDGET: Budget = { cap: 0, spent: 0, remaining: 0 };
 
 export default function AgentDemoControlRoom() {
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -64,6 +66,8 @@ export default function AgentDemoControlRoom() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const sym = useAssetSymbol();
+
   const esRef = useRef<EventSource | null>(null);
   const streamEnd = useRef<HTMLDivElement | null>(null);
 
@@ -75,23 +79,23 @@ export default function AgentDemoControlRoom() {
         setRunning(true);
         break;
       case "bought":
-        setBudget((b) => ({ ...b, remainingHbar: ev.remainingHbar, spentHbar: Math.max(0, b.capHbar - ev.remainingHbar) }));
+        setBudget((b) => ({ ...b, remaining: ev.remaining, spent: Math.max(0, b.cap - ev.remaining) }));
         break;
       case "budget-exhausted":
-        setBudget((b) => ({ ...b, remainingHbar: ev.remainingHbar, spentHbar: b.capHbar }));
+        setBudget((b) => ({ ...b, remaining: ev.remaining, spent: b.cap }));
         break;
       case "done":
         setRunning(false);
-        setBudget((b) => ({ ...b, spentHbar: ev.spentHbar, remainingHbar: Math.max(0, b.capHbar - ev.spentHbar) }));
+        setBudget((b) => ({ ...b, spent: ev.spent, remaining: Math.max(0, b.cap - ev.spent) }));
         break;
       case "balance":
-        setBalance(ev.hbar);
+        setBalance(ev.amount);
         break;
       case "identity":
         setIdentity((id) =>
           id
             ? { ...id, agentId: ev.agentId, hashscan: ev.hashscan }
-            : { agentId: ev.agentId, account: ev.agentId.split(":").pop() || "", hashscan: ev.hashscan }
+            : { agentId: ev.agentId, account: (ev.agentId ?? "").split(":").pop() || "", hashscan: ev.hashscan }
         );
         break;
       default:
@@ -115,7 +119,7 @@ export default function AgentDemoControlRoom() {
         if (cancelled) return;
         setRunning(s.running);
         setGoal(s.goal);
-        setBalance(s.balanceHbar);
+        setBalance(s.balance);
         setBudget(s.budget ?? DEFAULT_BUDGET);
         setEvents(s.events ?? []);
       })
@@ -189,7 +193,7 @@ export default function AgentDemoControlRoom() {
   const uaid = identity?.agentId || "uaid:aid:hedera:testnet:0.0.9746264";
   const idHashscan = identity?.hashscan;
 
-  const pct = budget.capHbar > 0 ? Math.min(100, (budget.spentHbar / budget.capHbar) * 100) : 0;
+  const pct = budget.cap > 0 ? Math.min(100, (budget.spent / budget.cap) * 100) : 0;
   const barClass = pct >= 90 ? "bg-hud-error" : pct >= 65 ? "bg-accent-orange" : "bg-accent-cyan";
 
   const plan = events.find((e): e is Extract<AgentEvent, { type: "plan" }> => e.type === "plan");
@@ -207,8 +211,8 @@ export default function AgentDemoControlRoom() {
       <Navbar>
         <NavStats
           stats={[
-            ["BALANCE", balance == null ? "—" : `${balance.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
-            ["SPENT", `${budget.spentHbar.toFixed(2)} ℏ`, "text-accent-orange"],
+            ["BALANCE", money(sym, balance, 2), "text-primary-fixed-dim"],
+            ["SPENT", money(sym, budget.spent, 2), "text-accent-orange"],
             ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
           ]}
         />
@@ -243,7 +247,7 @@ export default function AgentDemoControlRoom() {
                   <span className="font-data text-xs text-primary-fixed-dim break-all">{uaid}</span>
                 )}
                 <p className="mt-3 font-body text-[11px] text-on-surface-variant leading-tight">
-                  Autonomous buyer: plans a goal into sub-questions, buys each answer from the exchange in HBAR via x402, then synthesizes.
+                  Autonomous buyer: plans a goal into sub-questions, buys each answer from the exchange in USDC via x402, then synthesizes.
                 </p>
               </div>
             </Card>
@@ -257,19 +261,19 @@ export default function AgentDemoControlRoom() {
                 <div>
                   <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant block">AGENT WALLET</span>
                   <span className="font-data text-3xl font-bold text-on-surface">
-                    {balance == null ? "—" : balance.toFixed(4)} <span className="text-primary-fixed-dim">ℏ</span>
+                    <span className="text-primary-fixed-dim">{sym}</span>{amount(balance, 4)}
                   </span>
                 </div>
                 <div>
                   <div className="flex justify-between font-data text-[10px] tracking-[0.1em] text-on-surface-variant mb-1.5">
                     <span>BUDGET</span>
-                    <span><span className="text-on-surface">{budget.spentHbar.toFixed(4)}</span> / {budget.capHbar.toFixed(4)} ℏ</span>
+                    <span><span className="text-on-surface">{money(sym, budget.spent, 4)}</span> / {money(sym, budget.cap, 4)}</span>
                   </div>
                   <div className="h-2 w-full bg-surface-obsidian border border-outline-variant overflow-hidden">
                     <div className={`h-full transition-all duration-500 ${barClass}`} style={{ width: `${pct}%` }} aria-hidden />
                   </div>
                   <p className="mt-1.5 font-data text-[10px] text-on-surface-variant">
-                    {budget.remainingHbar.toFixed(4)} ℏ REMAINING
+                    {money(sym, budget.remaining, 4)} REMAINING
                   </p>
                 </div>
                 {done && (
@@ -359,7 +363,7 @@ export default function AgentDemoControlRoom() {
                       <div className="shrink-0 font-data text-[11px] text-right">
                         <div>
                           <span className="text-accent-cyan">{b.provider}</span>
-                          <span className="text-on-surface-variant"> · {b.costHbar.toFixed(4)} ℏ</span>
+                          <span className="text-on-surface-variant"> · {money(sym, b.cost, 4)}</span>
                         </div>
                         {b.hashscan && (
                           <a href={b.hashscan} target="_blank" rel="noreferrer"
@@ -393,7 +397,7 @@ export default function AgentDemoControlRoom() {
                 {done && (
                   <div className="row-in flex flex-wrap gap-6 font-data text-xs border-t border-outline-variant pt-4 text-on-surface-variant">
                     <span className="text-accent-cyan">✓ DONE</span>
-                    <span>TOTAL SPENT <span className="text-on-surface">{done.spentHbar.toFixed(4)} ℏ</span></span>
+                    <span>TOTAL SPENT <span className="text-on-surface">{money(sym, done.spent, 4)}</span></span>
                     <span>FINDINGS <span className="text-on-surface">{done.findings}</span></span>
                   </div>
                 )}

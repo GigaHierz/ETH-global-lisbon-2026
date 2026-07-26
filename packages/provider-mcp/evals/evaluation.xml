@@ -27,7 +27,7 @@
     <answer>llama-3.3-70b-versatile</answer>
   </qa_pair>
   <qa_pair>
-    <question>Use verify_provider_live for the provider with wallet 0.0.9746381 (Titan Compute) on the exchange at http://localhost:4100. What is its price per request in HBAR?</question>
+    <question>Use verify_provider_live for the provider with wallet 0.0.9746381 (Titan Compute) on the exchange at http://localhost:4100. What is its price per request?</question>
     <answer>0.1</answer>
   </qa_pair>
   <qa_pair>

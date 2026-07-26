@@ -22,7 +22,7 @@ This is deliberate: it keeps the whole marketplace on **native Hedera** (HBAR tr
 ```
 providers ──stake 50 ℏ──▶ ESCROW account 0.0.9746274
 agent ──HCS-14 identity──▶ registry topic
-agent ──0.12 ℏ x402──▶ exchange ──0.10 ℏ x402──▶ cheapest provider ──▶ Groq inference
+agent ──$0.12 x402──▶ exchange ──$0.10 x402──▶ cheapest provider ──▶ Groq inference
 verifier catches fraud ──slash 25 ℏ──▶ treasury   +   verdict ──▶ verdicts topic
 ```
 

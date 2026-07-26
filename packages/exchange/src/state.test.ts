@@ -8,6 +8,8 @@ import {
   pushRequest,
   addSSEClient,
   broadcast,
+  revenue,
+  statsSnapshot,
 } from "./state.js";
 
 function entry(i: number): RequestLogEntry {
@@ -17,7 +19,9 @@ function entry(i: number): RequestLogEntry {
     model: "llama-3.3-70b-versatile",
     provider: "Titan Compute",
     providerUrl: "http://localhost:4021",
-    priceHbar: 0.1,
+    price: 0.1,
+    fee: 0.01,
+    total: 0.11,
     latencyMs: 5,
     paymentRef: `pay-${i}`,
     promptPreview: "q",
@@ -30,7 +34,7 @@ function row(url: string): ProviderRow {
   return {
     displayName: url,
     model: "llama-3.3-70b-versatile",
-    priceHbar: 0.1,
+    price: 0.1,
     wallet: `0.0.${url}`,
     agentId: null,
     url,
@@ -38,6 +42,8 @@ function row(url: string): ProviderRow {
     reputation: 100,
     stakeHbar: 50,
     requestsServed: 0,
+    bondTokens: 100,
+    bondStatus: "active",
   };
 }
 
@@ -99,5 +105,28 @@ describe("SSE fanout", () => {
     broadcast({ type: "slashed", provider: "Y", amountHbar: 1, reason: "r" });
     expect(bad).toHaveBeenCalledTimes(1);
     expect(good).toHaveLength(2);
+  });
+});
+
+describe("statsSnapshot", () => {
+  beforeEach(() => {
+    Object.assign(revenue, { volumeUnits: 0, feeUnits: 0, requests: 0, refunds: 0, refundFailures: 0 });
+  });
+
+  it("reports accrued revenue as decimals in the settlement asset", () => {
+    // Revenue accrues in integer base units so it can never drift by a rounding
+    // step; only this snapshot converts to a decimal for display.
+    Object.assign(revenue, { volumeUnits: 300_000, feeUnits: 30_000, requests: 3 });
+    const s = statsSnapshot();
+    expect(s.totalVolume).toBeCloseTo(0.3, 9); // 300_000 micro-USDC
+    expect(s.feeRevenue).toBeCloseTo(0.03, 9);
+    expect(s.requests).toBe(3);
+    expect(s.asset).toBe("USDC");
+    expect(s.feeBps).toBe(1000);
+  });
+
+  it("carries refund counters through untouched", () => {
+    Object.assign(revenue, { refunds: 2, refundFailures: 1 });
+    expect(statsSnapshot()).toMatchObject({ refunds: 2, refundFailures: 1 });
   });
 });

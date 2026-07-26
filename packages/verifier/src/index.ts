@@ -16,8 +16,11 @@ import {
   AUDIT_REQUEST_HEADER,
   DEFAULT_EXCHANGE_URL,
   HEDERA_NETWORK,
+  BOND_AMOUNT,
   hederaAccount,
   publishToTopic,
+  bondTokenId,
+  multiSigWipeBond,
   log,
   type ProviderRow,
   type RequestLogEntry,
@@ -37,14 +40,14 @@ const audited = new Set<string>(); // request ids already checked
 const slashedWallets = new Set<string>(); // payout accounts this verifier has slashed
 let auditInFlight = false; // one audit at a time: replays can outlast INTERVAL_MS
 
-let payFetch: (url: string, init: RequestInit, priceHbar: number) => Promise<Response>;
+let payFetch: (url: string, init: RequestInit, price: number) => Promise<Response>;
 
 async function initPayFetch() {
   if (MOCK_MODE) {
-    payFetch = (url, init, priceHbar) =>
+    payFetch = (url, init, price) =>
       fetch(url, {
         ...init,
-        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(priceHbar) },
+        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(price) },
       });
     return;
   }
@@ -66,7 +69,7 @@ async function ask(
   providerUrl: string,
   model: string,
   prompt: string,
-  priceHbar: number,
+  price: number,
 ): Promise<ReplayOutcome> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS);
@@ -85,7 +88,7 @@ async function ask(
           }),
           signal: controller.signal,
         },
-        priceHbar,
+        price,
       );
     } catch (err) {
       if (controller.signal.aborted) return { kind: "timeout" };
@@ -153,6 +156,41 @@ async function publishVerdict(v: Record<string, unknown>) {
   }
 }
 
+async function postBondEvent(body: Record<string, unknown>) {
+  try {
+    await fetch(`${EXCHANGE}/bond-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    log("verifier", `bond-event post failed: ${(err as Error).message.slice(0, 80)}`);
+  }
+}
+
+// HTS ReputationBond enforcement — additive compliance layer on top of the proven
+// native-HBAR slash. Destroy the fraudster's bond with a 2-of-2 multi-sig
+// TokenWipe: the token's wipeKey is a KeyList [verifier, auditor], so the wipe
+// carries two signatures (verifier + auditor) — reputation → 0 on-chain, no
+// single party can do it alone. In real mode both signatures run here for the
+// end-to-end demo; in production the auditor is an independent signer. All chain
+// calls are no-ops in mock mode.
+async function enforceBond(wallet: string, displayName: string) {
+  const onChain = !MOCK_MODE && !!bondTokenId();
+  // Only surface bond enforcement when it's real (on-chain) or in the mock demo.
+  // In real mode without a configured bond token (`pnpm setup-hts` not run), the
+  // feature is simply off — never post a wiped event for a bond that doesn't
+  // exist on-chain.
+  if (!MOCK_MODE && !onChain) return;
+
+  let wipeTx: string | null = null;
+  if (onChain) {
+    wipeTx = await multiSigWipeBond(wallet, BOND_AMOUNT);
+    if (wipeTx) log("verifier", `⚖️ 2-of-2 multi-sig bond wipe (${displayName}): https://hashscan.io/testnet/transaction/${wipeTx}`);
+  }
+  await postBondEvent({ wallet, bondStatus: "wiped", bondTokens: 0, wipeTx });
+}
+
 async function auditOnce() {
   if (auditInFlight) return;
   auditInFlight = true;
@@ -172,7 +210,7 @@ async function auditOnce() {
       // A witness-less candidate is left un-audited on purpose: it becomes
       // auditable the moment a second provider for that model comes up.
       if (selection.reason === "no_witness") {
-        log("verifier", `no witness for ${selection.request.model} — skipping audit of ${selection.accused.displayName}`);
+        log("verifier", `no witness available for ${selection.request.model} (unique model on the exchange — cross-backend outputs are not comparable) — skipping audit of ${selection.accused.displayName}`);
       }
       return;
     }
@@ -183,8 +221,8 @@ async function auditOnce() {
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
     const [targetOutcome, witnessOutcome] = await Promise.all([
-      ask(target.url, candidate.model, candidate.promptPreview, target.priceHbar),
-      ask(witness.url, candidate.model, candidate.promptPreview, witness.priceHbar),
+      ask(target.url, candidate.model, candidate.promptPreview, target.price),
+      ask(witness.url, candidate.model, candidate.promptPreview, witness.price),
     ]);
     const result = classifyReplayOutcomes(targetOutcome, witnessOutcome, THRESHOLD);
 
@@ -255,6 +293,9 @@ async function auditOnce() {
       }),
     });
     log("verifier", `⚡ ${target.displayName} slashed and removed from routing`);
+
+    // Additive HTS enforcement: destroy the bond with a 2-of-2 multi-sig wipe.
+    await enforceBond(target.wallet, target.displayName);
   } catch (err) {
     log("verifier", `audit error: ${(err as Error).message.slice(0, 150)}`);
   } finally {

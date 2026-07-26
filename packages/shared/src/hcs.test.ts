@@ -2,6 +2,14 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import { getTopicId, topicLinks } from "./hcs.js";
 
+// Read the expected ids from deployments.json rather than hardcoding them. These
+// tests are about the resolution *mechanism* (env var wins, file is the fallback),
+// not about which topics happen to be live — hardcoding meant every topic rotation
+// broke CI for a reason unrelated to the code under test.
+const TOPICS: Record<string, string> = JSON.parse(
+  fs.readFileSync("deployments.json", "utf8"),
+).hederaTestnet.topics;
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -16,9 +24,9 @@ describe("getTopicId", () => {
   it("falls back to deployments.json when the env var is unset", () => {
     vi.stubEnv("HCS_REGISTRY_TOPIC", "");
     // Runs from the repo root, where deployments.json defines the real topics.
-    expect(getTopicId("registry")).toBe("0.0.9744593");
-    expect(getTopicId("trades")).toBe("0.0.9744594");
-    expect(getTopicId("verdicts")).toBe("0.0.9744595");
+    expect(getTopicId("registry")).toBe(TOPICS.registry);
+    expect(getTopicId("trades")).toBe(TOPICS.trades);
+    expect(getTopicId("verdicts")).toBe(TOPICS.verdicts);
   });
 
   it("returns null when deployments.json can't be read", () => {
@@ -43,11 +51,11 @@ describe("topicLinks", () => {
     vi.stubEnv("HCS_VERDICTS_TOPIC", "");
     const links = topicLinks();
     expect(links.registry).toEqual({
-      id: "0.0.9744593",
-      hashscan: "https://hashscan.io/testnet/topic/0.0.9744593",
+      id: TOPICS.registry,
+      hashscan: `https://hashscan.io/testnet/topic/${TOPICS.registry}`,
     });
-    expect(links.trades.hashscan).toContain("0.0.9744594");
-    expect(links.verdicts.id).toBe("0.0.9744595");
+    expect(links.trades.hashscan).toContain(TOPICS.trades);
+    expect(links.verdicts.id).toBe(TOPICS.verdicts);
   });
 
   it("yields null id + null hashscan when topics can't resolve", () => {

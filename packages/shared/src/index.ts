@@ -29,3 +29,4 @@ export function requireEnv(name: string): string {
   return v;
 }
 export * from "./hcs.js";
+export * from "./hts.js";

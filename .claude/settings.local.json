@@ -38,7 +38,9 @@
       "Skill(artifact-design)",
       "Skill(artifact-design:*)",
       "WebFetch(domain:claude.ai)",
-      "Bash(git commit -q -m 'DevRel briefing doc: narrative, demo beats, real-vs-mocked, anticipated Q&A, glossary *)"
+      "Bash(git commit -q -m 'DevRel briefing doc: narrative, demo beats, real-vs-mocked, anticipated Q&A, glossary *)",
+      "Bash(curl -s -m 15 https://router-api.0g.ai/v1/models)",
+      "Bash(curl -s -m 15 -H \"Authorization: Bearer test\" https://router-api.0g.ai/v1/models -o /dev/null -w \"%{http_code}\\\\n\")"
     ]
   },
   "enabledPlugins": {
