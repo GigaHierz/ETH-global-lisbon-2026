@@ -28,7 +28,9 @@ calls). The agent buys five inference calls; the exchange routes each to the che
 claiming `llama-3.3-70b-versatile` — which is SketchyGPU Labs, undercutting on price while
 secretly serving a smaller model. The verifier replays a sampled prompt against an honest
 witness, measures the divergence, slashes the cheater's stake, publishes the verdict to HCS,
-and the dashboard flags the slash as the cheater drops out of routing.
+and the dashboard flags the slash as the cheater drops out of routing. As a final beat, the demo
+buys one completion sourced from **0G Compute** (NimbusAI's `0gm-1.0-35b-a3b`) — a second,
+decentralized-GPU supply network settling on the same rails.
 
 Reset: Ctrl-C the demo, `rm -f .registry-cache.json`, then run `pnpm demo` again. Set
 `GROQ_API_KEY` in `.env` for real inference; without it, deterministic canned responses keep
@@ -63,7 +65,7 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 | Package | What it does | Docs |
 |---|---|---|
-| [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: plans a goal into questions, buys each answer through the exchange, budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
+| [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: routes each goal to a model tier from the live market, buys the answer through the exchange (one goal = one purchase; decomposition opt-in), budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
 | [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 USDC paywall (native HBAR via `SETTLEMENT_ASSET=hbar`); on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK). Default supply backend: **0G Compute** (decentralized GPU network); groq/canned selectable per instance | [provider.md](docs/provider.md) |
 | [`packages/exchange`](packages/exchange) | Discovers supply from HCS, routes each request to the cheapest live provider claiming the model, pays via x402, publishes trades | [exchange.md](docs/exchange.md) |
 | [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness; on divergence slashes staked HBAR and **destroys the HTS bond with a 2-of-2 multi-sig wipe** (verifier + auditor) | [verifier.md](docs/verifier.md) |

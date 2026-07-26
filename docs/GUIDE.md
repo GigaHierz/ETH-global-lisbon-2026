@@ -88,11 +88,14 @@ pnpm dashboard     # second terminal → localhost:3000
 
 Real chain: credentials in `.env` → `pnpm setup-hedera` → `MOCK_MODE=false` → same commands. Gate proof: `MOCK_MODE=false pnpm smoke`.
 
-> **Demo note:** `pnpm demo` intentionally boots only providers 1–3. A fourth profile,
-> `provider4` (NimbusAI) is an *honest* provider that resells **0G Compute**, serving
-> `0gm-1.0-35b-a3b` at $0.06. It advertises its own model id, so it competes only for 0G
-> traffic and never enters the llama-70b arc between Titan and the cheater — booting it
-> adds a second supply network to the marketplace without disturbing the slash demo.
+> **Demo note:** the slash arc runs on providers 1–3. A fourth profile, `provider4` (NimbusAI)
+> is an *honest* provider that resells **0G Compute**, serving `0gm-1.0-35b-a3b` at $0.06. It
+> advertises its own model id, so it competes only for 0G traffic and never enters the llama-70b
+> arc between Titan and the cheater — it adds a second supply network without disturbing the slash
+> demo. Because cheapest-first routing on the 70b model never selects it, `pnpm demo` ends with a
+> **dedicated 0G beat** that buys one completion pinned to `0gm-1.0-35b-a3b`, and the dashboard's
+> model picker (or `POST /run {model}` / `GET /models`) lets you route to any live supply network —
+> including 0G — on demand.
 
 ## Components
 
