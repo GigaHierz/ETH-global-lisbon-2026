@@ -7,7 +7,7 @@ export const ZEROG_MODEL = "0gm-1.0-35b-a3b";
 export const SMALL_MODEL = "llama-3.1-8b-instant"; // the cheaper 8b (what the cheater really serves)
 
 // Flat x402 ask the agent pays the exchange per request (the exchange keeps the spread).
-export const DEFAULT_EXCHANGE_ASK_HBAR = 0.12;
+export const DEFAULT_EXCHANGE_ASK = 0.12;
 
 // Where the agent, verifier, and dashboard reach the exchange by default.
 export const DEFAULT_EXCHANGE_URL = "http://localhost:4100";

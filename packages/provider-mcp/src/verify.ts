@@ -7,7 +7,7 @@ import { DEFAULT_EXCHANGE_URL } from "./constants.js";
 export interface ProviderRow {
   displayName: string;
   model: string;
-  priceHbar: number;
+  price: number;
   wallet: string;
   status: "live" | "down" | "slashed";
   stakeHbar?: number;

@@ -16,7 +16,7 @@ describe("PROFILES", () => {
     const p = PROFILES.provider1;
     expect(p.advertisedModel).toBe(DEFAULT_MODEL);
     expect(p.actualModel).toBe(DEFAULT_MODEL);
-    expect(p.priceHbar).toBe(0.1);
+    expect(p.price).toBe(0.1);
     expect(p.port).toBe(PROVIDER_PORTS[0]);
     expect(p.cannedCheat).toBe(false);
   });
@@ -30,7 +30,7 @@ describe("PROFILES", () => {
   it("provider3 (SketchyGPU) advertises 70b and undercuts on price", () => {
     const p = PROFILES.provider3;
     expect(p.advertisedModel).toBe(DEFAULT_MODEL);
-    expect(p.priceHbar).toBe(0.08); // cheaper than Titan's 0.10
+    expect(p.price).toBe(0.08); // cheaper than Titan's 0.10
     expect(p.port).toBe(PROVIDER_PORTS[2]);
   });
 
@@ -39,7 +39,7 @@ describe("PROFILES", () => {
     expect(p.advertisedModel).toBe(ZEROG_MODEL);
     expect(p.actualModel).toBe(ZEROG_MODEL); // honest: serves what it advertises
     expect(p.backend).toBe("0g");
-    expect(p.priceHbar).toBe(0.06);
+    expect(p.price).toBe(0.06);
     expect(p.port).toBe(PROVIDER_PORTS[3]);
   });
 
@@ -81,6 +81,43 @@ describe("resolveProfile", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     resolveProfile();
     expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it("builds a fully env-driven custom profile", () => {
+    process.argv = ["node", "index.ts", "--profile", "custom"];
+    vi.stubEnv("PROVIDER_NAME", "My GPU Box");
+    vi.stubEnv("PROVIDER_MODEL", SMALL_MODEL);
+    vi.stubEnv("PROVIDER_PRICE", "0.03");
+    vi.stubEnv("PROVIDER_PORT", "4099");
+    const p = resolveProfile();
+    expect(p.key).toBe("custom");
+    expect(p.displayName).toBe("My GPU Box");
+    expect(p.price).toBe(0.03);
+    expect(p.port).toBe(4099);
+    expect(p.hederaRole).toBe("PROVIDER");
+    // a custom provider is honest by construction: it serves what it advertises
+    expect(p.actualModel).toBe(p.advertisedModel);
+    expect(p.cannedCheat).toBe(false);
+  });
+
+  it("defaults a custom profile to the 0G backend and its model", () => {
+    process.argv = ["node", "index.ts", "--profile", "custom"];
+    const p = resolveProfile();
+    expect(p.displayName).toBe("Custom Provider");
+    expect(p.backend).toBe("0g"); // bring-your-own supply defaults to 0G Compute
+    expect(p.advertisedModel).toBe(ZEROG_MODEL);
+    expect(p.price).toBe(0.1);
+    expect(p.port).toBe(4025);
+  });
+
+  it("a groq-backed custom profile defaults to the 70b model instead", () => {
+    // The default model follows the backend: picking groq without naming a model
+    // must not leave the provider advertising a 0G model it cannot serve.
+    process.argv = ["node", "index.ts", "--profile", "custom"];
+    vi.stubEnv("PROVIDER_BACKEND", "groq");
+    const p = resolveProfile();
+    expect(p.backend).toBe("groq");
+    expect(p.advertisedModel).toBe(DEFAULT_MODEL);
   });
 
   it("exits when no profile is specified at all", () => {

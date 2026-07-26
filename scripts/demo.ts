@@ -6,11 +6,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK_HBAR, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, ZEROG_MODEL } from "@agentrouter/shared";
+import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, ZEROG_MODEL, money } from "@agentrouter/shared";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCK = process.env.MOCK_MODE !== "false";
-const EXCHANGE_ASK_HBAR = process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR);
+const EXCHANGE_ASK = process.env.EXCHANGE_ASK || String(DEFAULT_EXCHANGE_ASK);
 const EXCHANGE_URL = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const procs: ChildProcess[] = [];
 
@@ -106,17 +106,17 @@ async function main() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK_HBAR } : {}),
+          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK } : {}),
         },
         body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       });
       const raw = await res.text();
-      let routed: { provider: string; totalHbar: number } | undefined;
+      let routed: { provider: string; total: number } | undefined;
       try {
-        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; totalHbar: number } }).agentrouter;
+        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; total: number } }).agentrouter;
       } catch { /* non-JSON error body — reported below */ }
       if (res.ok && routed) {
-        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.totalHbar} ℏ/req incl. fee)`);
+        console.log(`  next 70b request now routes to: ${routed.provider} (${money(routed.total)}/req incl. fee)`);
       } else {
         console.log(`  reroute check failed: exchange answered HTTP ${res.status} — ${raw.slice(0, 120)}`);
       }
@@ -134,9 +134,9 @@ async function main() {
       });
       const zgRaw = await zg.text();
       try {
-        const zgJson = JSON.parse(zgRaw) as { agentrouter?: { provider: string; totalHbar?: number; paymentRef?: string }; choices?: Array<{ message?: { content?: string } }> };
+        const zgJson = JSON.parse(zgRaw) as { agentrouter?: { provider: string; total?: number; paymentRef?: string }; choices?: Array<{ message?: { content?: string } }> };
         if (zg.ok && zgJson.agentrouter) {
-          console.log(`  0G trade: ${zgJson.agentrouter.provider} | ${zgJson.agentrouter.totalHbar} ℏ | pay=${(zgJson.agentrouter.paymentRef ?? "").slice(0, 24)}`);
+          console.log(`  0G trade: ${zgJson.agentrouter.provider} | ${money(zgJson.agentrouter.total ?? "?")} | pay=${(zgJson.agentrouter.paymentRef ?? "").slice(0, 24)}`);
           console.log(`  ✦ ${(zgJson.choices?.[0]?.message?.content ?? "").slice(0, 90)}`);
         } else {
           console.log(`  0G trade skipped: HTTP ${zg.status} — ${zgRaw.slice(0, 100)}`);

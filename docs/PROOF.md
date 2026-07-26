@@ -2,6 +2,11 @@
 
 *Step-2 gate, executed 2026-07-25. Every link below is publicly verifiable on Hedera Testnet.*
 
+> **These receipts predate the move to USDC settlement**, so the amounts below are native
+> HBAR (ℏ) — that is what actually settled at the time, and the figures are left untouched.
+> Requests now settle in HTS USDC `0.0.429274`; see [MIGRATION-USDC.md](MIGRATION-USDC.md).
+> Staking and slashing are still native HBAR today, so those amounts remain current.
+
 ## The two settlement transactions (slice-1 gate, run twice back-to-back)
 
 | Round | Transaction | Hashscan |

@@ -1,20 +1,20 @@
 // In-memory exchange state: provider table, request log, reputation, mock ledger.
 // No DB by design — hackathon MVP.
 
-import { EXCHANGE_FEE_BPS, hbarOf } from "@agentrouter/shared";
+import { EXCHANGE_FEE_BPS, ASSET_LABEL, fromBaseUnits } from "@agentrouter/shared";
 import type { ProviderRow, RequestLogEntry, ExchangeEvent, ExchangeStats } from "@agentrouter/shared";
 
 export const providers = new Map<string, ProviderRow>(); // key: provider url
 export const requestLog: RequestLogEntry[] = [];
-export const priceIndex: Array<{ ts: number; model: string; priceHbar: number }> = [];
+export const priceIndex: Array<{ ts: number; model: string; price: number }> = [];
 
 // MOCK_MODE ledger: hbar balances per role/wallet
 export const mockLedger = new Map<string, number>();
 
-// ---- cumulative revenue (integer tinybars; floats only at the display edge) ----
+// ---- cumulative revenue (integer base units; floats only at the display edge) ----
 export const revenue = {
-  volumeTinybar: 0, // provider prices settled
-  feeTinybar: 0, // accrued exchange fees
+  volumeUnits: 0, // provider prices settled
+  feeUnits: 0, // accrued exchange fees
   requests: 0,
   refunds: 0,
   refundFailures: 0,
@@ -22,12 +22,13 @@ export const revenue = {
 
 export function statsSnapshot(): ExchangeStats {
   return {
-    totalVolumeHbar: hbarOf(revenue.volumeTinybar),
+    totalVolume: fromBaseUnits(revenue.volumeUnits),
     requests: revenue.requests,
-    feeRevenueHbar: hbarOf(revenue.feeTinybar),
+    feeRevenue: fromBaseUnits(revenue.feeUnits),
     refunds: revenue.refunds,
     refundFailures: revenue.refundFailures,
     feeBps: EXCHANGE_FEE_BPS,
+    asset: ASSET_LABEL,
   };
 }
 
@@ -60,7 +61,7 @@ export function providerList(): ProviderRow[] {
 export function pushRequest(entry: RequestLogEntry) {
   requestLog.push(entry);
   if (requestLog.length > 500) requestLog.shift();
-  priceIndex.push({ ts: entry.ts, model: entry.model, priceHbar: entry.priceHbar });
+  priceIndex.push({ ts: entry.ts, model: entry.model, price: entry.price });
   if (priceIndex.length > 2000) priceIndex.shift();
   broadcast({ type: "request", entry });
 }
