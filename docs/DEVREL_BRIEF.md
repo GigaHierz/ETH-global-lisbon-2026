@@ -111,7 +111,7 @@ Point any existing OpenAI SDK at the exchange URL and it works. Adoption path fo
 ## Try it herself (10 minutes, no funding, no API keys)
 
 ```bash
-git clone <repo> && cd Inferit
+git clone <repo> && cd ETH-global-lisbon-2026
 pnpm install
 cp .env.example .env   # MOCK_MODE=true — no chain, no keys needed
 pnpm demo          # the whole story, narrated, in one terminal

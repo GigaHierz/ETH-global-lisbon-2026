@@ -7,8 +7,8 @@ services: **Hedera Consensus Service (HCS)**, **Hedera Token Service (HTS)**, an
 **Mirror Node REST API**. "Natural extension" lines are explicitly *not yet built*.
 
 One-liner: **AgentRouter is an on-chain OpenRouter for agentic payments — autonomous AI agents
-buy LLM inference per request with native HBAR over x402 (sub-second finality, low predictable
-fees), providers carry an HCS-14-style identity via the Hedera Agent Kit plus an HTS
+buy LLM inference per request with USDC over x402 (native HBAR behind a flag; sub-second finality,
+low predictable fees), providers carry an HCS-14-style identity via the Hedera Agent Kit plus an HTS
 ReputationBond, and a verifier that catches model fraud slashes staked HBAR and destroys the
 bond with a 2-of-2 multi-sig `TokenWipe`.**
 
@@ -28,9 +28,9 @@ standard.
 **What we implement**
 - **Autonomous AI agent making agentic payments** — the buyer plans a goal into questions and
   pays for each answer per request. `packages/agent/src/loop.ts`, `packages/agent/src/buy.ts`.
-- **x402 payment standard, native HBAR, per request** — official `@x402/*` 2.19, `ExactHederaScheme`
-  on `hedera:testnet`, signed with the agent's own key; the exchange/provider run the x402
-  paywall. `packages/agent/src/payer.ts:25-53`, `packages/exchange/src/index.ts` (x402
+- **x402 payment standard, USDC (native HBAR behind a flag), per request** — official `@x402/*` 2.19,
+  `ExactHederaScheme` on `hedera:testnet`, signed with the agent's own key; the exchange/provider run
+  the x402 paywall. `packages/agent/src/payer.ts:25-53`, `packages/exchange/src/index.ts` (x402
   resource server ~L128-136), `packages/provider/src/index.ts:55-61`. Fee-sponsored facilitator ladder:
   `packages/shared/src/hedera.ts:43-76` (payers need zero gas).
 - **Hedera Agent Kit** — the agent registers its **HCS-14-style Universal Agent ID**
