@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { DEFAULT_MODEL, SMALL_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
+import { DEFAULT_MODEL, SMALL_MODEL, ZEROG_MODEL, PROVIDER_PORTS } from "@agentrouter/shared";
 import { PROFILES, resolveProfile } from "./profiles.js";
 
 const savedArgv = process.argv;
@@ -34,12 +34,22 @@ describe("PROFILES", () => {
     expect(p.port).toBe(PROVIDER_PORTS[2]);
   });
 
-  it("provider4 (NimbusAI) is honest 70b, cheaper than Titan but plays fair", () => {
+  it("provider4 (NimbusAI) honestly resells 0G Compute on its own unique model", () => {
     const p = PROFILES.provider4;
-    expect(p.advertisedModel).toBe(DEFAULT_MODEL);
-    expect(p.actualModel).toBe(DEFAULT_MODEL);
+    expect(p.advertisedModel).toBe(ZEROG_MODEL);
+    expect(p.actualModel).toBe(ZEROG_MODEL); // honest: serves what it advertises
+    expect(p.backend).toBe("0g");
     expect(p.priceHbar).toBe(0.06);
     expect(p.port).toBe(PROVIDER_PORTS[3]);
+  });
+
+  it("p1-p3 backends are pinned to groq — the slash arc depends on it", () => {
+    // FROZEN: deterministic same-model Groq outputs are what the verifier compares.
+    expect(PROFILES.provider1.backend).toBe("groq");
+    expect(PROFILES.provider2.backend).toBe("groq");
+    expect(PROFILES.provider3.backend).toBe("groq");
+    // and provider4 must never collide with the 70b arc's model
+    expect(PROFILES.provider4.advertisedModel).not.toBe(DEFAULT_MODEL);
   });
 
   it("provider3 secretly serves the small model when CHEAT_MODE=true", async () => {
