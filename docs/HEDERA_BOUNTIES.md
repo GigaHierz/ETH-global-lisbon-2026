@@ -1,9 +1,10 @@
 # AgentRouter × Hedera prize tracks
 
-How AgentRouter maps to the Hedera bounties at ETHGlobal Lisbon 2026. Every "Implemented"
-line is real and SDK-native — **no Solidity anywhere** — across four Hedera services:
-**Hedera Consensus Service (HCS)**, **Hedera Token Service (HTS)**, **Hedera Schedule
-Service**, and the **Mirror Node REST API**. "Natural extension" lines are explicitly
+How AgentRouter maps to the Hedera bounties we target at ETHGlobal Lisbon 2026 — **AI &
+Agentic Payments (#1)**, **Tokenization (#2)**, and **"No Solidity Allowed" (#3)**. Every
+"Implemented" line is real and SDK-native — **no Solidity anywhere** — across four Hedera
+services: **Hedera Consensus Service (HCS)**, **Hedera Token Service (HTS)**, **Hedera
+Schedule Service**, and the **Mirror Node REST API**. "Natural extension" lines are explicitly
 *not yet built*.
 
 One-liner: **AgentRouter is an on-chain OpenRouter for agentic payments — autonomous AI agents
@@ -41,8 +42,8 @@ standard.
   relies on for per-request machine payments.
 - **Optional enhancements, also implemented:** multi-agent system (buyer agent + provider
   agents + verifier), **x402 pay-per-request APIs**, **ERC-8004 / HCS-14-style agent identity**,
-  **token creation via HTS** (see track 2), **scheduled transactions** (see track 4/5), and
-  **HCS audit trails** (registry/trades/verdicts).
+  **token creation via HTS** (see track 2), a **scheduled token operation** (the multi-sig
+  scheduled wipe, see track 2), and **HCS audit trails** (registry/trades/verdicts).
 
 **Natural extension** — adopt OpenClaw / Virtuals **Agent Commerce Protocol (ACP)** job-lifecycle
 schema on the HCS trades topic (our exchange is already an ACP-style marketplace; ACP itself is
@@ -68,6 +69,10 @@ Real-world asset tokenization using the Hedera Token Service with compliance con
   on fraud the verifier **freezes** the cheater's bond and **wipes** it. Freeze key = verifier;
   wipe key = 2-of-2 `KeyList` [verifier, auditor]. `packages/shared/src/hts.ts`
   (`freezeBond`, `scheduledWipeBond`), `scripts/setup-hts-token.ts`.
+- **Scheduled token operations (Hedera Scheduled Transactions)** — the wipe executes as a
+  `ScheduleCreateTransaction` requiring a 2-of-2 [verifier, auditor] signature
+  (`ScheduleSignTransaction`) — multi-sig, no keeper. `packages/shared/src/hts.ts`
+  (`scheduledWipeBond`, `signSchedule`).
 - **Token lifecycle operations** — create → associate → grant (mint/transfer to providers) →
   freeze → scheduled wipe. Balance per provider *is* on-chain reputation.
 - **Verifiable on Hashscan** — the token, grants, freeze, and wipe are all native HTS
@@ -75,8 +80,8 @@ Real-world asset tokenization using the Hedera Token Service with compliance con
   with the funded real-mode run capturing the Hashscan links in `docs/PROOF.md`.
 
 **Natural extension** — real asset classes (securities, invoices, carbon credits) with KYC keys;
-`@hiero-ledger/hiero-contracts`; cross-chain (LayerZero/CCIP/HashPort); oracle-priced bonds;
-scheduled distributions.
+`@hiero-ledger/hiero-contracts`; cross-chain token operations (LayerZero/CCIP/HashPort);
+oracle-priced bonds.
 
 **Qualification:** create/manage tokens with HTS via SDK ✓ · deployed on Hedera Testnet ✓ ·
 public repo + Hashscan-visible token ✓ · demo video (to record).
@@ -108,50 +113,10 @@ Kit ✓.
 
 ---
 
-## 4 · Cross-Chain Automation Hub — Schedule Service + Axelar — **Core implemented; Axelar = extension**
-
-Decentralized multi-chain automation combining Hedera Schedule Service with Axelar GMP,
-eliminating keeper dependency.
-
-**What we implement**
-- **Hedera Schedule Service, no keepers/bots** — enforcement runs as a `ScheduleCreateTransaction`
-  co-signed by a second party, executing on-chain with no off-chain relayer. Verifier
-  `ScheduleCreate` (sig 1) → auditor `ScheduleSign` (sig 2) → wipe executes.
-  `packages/shared/src/hts.ts`, `packages/verifier/src/index.ts` (`enforceBond`).
-- **Multi-sig approval workflow** — the wipe key is a 2-of-2 `KeyList`; users create, approve,
-  and manage the scheduled action through the two signatures.
-
-**Natural extension (the Axelar half of this bounty)** — dispatch an **Axelar GMP** cross-chain
-message triggered by the scheduled transaction (e.g. mirror a slash/reputation event to an EVM
-chain). Not yet built — this track specifically requires Axelar, so treat our fit as the
-Schedule-Service core plus a clear cross-chain roadmap.
-
----
-
-## 5 · Autonomous On-Chain Automation Platform (Schedule Service) — **Core implemented** *(Continuity Track eligibility applies)*
-
-Production-ready automation using the Hedera Schedule Service for workflows without bots/keepers.
-
-**What we implement**
-- **Scheduled transaction executed end-to-end** — the multi-sig scheduled wipe runs
-  trigger→execution with no bot. `packages/shared/src/hts.ts`, `packages/verifier/src/index.ts`.
-- **Multi-sig / role-based approval** — verifier + auditor co-sign (2-of-2). `scripts/setup-hts-token.ts`.
-- **Dashboard surface** — the Bond column animates active → 🔒 frozen → wiped as the scheduled
-  action lands. `packages/dashboard/app/exchange/page.tsx`.
-- **HCS audit trail** — verdicts recorded on-chain.
-
-**Natural extension** — a general user-facing scheduler UI to create/approve/manage arbitrary
-future or conditional actions (payroll, treasury, subscriptions); conditional logic combining
-time + state + approvals; cost-comparison analysis. Note: this track is limited to Continuity
-Track participants.
-
----
-
 ### Truthfulness note
 
 `sub-second finality` and `low, predictable fees` are stated as Hedera network properties, not
 benchmarks we ran. Identity is **HCS-14-*style*** (the code says so), interoperable with but not
 a certified HCS-14 registry. For the live demo the verifier completes *both* scheduled-wipe
 signatures so the loop runs end-to-end; in production the auditor is an independent second
-signer. `ACP`, `Axelar`, `Guardian`, cross-chain bridges, oracles, and TEE/zkML are roadmap,
-never claimed as built.
+signer. `ACP`, `Guardian`, oracles, and TEE/zkML are roadmap, never claimed as built.
