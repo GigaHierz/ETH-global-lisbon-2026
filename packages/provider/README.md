@@ -1,8 +1,9 @@
 # @agentrouter/provider
 
 Inference supply: an OpenAI-compatible server that sells inference per request behind an
-x402 paywall (USDC by default, HBAR under `SETTLEMENT_ASSET=hbar`), registers on the HCS
-registry topic, and stakes a 50 ℏ bond to escrow on boot.
+x402 USDC paywall (native HBAR via `SETTLEMENT_ASSET=hbar`), registers on the HCS registry topic,
+and stakes a 50 ℏ bond to escrow on boot. Pluggable compute backends: **0G Compute** (default for
+bring-your-own supply), **Groq**, or a **canned** offline fallback.
 
 One codebase, five env-driven profiles: `provider1`–`provider4` are the demo personalities
 (including the cheater the verifier catches), and **`custom` is the one you use to list your

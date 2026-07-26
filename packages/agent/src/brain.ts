@@ -34,6 +34,10 @@ const MAX_QUESTIONS = parseInt(process.env.AGENT_MAX_QUESTIONS || "3", 10);
 
 export const groqBrain: Brain = {
   async plan(goal: string): Promise<string[]> {
+    // DEFAULT: one goal = ONE purchase. The router (route-model.ts) decides which
+    // LLM tier that single query buys. Multi-question decomposition is opt-in via
+    // AGENT_PLAN_MODE=decompose — it triples spend and adds latency.
+    if (process.env.AGENT_PLAN_MODE !== "decompose") return [goal];
     // No key → degrade to treating the goal itself as the single question, so the
     // agent still buys at least one inference and the payment flow is exercised.
     if (!process.env.GROQ_API_KEY) return [goal];
@@ -52,6 +56,8 @@ export const groqBrain: Brain = {
   },
 
   async synthesize(goal: string, findings: Finding[]): Promise<string> {
+    // Single-purchase runs: the bought answer IS the answer — no synthesis hop.
+    if (findings.length === 1) return findings[0].a;
     if (findings.length === 0) return "(no answers were purchased — budget exhausted before any buy)";
     if (!process.env.GROQ_API_KEY) return findings.map((f) => f.a).join("\n\n");
     const context = findings.map((f, i) => `Q${i + 1}: ${f.q}\nA${i + 1}: ${f.a}`).join("\n\n");
