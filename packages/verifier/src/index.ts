@@ -16,8 +16,13 @@ import {
   DEFAULT_EXCHANGE_URL,
   REQUEST_LOG_LIMIT,
   HEDERA_NETWORK,
+  BOND_AMOUNT,
   hederaAccount,
   publishToTopic,
+  bondTokenId,
+  freezeBond,
+  scheduledWipeBond,
+  signSchedule,
   log,
   type ProviderRow,
   type RequestLogEntry,
@@ -40,14 +45,14 @@ const audited = new Set<string>(); // request ids already checked
 const slashedWallets = new Set<string>(); // payout accounts this verifier has slashed
 let auditInFlight = false; // one audit at a time: replays can outlast INTERVAL_MS
 
-let payFetch: (url: string, init: RequestInit, priceHbar: number) => Promise<Response>;
+let payFetch: (url: string, init: RequestInit, price: number) => Promise<Response>;
 
 async function initPayFetch() {
   if (MOCK_MODE) {
-    payFetch = (url, init, priceHbar) =>
+    payFetch = (url, init, price) =>
       fetch(url, {
         ...init,
-        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(priceHbar) },
+        headers: { ...(init.headers as Record<string, string>), [MOCK_PAYMENT_HEADER]: String(price) },
       });
     return;
   }
@@ -74,7 +79,7 @@ async function ask(
   providerUrl: string,
   model: string,
   prompt: string,
-  priceHbar: number,
+  price: number,
 ): Promise<ReplayOutcome> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS);
@@ -93,7 +98,7 @@ async function ask(
           }),
           signal: controller.signal,
         },
-        priceHbar,
+        price,
       );
     } catch (err) {
       if (controller.signal.aborted) return { kind: "timeout" };
@@ -161,6 +166,59 @@ async function publishVerdict(v: Record<string, unknown>) {
   }
 }
 
+async function postBondEvent(body: Record<string, unknown>) {
+  try {
+    await fetch(`${EXCHANGE}/bond-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    log("verifier", `bond-event post failed: ${(err as Error).message.slice(0, 80)}`);
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// HTS ReputationBond enforcement — additive compliance layer on top of the proven
+// native-HBAR slash. Freeze the fraudster's bond immediately (verifier freezeKey),
+// then destroy it via a multi-sig scheduled wipe: verifier ScheduleCreate (sig 1),
+// auditor ScheduleSign (sig 2) → the wipe executes on-chain, no keeper. In real
+// mode both signatures run here for an end-to-end demo; in production the auditor
+// is an independent signer. All chain calls are no-ops in mock mode.
+async function enforceBond(wallet: string, displayName: string) {
+  const onChain = !MOCK_MODE && !!bondTokenId();
+  // Only surface bond enforcement when it's real (on-chain) or in the mock demo.
+  // In real mode without a configured bond token (`pnpm setup-hts` not run), the
+  // feature is simply off — never post frozen/wiped events for a bond that
+  // doesn't exist on-chain.
+  if (!MOCK_MODE && !onChain) return;
+
+  // 1. Freeze — a fast compliance action; the bond can no longer move.
+  let freezeTx: string | null = null;
+  if (onChain) {
+    freezeTx = await freezeBond(wallet);
+    if (freezeTx) log("verifier", `🔒 froze ${displayName} ARBOND bond: https://hashscan.io/testnet/transaction/${freezeTx}`);
+  }
+  await postBondEvent({ wallet, bondStatus: "frozen", bondTokens: BOND_AMOUNT, freezeTx });
+
+  // Let the dashboard show active → frozen before the wipe lands.
+  await sleep(1200);
+
+  // 2. Multi-sig scheduled wipe (Hedera Schedule Service).
+  let scheduleId: string | null = null;
+  let wipeTx: string | null = null;
+  if (onChain) {
+    ({ scheduleId } = await scheduledWipeBond(wallet, BOND_AMOUNT));
+    if (scheduleId) {
+      log("verifier", `📅 scheduled wipe of ${displayName} bond (schedule ${scheduleId}) — awaiting 2nd signer`);
+      wipeTx = await signSchedule(scheduleId);
+      if (wipeTx) log("verifier", `⚖️ multi-sig wipe executed: https://hashscan.io/testnet/transaction/${wipeTx}`);
+    }
+  }
+  await postBondEvent({ wallet, bondStatus: "wiped", bondTokens: 0, scheduleId, wipeTx });
+}
+
 async function auditOnce() {
   if (auditInFlight) return;
   auditInFlight = true;
@@ -186,7 +244,7 @@ async function auditOnce() {
       // A witness-less candidate is left un-audited on purpose: it becomes
       // auditable the moment a second provider for that model comes up.
       if (selection.reason === "no_witness") {
-        log("verifier", `no witness for ${selection.request.model} — skipping audit of ${selection.accused.displayName}`);
+        log("verifier", `no witness available for ${selection.request.model} (unique model on the exchange — cross-backend outputs are not comparable) — skipping audit of ${selection.accused.displayName}`);
       }
       return;
     }
@@ -197,8 +255,8 @@ async function auditOnce() {
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
     const [targetOutcome, witnessOutcome] = await Promise.all([
-      ask(target.url, candidate.model, candidate.promptPreview, target.priceHbar),
-      ask(witness.url, candidate.model, candidate.promptPreview, witness.priceHbar),
+      ask(target.url, candidate.model, candidate.promptPreview, target.price),
+      ask(witness.url, candidate.model, candidate.promptPreview, witness.price),
     ]);
     const result = classifyReplayOutcomes(targetOutcome, witnessOutcome, THRESHOLD);
 
@@ -269,6 +327,9 @@ async function auditOnce() {
       }),
     });
     log("verifier", `⚡ ${target.displayName} slashed and removed from routing`);
+
+    // Additive HTS enforcement: freeze the bond, then multi-sig scheduled wipe.
+    await enforceBond(target.wallet, target.displayName);
   } catch (err) {
     log("verifier", `audit error: ${(err as Error).message.slice(0, 150)}`);
   } finally {

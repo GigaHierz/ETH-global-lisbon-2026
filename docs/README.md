@@ -1,7 +1,7 @@
 # AgentRouter documentation
 
 AgentRouter is an on-chain inference exchange: AI agents buy LLM inference per request with
-HBAR over x402, from providers identity- and reputation-tracked on Hedera Consensus Service,
+USDC over x402, from providers identity- and reputation-tracked on Hedera Consensus Service,
 with a verifier that catches providers serving cheaper models than advertised and slashes
 their staked HBAR. Everything on-chain runs on Hedera Testnet.
 
@@ -28,6 +28,8 @@ use the documents below.
 - [DEPLOY.md](DEPLOY.md) — production URLs, per-service configuration, and the demo runbook.
 - [TESTING.md](TESTING.md) — shared live test URLs.
 - [FUNDING.md](FUNDING.md) — the Hedera Testnet funding / settlement decisions.
+- [MIGRATION-USDC.md](MIGRATION-USDC.md) — moving an existing deployment from HBAR to USDC
+  settlement: account association, funding, and the per-service variable changes.
 
 ## On-chain proof and reference
 

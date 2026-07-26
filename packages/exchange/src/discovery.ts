@@ -3,7 +3,7 @@
 // liveness + current price. PROVIDER_URLS env stays as seed/fallback (and the
 // only source in mock mode). Slashed providers stay slashed even if live.
 
-import { log, MOCK_MODE, DEFAULT_PROVIDER_URLS, readTopicMessages, type ProviderInfo } from "@agentrouter/shared";
+import { log, MOCK_MODE, money, DEFAULT_PROVIDER_URLS, BOND_AMOUNT, readTopicMessages, type ProviderInfo } from "@agentrouter/shared";
 import { providers, providerList, broadcast, mockLedger } from "./state.js";
 
 export const PROVIDER_URLS = (process.env.PROVIDER_URLS || DEFAULT_PROVIDER_URLS.join(","))
@@ -14,7 +14,7 @@ export const PROVIDER_URLS = (process.env.PROVIDER_URLS || DEFAULT_PROVIDER_URLS
 const INITIAL_STAKE_HBAR = 50; // display fallback; real entries carry stakeHbar from HCS
 
 // endpoint → registration payload from the HCS registry topic
-interface HcsReg { stakeHbar?: number; agentId?: string; displayName?: string; model?: string; priceHbar?: number; account?: string }
+interface HcsReg { stakeHbar?: number; agentId?: string; displayName?: string; model?: string; price?: number; account?: string }
 const hcsRegistrations = new Map<string, HcsReg>();
 
 /* v8 ignore start -- Mirror Node + provider /info network I/O; covered via integration/demo */
@@ -28,7 +28,7 @@ async function refreshHcsRegistry(): Promise<void> {
         if (!hcsRegistrations.has(p.endpoint)) log("exchange", `HCS registry: discovered ${p.agentId} @ ${p.endpoint}`);
         hcsRegistrations.set(p.endpoint, {
           stakeHbar: p.stakeHbar, agentId: p.agentId, displayName: p.displayName,
-          model: p.model, priceHbar: p.priceHbar, account: p.account,
+          model: p.model, price: p.price, account: p.account,
         });
       }
     }
@@ -46,6 +46,16 @@ export async function refreshProviders(): Promise<void> {
       try {
         const res = await fetch(`${url}/info`, { signal: AbortSignal.timeout(2000) });
         const info = (await res.json()) as ProviderInfo;
+        // A provider that won't quote a usable price can't be routed to: without this
+        // it lands in the table with price undefined, and the cheapest-first comparator
+        // in pickProvider degrades to NaN, which silently scrambles routing order.
+        if (!Number.isFinite(info.price)) {
+          log("exchange", `${url} /info has no usable price (${info.price}) — marking down`);
+          providers.set(url, { ...info, url, price: 0, status: "down", reputation: existing?.reputation ?? 100,
+            stakeHbar: existing?.stakeHbar ?? INITIAL_STAKE_HBAR, requestsServed: existing?.requestsServed ?? 0,
+            bondTokens: existing?.bondTokens ?? BOND_AMOUNT, bondStatus: existing?.bondStatus ?? "active" });
+          return;
+        }
         providers.set(url, {
           ...info,
           url,
@@ -53,6 +63,8 @@ export async function refreshProviders(): Promise<void> {
           reputation: existing?.reputation ?? 100,
           stakeHbar: existing?.stakeHbar ?? hcsRegistrations.get(url)?.stakeHbar ?? INITIAL_STAKE_HBAR,
           requestsServed: existing?.requestsServed ?? 0,
+          bondTokens: existing?.bondTokens ?? BOND_AMOUNT,
+          bondStatus: existing?.bondStatus ?? "active",
         });
         if (MOCK_MODE && !mockLedger.has(info.wallet)) mockLedger.set(info.wallet, 0);
       } catch {
@@ -63,9 +75,10 @@ export async function refreshProviders(): Promise<void> {
           // box offline, no tunnel). Show it as down instead of hiding it.
           const r = hcsRegistrations.get(url)!;
           providers.set(url, {
-            displayName: r.displayName ?? url, model: r.model ?? "?", priceHbar: r.priceHbar ?? 0,
+            displayName: r.displayName ?? url, model: r.model ?? "?", price: r.price ?? 0,
             wallet: r.account ?? "?", agentId: r.agentId ?? null, url,
             status: "down", reputation: 100, stakeHbar: r.stakeHbar ?? 0, requestsServed: 0,
+            bondTokens: BOND_AMOUNT, bondStatus: "active",
           });
         }
       }
@@ -77,7 +90,7 @@ export async function refreshProviders(): Promise<void> {
 export function startDiscovery() {
   refreshProviders().then(() => {
     const live = providerList().filter((p) => p.status === "live");
-    log("exchange", `discovered ${live.length} providers: ${live.map((p) => `${p.displayName} (${p.model} @ ${p.priceHbar} ℏ)`).join(", ")}`);
+    log("exchange", `discovered ${live.length} providers: ${live.map((p) => `${p.displayName} (${p.model} @ ${money(p.price)})`).join(", ")}`);
   });
   setInterval(refreshProviders, 5000);
 }
@@ -90,6 +103,6 @@ export function startDiscovery() {
  */
 export function pickProvider(model: string) {
   return providerList()
-    .filter((p) => p.status === "live" && p.model === model)
-    .sort((a, b) => a.priceHbar - b.priceHbar || a.url.localeCompare(b.url))[0];
+    .filter((p) => p.status === "live" && p.model === model && Number.isFinite(p.price))
+    .sort((a, b) => a.price - b.price || a.url.localeCompare(b.url))[0];
 }

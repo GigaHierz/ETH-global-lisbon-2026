@@ -16,7 +16,7 @@ on-chain actions) + the **Hedera SDK** + **x402**. Everything on-chain is real t
 2. **Plans** a goal into sub-questions (Groq brain — the agent's own reasoning).
 3. **Buys** an answer to each question through the exchange, **signing the x402 HBAR payment with
    its own AGENT account** (the exchange routes to the cheapest live provider and keeps the spread).
-4. **Enforces a budget** (`AGENT_BUDGET_HBAR`) — stops buying the moment the next call won't fit.
+4. **Enforces a budget** (`AGENT_BUDGET`) — stops buying the moment the next call won't fit.
 5. **Synthesizes** the bought answers into a final result.
 6. **Streams** identity, balance, budget, and every paid step (with Hashscan links) over SSE to
    the `/agent` web page.
@@ -49,7 +49,7 @@ Then open `http://localhost:3000/agent`, enter a goal, and watch it buy.
 | `GET /state` | snapshot (balance, budget, findings, events) |
 
 ### Config
-`EXCHANGE_ASK_HBAR` (0.12) · `AGENT_BUDGET_HBAR` (2) · `AGENT_PORT` (4200) ·
+`EXCHANGE_ASK` (0.12) · `AGENT_BUDGET` (2) · `AGENT_PORT` (4200) ·
 `AGENT_MODEL` (llama-3.3-70b-versatile) · `AGENT_MAX_QUESTIONS` (3) · `AGENT_BRAIN_MODEL`.
 
 ## On-chain transactions (live, verifiable on Hashscan)
@@ -58,6 +58,9 @@ Every transaction below is a **real Hedera Testnet transaction** produced by thi
 
 **Agent account (full ledger):** [`0.0.9746264`](https://hashscan.io/testnet/account/0.0.9746264)
 **HCS registry topic (identity + discovery):** [`0.0.9744593`](https://hashscan.io/testnet/topic/0.0.9744593)
+
+> Amounts in these receipts are native HBAR — they predate the move to USDC settlement.
+
 
 | # | Action | Type | Transaction |
 |---|--------|------|-------------|

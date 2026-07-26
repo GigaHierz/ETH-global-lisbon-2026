@@ -8,10 +8,14 @@ import {
   PROMPT_PREVIEW_LIMIT,
   EXCHANGE_FEE_BPS,
   HEDERA_NETWORK,
-  HBAR_ASSET,
-  hbarOf,
-  tinybarsOf,
-  feeForPrice,
+  ASSET_LABEL,
+  ASSET_SYMBOL,
+  SETTLEMENT_ASSET,
+  SCHEME_CONFIG,
+  money,
+  baseUnitsOf,
+  fromBaseUnits,
+  settlementPriceFromUnits,
   resolveFacilitator,
   hederaAccount,
   publishToTopic,
@@ -34,14 +38,16 @@ import {
 import { startDiscovery, pickProvider, refreshProviders } from "./discovery.js";
 import { initPayer, paidPost } from "./payer.js";
 import { applySlash } from "./slash.js";
+import { applyBondEvent } from "./bond.js";
 import { quoteFor, pinnedQuote, quoteById, consumeQuote, type Quote } from "./quotes.js";
 import { sendRefund, REFUND_ON_FAILURE } from "./refund.js";
 
 // Hosts (Railway/Render/Fly) inject PORT; fall back to EXCHANGE_PORT locally.
 const PORT = parseInt(process.env.PORT || process.env.EXCHANGE_PORT || "4100", 10);
 // Percentage taker fee: the agent pays provider price + fee (EXCHANGE_FEE_BPS,
-// ceil-rounded in tinybars so the exchange never underquotes). Providers always
-// receive exactly their listed price; the fee is the exchange's revenue.
+// ceil-rounded in the settlement asset's base units so the exchange never
+// underquotes). Providers always receive exactly their listed price; the fee is
+// the exchange's revenue.
 const exchangeWallet = MOCK_MODE ? "0.0.mock-exchange" : hederaAccount("EXCHANGE").id;
 
 // quoteId → request-log entry id awaiting its inbound (agent→exchange) settle tx
@@ -58,7 +64,13 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/healthz", (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
+app.get("/healthz", (_req, res) => res.json({ ok: true, mock: MOCK_MODE, settlement: SETTLEMENT_ASSET }));
+
+// What every price on this exchange is denominated in. The dashboard reads this to
+// label its axes; it defaults to USDC on its own side if the exchange is unreachable.
+app.get("/settlement", (_req, res) =>
+  res.json({ asset: SETTLEMENT_ASSET, label: ASSET_LABEL, symbol: ASSET_SYMBOL }),
+);
 
 app.get("/providers", (_req, res) => res.json(providerList()));
 
@@ -99,6 +111,25 @@ app.post("/slash", (req, res) => {
   res.json({ ok: true });
 });
 
+// Verifier reports each HTS ReputationBond transition (frozen → wiped) so the
+// dashboard's Bond column animates alongside the SLASHED banner.
+app.post("/bond-event", (req, res) => {
+  const result = applyBondEvent(providerList(), req.body ?? {});
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+  const { row } = result;
+  const { freezeTx, scheduleId, wipeTx } = req.body as {
+    freezeTx?: string | null; scheduleId?: string | null; wipeTx?: string | null;
+  };
+  providers.set(row.url, row);
+  log("exchange", `BOND ${row.displayName}: ${row.bondStatus} (${row.bondTokens} ARBOND)`);
+  broadcast({
+    type: "bond", provider: row.displayName, wallet: row.wallet,
+    bondTokens: row.bondTokens, bondStatus: row.bondStatus, freezeTx, scheduleId, wipeTx,
+  });
+  broadcast({ type: "providers", providers: providerList() });
+  res.json({ ok: true });
+});
+
 // Verifier reports each comparison so the dashboard can show verification activity.
 app.post("/verify-report", (req, res) => {
   const { provider, witness, similarity, verdict } = req.body;
@@ -121,10 +152,10 @@ if (MOCK_MODE) {
     const body = req.body as ChatCompletionRequest;
     const quote = body?.model && body?.messages?.length ? routeQuote(body) : null;
     if (!quote) return next(); // router below answers 400/503 properly
-    const paidTinybar = tinybarsOf(parseFloat(req.header(MOCK_PAYMENT_HEADER) ?? "0"));
-    if (paidTinybar >= quote.totalTinybar) {
+    const paidUnits = baseUnitsOf(parseFloat(req.header(MOCK_PAYMENT_HEADER) ?? "0"));
+    if (paidUnits >= quote.totalUnits) {
       // charge the mock ledger up-front (mirrors real settle; refunded on failure)
-      mockLedger.set(exchangeWallet, (mockLedger.get(exchangeWallet) ?? 0) + hbarOf(quote.totalTinybar));
+      mockLedger.set(exchangeWallet, (mockLedger.get(exchangeWallet) ?? 0) + fromBaseUnits(quote.totalUnits));
       return next();
     }
     return res.status(402).json({
@@ -132,14 +163,19 @@ if (MOCK_MODE) {
       accepts: [
         {
           scheme: "mock",
-          price: `${hbarOf(quote.totalTinybar)} HBAR`,
+          price: `${fromBaseUnits(quote.totalUnits)} ${ASSET_LABEL}`,
           payTo: exchangeWallet,
-          extra: { quoteId: quote.quoteId, priceHbar: hbarOf(quote.priceTinybar), feeHbar: hbarOf(quote.feeTinybar) },
+          extra: {
+            quoteId: quote.quoteId,
+            price: fromBaseUnits(quote.priceUnits),
+            fee: fromBaseUnits(quote.feeUnits),
+            asset: ASSET_LABEL,
+          },
         },
       ],
     });
   });
-  log("exchange", `MOCK paywall: dynamic quote (fee ${EXCHANGE_FEE_BPS} bps) via ${MOCK_PAYMENT_HEADER}`);
+  log("exchange", `MOCK paywall: dynamic quote (fee ${EXCHANGE_FEE_BPS} bps, ${ASSET_LABEL}) via ${MOCK_PAYMENT_HEADER}`);
 } else {
   const { paymentMiddleware, x402ResourceServer } = await import("@x402/express");
   const { ExactHederaScheme } = await import("@x402/hedera/exact/server");
@@ -147,7 +183,7 @@ if (MOCK_MODE) {
   const facilitatorUrl = await resolveFacilitator("exchange");
   const server = new x402ResourceServer(
     new HTTPFacilitatorClient({ url: facilitatorUrl }),
-  ).register("hedera:*", new ExactHederaScheme());
+  ).register("hedera:*", new ExactHederaScheme(SCHEME_CONFIG));
 
   // After the facilitator settles the agent's payment (post-response), attach the
   // inbound tx to the trade, accrue fee revenue, and publish the HCS trade message.
@@ -164,20 +200,21 @@ if (MOCK_MODE) {
       broadcast({ type: "request", entry });
     }
     revenue.requests += 1;
-    revenue.volumeTinybar += entry ? tinybarsOf(entry.priceHbar) : (quote?.priceTinybar ?? 0);
-    revenue.feeTinybar += entry ? tinybarsOf(entry.feeHbar) : (quote?.feeTinybar ?? 0);
+    revenue.volumeUnits += entry ? baseUnitsOf(entry.price) : (quote?.priceUnits ?? 0);
+    revenue.feeUnits += entry ? baseUnitsOf(entry.fee) : (quote?.feeUnits ?? 0);
     broadcast({ type: "stats", stats: statsSnapshot() });
     if (quote) consumeQuote(quote);
-    log("exchange", `inbound settled ${inboundRef.slice(0, 24)}… (quote ${quoteId}) — fee revenue now ${statsSnapshot().feeRevenueHbar.toFixed(4)} ℏ`);
+    log("exchange", `inbound settled ${inboundRef.slice(0, 24)}… (quote ${quoteId}) — fee revenue now ${money(statsSnapshot().feeRevenue.toFixed(4))}`);
     if (entry) {
       publishToTopic("trades", hederaAccount("EXCHANGE"), {
         type: "trade",
         model: entry.model,
         provider: entry.provider,
         providerAccount: providerList().find((pr) => pr.displayName === entry.provider)?.wallet ?? "?",
-        priceHbar: entry.priceHbar,
-        feeHbar: entry.feeHbar,
-        totalHbar: entry.totalHbar,
+        price: entry.price,
+        fee: entry.fee,
+        total: entry.total,
+        asset: ASSET_LABEL, // immutable log: the unit has to travel with the amounts
         latencyMs: entry.latencyMs,
         inboundTx: inboundRef,
         paymentTx: entry.paymentRef,
@@ -210,12 +247,16 @@ if (MOCK_MODE) {
                 if (!quote) {
                   // No live provider: quote 0 so verification never passes a real charge;
                   // the router below answers 503 for unpaid + paid alike.
-                  return { amount: "0", asset: HBAR_ASSET };
+                  return settlementPriceFromUnits(0);
                 }
                 return {
-                  amount: String(quote.totalTinybar),
-                  asset: HBAR_ASSET,
-                  extra: { quoteId: quote.quoteId, priceTinybar: String(quote.priceTinybar), feeTinybar: String(quote.feeTinybar) },
+                  ...settlementPriceFromUnits(quote.totalUnits),
+                  extra: {
+                    quoteId: quote.quoteId,
+                    priceUnits: String(quote.priceUnits),
+                    feeUnits: String(quote.feeUnits),
+                    asset: ASSET_LABEL,
+                  },
                 };
               },
             },
@@ -227,7 +268,7 @@ if (MOCK_MODE) {
       server,
     ),
   );
-  log("exchange", `x402 paywall: dynamic quotes, fee ${EXCHANGE_FEE_BPS} bps via ${facilitatorUrl} → ${exchangeWallet}`);
+  log("exchange", `x402 paywall: dynamic quotes in ${ASSET_LABEL}, fee ${EXCHANGE_FEE_BPS} bps via ${facilitatorUrl} → ${exchangeWallet}`);
 }
 
 // ---- the router itself ----
@@ -247,9 +288,11 @@ app.post("/v1/chat/completions", async (req, res) => {
     }
   }
   const pinned = providers.get(quote.providerUrl)!;
-  const priceHbarQ = hbarOf(quote.priceTinybar);
-  const feeHbarQ = hbarOf(quote.feeTinybar);
-  const totalHbarQ = hbarOf(quote.totalTinybar);
+  // Decimal views of the pinned quote. The integer base units stay authoritative;
+  // these exist for logs, the response envelope, and the request log.
+  const quotedPrice = fromBaseUnits(quote.priceUnits);
+  const quotedFee = fromBaseUnits(quote.feeUnits);
+  const quotedTotal = fromBaseUnits(quote.totalUnits);
 
   // Verifier replays normally hit providers directly, but anything routed while
   // carrying the audit header is tagged so it stays out of the audit pool.
@@ -259,7 +302,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     const { res: upstream, paymentRef } = await paidPost(
       `${pinned.url}/v1/chat/completions`,
       body,
-      priceHbarQ, // pinned provider price — the provider receives exactly its ask at quote time
+      quotedPrice, // pinned provider price — the provider receives exactly its ask at quote time
       pinned.wallet,
     );
     const latencyMs = Date.now() - t0;
@@ -278,9 +321,9 @@ app.post("/v1/chat/completions", async (req, res) => {
       model: body.model,
       provider: pinned.displayName,
       providerUrl: pinned.url,
-      priceHbar: priceHbarQ,
-      feeHbar: feeHbarQ,
-      totalHbar: totalHbarQ,
+      price: quotedPrice,
+      fee: quotedFee,
+      total: quotedTotal,
       latencyMs,
       paymentRef,
       promptPreview: body.messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, PROMPT_PREVIEW_LIMIT) ?? "",
@@ -293,8 +336,8 @@ app.post("/v1/chat/completions", async (req, res) => {
       // mock inbound already charged at the gate; accrue + publish equivalents here
       entry.inboundRef = `mock-in-${quote.quoteId}`;
       revenue.requests += 1;
-      revenue.volumeTinybar += quote.priceTinybar;
-      revenue.feeTinybar += quote.feeTinybar;
+      revenue.volumeUnits += quote.priceUnits;
+      revenue.feeUnits += quote.feeUnits;
       consumeQuote(quote);
       broadcast({ type: "stats", stats: statsSnapshot() });
     }
@@ -302,7 +345,7 @@ app.post("/v1/chat/completions", async (req, res) => {
     broadcast({ type: "providers", providers: providerList() });
     log(
       "exchange",
-      `routed → ${pinned.displayName} (price ${priceHbarQ} + fee ${feeHbarQ} = ${totalHbarQ} ℏ, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
+      `routed → ${pinned.displayName} (price ${money(quotedPrice)} + fee ${money(quotedFee)} = ${money(quotedTotal)}, ${latencyMs}ms, pay=${paymentRef.slice(0, 18)}…)`,
     );
 
     res.json({
@@ -312,9 +355,10 @@ app.post("/v1/chat/completions", async (req, res) => {
         providerWallet: pinned.wallet,
         agentId: pinned.agentId,
         quoteId: quote.quoteId,
-        priceHbar: priceHbarQ, // provider's listed price (provider receives exactly this)
-        feeHbar: feeHbarQ, // exchange taker fee (EXCHANGE_FEE_BPS, ceil in tinybars)
-        totalHbar: totalHbarQ, // what the agent paid the exchange
+        price: quotedPrice, // provider's listed price (provider receives exactly this)
+        fee: quotedFee, // exchange taker fee (EXCHANGE_FEE_BPS, ceil in base units)
+        total: quotedTotal, // what the agent paid the exchange
+        asset: ASSET_LABEL, // what price/fee/total are denominated in
         latencyMs,
         paymentRef, // exchange→provider settle tx (agent→exchange tx lands via X-PAYMENT-RESPONSE header + /log)
       },
@@ -327,8 +371,8 @@ app.post("/v1/chat/completions", async (req, res) => {
     let refundRef: string | undefined;
     let status: "error" | "refunded" = "error";
     if (MOCK_MODE && REFUND_ON_FAILURE) {
-      mockLedger.set(exchangeWallet, (mockLedger.get(exchangeWallet) ?? 0) - totalHbarQ);
-      const r = await sendRefund("0.0.mock-agent", quote.totalTinybar, quote.quoteId);
+      mockLedger.set(exchangeWallet, (mockLedger.get(exchangeWallet) ?? 0) - quotedTotal);
+      const r = await sendRefund("0.0.mock-agent", quote.totalUnits, quote.quoteId);
       if (r.ok) {
         refundRef = r.refundRef;
         status = "refunded";
@@ -340,7 +384,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       if (!MOCK_MODE) { /* unreachable */ }
       publishToTopic("trades", hederaAccount("EXCHANGE"), {
         type: "refund", model: body.model, provider: pinned.displayName,
-        totalHbar: totalHbarQ, refundTx: refundRef ?? null, quoteId: quote.quoteId,
+        total: quotedTotal, asset: ASSET_LABEL, refundTx: refundRef ?? null, quoteId: quote.quoteId,
       }).catch(() => {});
     }
     consumeQuote(quote);
@@ -350,9 +394,9 @@ app.post("/v1/chat/completions", async (req, res) => {
       model: body.model,
       provider: pinned.displayName,
       providerUrl: pinned.url,
-      priceHbar: priceHbarQ,
-      feeHbar: feeHbarQ,
-      totalHbar: totalHbarQ,
+      price: quotedPrice,
+      fee: quotedFee,
+      total: quotedTotal,
       latencyMs: Date.now() - t0,
       paymentRef: "-",
       refundRef,

@@ -11,17 +11,20 @@ import NavStats from "@/components/NavStats";
 import StatusPill from "@/components/StatusPill";
 import Footer from "@/components/Footer";
 import { EXCHANGE } from "@/lib/config";
+import { useAssetSymbol } from "@/lib/settlement";
 import { CHART, SERIES_HEX } from "@/lib/chart";
 
 // ---- types mirrored from @agentrouter/shared (kept local: dashboard is standalone) ----
 interface ProviderRow {
-  displayName: string; model: string; priceHbar: number; wallet: string;
+  displayName: string; model: string; price: number; wallet: string;
   agentId: string | null; url: string; status: "live" | "down" | "slashed";
   reputation: number; stakeHbar: number; requestsServed: number;
+  // HTS ReputationBond (ARBOND) — on-chain reputation; verifier freezes then wipes on fraud
+  bondTokens: number; bondStatus: "active" | "frozen" | "wiped";
 }
 interface RequestLogEntry {
-  id: string; ts: number; model: string; provider: string; priceHbar: number;
-  feeHbar?: number; totalHbar?: number; inboundRef?: string; refundRef?: string;
+  id: string; ts: number; model: string; provider: string; price: number;
+  fee?: number; total?: number; inboundRef?: string; refundRef?: string;
   latencyMs: number; paymentRef: string; promptPreview: string; answerPreview: string;
   status: "ok" | "error" | "refunded";
 }
@@ -29,7 +32,7 @@ interface SlashEvent { provider: string; amountHbar: number; reason: string }
 interface AuditMsg { topic: string; consensusTs: string; sequence: number; payload: Record<string, unknown> | null }
 interface TopicInfo { id: string | null; hashscan: string | null }
 interface VerifyEvent { provider: string; witness: string; similarity: number; verdict: "ok" | "divergent" }
-interface ExchangeStats { totalVolumeHbar: number; requests: number; feeRevenueHbar: number; refunds: number; refundFailures: number; feeBps: number }
+interface ExchangeStats { totalVolume: number; requests: number; feeRevenue: number; refunds: number; refundFailures: number; feeBps: number; asset?: string }
 
 const hashscanTx = (ref: string) =>
   ref.includes("@") ? `https://hashscan.io/testnet/transaction/${ref}` : null;
@@ -39,7 +42,7 @@ const hashscanAccount = (id: string) =>
 export default function ExchangeControlRoom() {
   const [providers, setProviders] = useState<ProviderRow[]>([]);
   const [feed, setFeed] = useState<RequestLogEntry[]>([]);
-  const [prices, setPrices] = useState<Array<{ ts: number; model: string; priceHbar: number }>>([]);
+  const [prices, setPrices] = useState<Array<{ ts: number; model: string; price: number }>>([]);
   const [slash, setSlash] = useState<SlashEvent | null>(null);
   const [verifies, setVerifies] = useState<VerifyEvent[]>([]);
   const [connected, setConnected] = useState(false);
@@ -49,6 +52,7 @@ export default function ExchangeControlRoom() {
   const [activeTopic, setActiveTopic] = useState<"registry" | "trades" | "verdicts">("trades");
   const [stats, setStats] = useState<ExchangeStats | null>(null);
   const slashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sym = useAssetSymbol();
 
   useEffect(() => {
     fetch(`${EXCHANGE}/providers`).then((r) => r.json()).then(setProviders).catch(() => {});
@@ -64,7 +68,7 @@ export default function ExchangeControlRoom() {
       if (ev.type === "providers") setProviders(ev.providers);
       if (ev.type === "request") {
         setFeed((f) => [ev.entry, ...f].slice(0, 60));
-        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, priceHbar: ev.entry.priceHbar }]);
+        setPrices((p) => [...p.slice(-499), { ts: ev.entry.ts, model: ev.entry.model, price: ev.entry.price }]);
       }
       if (ev.type === "slashed") {
         setSlash({ provider: ev.provider, amountHbar: ev.amountHbar, reason: ev.reason });
@@ -80,6 +84,13 @@ export default function ExchangeControlRoom() {
           if (i < 0) return f;
           const next = [...f]; next[i] = ev.entry; return next;
         });
+      }
+      if (ev.type === "bond") {
+        setProviders((ps) => ps.map((p) =>
+          p.wallet.toLowerCase() === String(ev.wallet).toLowerCase()
+            ? { ...p, bondTokens: ev.bondTokens, bondStatus: ev.bondStatus }
+            : p,
+        ));
       }
     };
     return () => es.close();
@@ -123,7 +134,7 @@ export default function ExchangeControlRoom() {
       const b = Math.floor(p.ts / 5000) * 5000;
       const row = buckets.get(b) ?? {};
       const cell = row[p.model] ?? { sum: 0, n: 0 };
-      cell.sum += p.priceHbar; cell.n += 1;
+      cell.sum += p.price; cell.n += 1;
       row[p.model] = cell; buckets.set(b, row);
     }
     return [...buckets.entries()]
@@ -139,8 +150,11 @@ export default function ExchangeControlRoom() {
   }, [prices]);
 
   const models = useMemo(() => [...new Set(prices.map((p) => p.model))], [prices]);
+  // The chart plots hundredths of a unit (see chartData), so the axis unit is the
+  // settlement asset's "cent": ¢ for USDC, cℏ for HBAR.
+  const centLabel = sym === "$" ? "¢" : `c${sym}`;
   const okFeed = feed.filter((f) => f.status === "ok");
-  const totalVolume = okFeed.reduce((s, f) => s + f.priceHbar, 0);
+  const totalVolume = okFeed.reduce((s, f) => s + f.price, 0);
   const liveCount = providers.filter((p) => p.status === "live").length;
   const avgPrice = okFeed.length ? totalVolume / okFeed.length : 0;
   const topicMsgs = audit.filter((m) => m.topic === activeTopic);
@@ -151,11 +165,11 @@ export default function ExchangeControlRoom() {
       <Navbar>
         <NavStats
           stats={[
-            ["VOLUME", `${totalVolume.toFixed(2)} ℏ`, "text-primary-fixed-dim"],
+            ["VOLUME", `${sym}${totalVolume.toFixed(2)}`, "text-primary-fixed-dim"],
             ["REQUESTS", String(okFeed.length), "text-primary-fixed-dim"],
             ["PROVIDERS", String(liveCount), "text-primary-fixed-dim"],
-            ["AVG PRICE", `${avgPrice.toFixed(3)} ℏ`, "text-primary-fixed-dim"],
-            ["EXCHANGE REVENUE", stats ? `${stats.feeRevenueHbar.toFixed(4)} ℏ` : "—", "text-accent-orange"],
+            ["AVG PRICE", `${sym}${avgPrice.toFixed(3)}`, "text-primary-fixed-dim"],
+            ["EXCHANGE REVENUE", stats ? `${sym}${stats.feeRevenue.toFixed(4)}` : "—", "text-accent-orange"],
           ]}
         />
         <StatusPill
@@ -197,7 +211,7 @@ export default function ExchangeControlRoom() {
                 <div className="space-y-4">
                   <div>
                     <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant block">SESSION VOLUME</span>
-                    <span className="font-data text-3xl font-bold text-on-surface">{totalVolume.toFixed(2)} <span className="text-primary-fixed-dim">ℏ</span></span>
+                    <span className="font-data text-3xl font-bold text-on-surface"><span className="text-primary-fixed-dim">{sym}</span>{totalVolume.toFixed(2)}</span>
                   </div>
                   <div className="pt-4 border-t border-outline-variant flex justify-between">
                     <div>
@@ -216,7 +230,7 @@ export default function ExchangeControlRoom() {
             {/* Price index chart */}
             <Card className="p-5">
               <div className="flex justify-between items-center mb-4">
-                <span className="font-data text-[11px] tracking-[0.1em]">PRICE INDEX (cℏ/REQ)</span>
+                <span className="font-data text-[11px] tracking-[0.1em]">PRICE INDEX ({centLabel}/REQ)</span>
                 <Icon name="trending_up" className="text-primary-fixed-dim text-sm" />
               </div>
               <div className="h-44">
@@ -228,7 +242,7 @@ export default function ExchangeControlRoom() {
                     <Tooltip
                       contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.grid}`, fontSize: 11, fontFamily: "JetBrains Mono" }}
                       labelStyle={{ color: CHART.tooltipLabel }}
-                      formatter={(v: number, name: string) => [`${v} cℏ`, name]}
+                      formatter={(v: number, name: string) => [`${v}${centLabel}`, name]}
                     />
                     <Legend wrapperStyle={{ fontSize: 10, fontFamily: "JetBrains Mono" }} iconType="plainline" />
                     {models.map((m) => (
@@ -263,6 +277,7 @@ export default function ExchangeControlRoom() {
                       <th className="px-6 py-3 font-bold text-right">Price</th>
                       <th className="px-6 py-3 font-bold text-right">Stake</th>
                       <th className="px-6 py-3 font-bold text-right">Rep</th>
+                      <th className="px-6 py-3 font-bold text-center">Bond</th>
                       <th className="px-6 py-3 font-bold text-center">Status</th>
                     </tr>
                   </thead>
@@ -287,9 +302,19 @@ export default function ExchangeControlRoom() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-on-surface-variant">{p.model}</td>
-                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{p.priceHbar.toFixed(2)} ℏ</td>
+                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{sym}{p.price.toFixed(2)}</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error font-bold" : ""}`}>{p.stakeHbar.toFixed(0)} ℏ</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error" : "text-accent-cyan"}`}>{p.reputation}%</td>
+                        <td className="px-6 py-4 text-center whitespace-nowrap">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`font-bold ${p.bondStatus === "wiped" ? "text-hud-error line-through" : p.bondStatus === "frozen" ? "text-accent-orange" : "text-on-surface"}`}>
+                              {p.bondTokens} ARBOND
+                            </span>
+                            {p.bondStatus === "active" && <span className="px-2 py-0.5 bg-accent-cyan/10 text-primary-fixed-dim text-[9px] rounded-sm">BONDED</span>}
+                            {p.bondStatus === "frozen" && <span className="px-2 py-0.5 bg-accent-orange/20 text-accent-orange text-[9px] rounded-sm">🔒 FROZEN</span>}
+                            {p.bondStatus === "wiped" && <span className="px-2 py-0.5 bg-hud-error text-surface-obsidian font-bold text-[9px] rounded-sm">WIPED</span>}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-center">
                           {p.status === "live" && <span className="px-2 py-1 bg-accent-cyan/20 text-accent-cyan text-[10px] rounded-sm">LIVE</span>}
                           {p.status === "down" && <span className="px-2 py-1 bg-surface-variant text-on-surface-variant text-[10px] rounded-sm">DOWN</span>}
@@ -298,7 +323,7 @@ export default function ExchangeControlRoom() {
                       </tr>
                     ))}
                     {providers.length === 0 && (
-                      <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">scanning HCS registry…</td></tr>
+                      <tr><td colSpan={7} className="px-6 py-8 text-center text-on-surface-variant">scanning HCS registry…</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -399,9 +424,9 @@ export default function ExchangeControlRoom() {
                       <th className="px-4 py-2">Provider</th>
                       <th className="px-4 py-2">Model</th>
                       <th className="px-4 py-2">Prompt</th>
-                      <th className="px-4 py-2 text-right">Price (ℏ)</th>
-                      <th className="px-4 py-2 text-right">Fee (ℏ)</th>
-                      <th className="px-4 py-2 text-right">Total (ℏ)</th>
+                      <th className="px-4 py-2 text-right">Price ({sym})</th>
+                      <th className="px-4 py-2 text-right">Fee ({sym})</th>
+                      <th className="px-4 py-2 text-right">Total ({sym})</th>
                       <th className="px-4 py-2 text-right">Lat.</th>
                       <th className="px-4 py-2 text-center">Status</th>
                       <th className="px-4 py-2 text-right">TX in·out</th>
@@ -414,9 +439,9 @@ export default function ExchangeControlRoom() {
                         <td className={`px-4 py-3 ${r.status === "error" ? "text-hud-error" : "text-primary-fixed-dim"}`}>{r.provider}</td>
                         <td className="px-4 py-3 opacity-70">{r.model.replace("-versatile", "").replace("-instant", "")}</td>
                         <td className="px-4 py-3 text-on-surface-variant max-w-[220px] truncate">{r.promptPreview}</td>
-                        <td className="px-4 py-3 text-right">{r.priceHbar.toFixed(3)}</td>
-                        <td className="px-4 py-3 text-right text-accent-orange">{r.feeHbar != null ? r.feeHbar.toFixed(3) : "—"}</td>
-                        <td className="px-4 py-3 text-right">{r.totalHbar != null ? r.totalHbar.toFixed(3) : "—"}</td>
+                        <td className="px-4 py-3 text-right">{r.price.toFixed(3)}</td>
+                        <td className="px-4 py-3 text-right text-accent-orange">{r.fee != null ? r.fee.toFixed(3) : "—"}</td>
+                        <td className="px-4 py-3 text-right">{r.total != null ? r.total.toFixed(3) : "—"}</td>
                         <td className="px-4 py-3 text-right text-accent-cyan">{r.status === "ok" ? `${r.latencyMs}ms` : "--"}</td>
                         <td className="px-4 py-3 text-center">
                           {r.status === "ok" && <span className="text-accent-cyan">SETTLED</span>}

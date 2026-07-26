@@ -8,7 +8,7 @@
 // payment verify. Expired or unknown → fresh 402 (the client just retries).
 
 import { createHash } from "node:crypto";
-import { feeForPrice, tinybarsOf, type ChatCompletionRequest } from "@agentrouter/shared";
+import { feeForPrice, baseUnitsOf, type ChatCompletionRequest } from "@agentrouter/shared";
 import type { ProviderRow } from "@agentrouter/shared";
 
 export const QUOTE_TTL_MS = 60_000;
@@ -18,9 +18,11 @@ export interface Quote {
   bodyKey: string;
   providerUrl: string;
   providerName: string;
-  priceTinybar: number; // provider's listed price — the provider receives exactly this
-  feeTinybar: number; // ceil(price * FEE_BPS / 10000) — the exchange keeps this
-  totalTinybar: number; // what the agent pays the exchange
+  // Integer base units of the active settlement asset (tinybar under HBAR,
+  // micro-USDC under USDC) — never floats, so a quote can't drift by a rounding step.
+  priceUnits: number; // provider's listed price — the provider receives exactly this
+  feeUnits: number; // ceil(price * FEE_BPS / 10000) — the exchange keeps this
+  totalUnits: number; // what the agent pays the exchange
   expiresAt: number;
 }
 
@@ -44,16 +46,16 @@ export function quoteFor(body: ChatCompletionRequest, provider: ProviderRow | un
     byId.delete(existing.quoteId);
   }
   if (!provider) return null;
-  const priceTinybar = tinybarsOf(provider.priceHbar);
-  const feeTinybar = feeForPrice(priceTinybar, feeBps);
+  const priceUnits = baseUnitsOf(provider.price);
+  const feeUnits = feeForPrice(priceUnits, feeBps);
   const quote: Quote = {
     quoteId: `q-${Date.now().toString(36)}-${key.slice(0, 8)}`,
     bodyKey: key,
     providerUrl: provider.url,
     providerName: provider.displayName,
-    priceTinybar,
-    feeTinybar,
-    totalTinybar: priceTinybar + feeTinybar,
+    priceUnits,
+    feeUnits,
+    totalUnits: priceUnits + feeUnits,
     expiresAt: Date.now() + QUOTE_TTL_MS,
   };
   quotes.set(key, quote);
