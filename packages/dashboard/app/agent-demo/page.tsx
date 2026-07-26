@@ -95,7 +95,7 @@ export default function AgentDemoControlRoom() {
         setIdentity((id) =>
           id
             ? { ...id, agentId: ev.agentId, hashscan: ev.hashscan }
-            : { agentId: ev.agentId, account: ev.agentId.split(":").pop() || "", hashscan: ev.hashscan }
+            : { agentId: ev.agentId, account: (ev.agentId ?? "").split(":").pop() || "", hashscan: ev.hashscan }
         );
         break;
       default:
