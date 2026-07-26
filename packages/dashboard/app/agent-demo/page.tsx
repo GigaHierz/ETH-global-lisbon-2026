@@ -118,9 +118,11 @@ export default function AgentDemoControlRoom() {
       memoryTx: string;
       mintTx: string;
       callCount: number;
+      inherited?: boolean;
     } | null;
   } | null>(null);
   const [minting, setMinting] = useState(false);
+  const [mintError, setMintError] = useState<string | null>(null);
 
   const sym = useAssetSymbol();
 
@@ -258,11 +260,19 @@ export default function AgentDemoControlRoom() {
   async function mintAgenticId() {
     if (minting) return;
     setMinting(true);
+    setMintError(null);
     try {
-      await fetch(`${AGENT}/agentic-id/mint`, { method: "POST" }).then((r) => r.json());
+      const res = await fetch(`${AGENT}/agentic-id/mint`, { method: "POST" });
+      if (!res.ok) {
+        // Surface the real reason instead of silently no-op'ing — a 501 means 0G
+        // isn't configured on the agent-server, a 500 carries the upstream error.
+        const body = await res.json().catch(() => ({}));
+        setMintError(body.error || `mint failed (${res.status})`);
+        return;
+      }
       refreshAgenticId();
     } catch {
-      /* leave the panel as-is; 0G may be unconfigured */
+      setMintError("agent-server unreachable");
     } finally {
       setMinting(false);
     }
@@ -475,6 +485,12 @@ export default function AgentDemoControlRoom() {
                       <div className="font-data text-[10px] text-on-surface-variant">
                         {agenticId.agenticId.callCount} calls · encrypted (AES-256)
                       </div>
+                      {agenticId.agenticId.inherited && (
+                        <div className="font-data text-[10px] text-accent-cyan flex items-center gap-1">
+                          <Icon name="download" className="text-[12px]" />
+                          inherited memory · {agenticId.agenticId.callCount} calls loaded from 0G
+                        </div>
+                      )}
                       <button
                         onClick={mintAgenticId}
                         disabled={minting}
@@ -497,6 +513,9 @@ export default function AgentDemoControlRoom() {
                         {minting ? "minting…" : "mint agentic id"}
                       </button>
                     </>
+                  )}
+                  {mintError && (
+                    <p className="font-data text-[10px] text-hud-error break-words">⚠ {mintError}</p>
                   )}
                 </div>
               </Card>
