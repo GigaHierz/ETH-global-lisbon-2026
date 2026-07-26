@@ -12,6 +12,7 @@ import StatusPill from "@/components/StatusPill";
 import Footer from "@/components/Footer";
 import { EXCHANGE } from "@/lib/config";
 import { useAssetSymbol } from "@/lib/settlement";
+import { amount, money, sumOf } from "@/lib/format";
 import { CHART, SERIES_HEX } from "@/lib/chart";
 
 // ---- types mirrored from @agentrouter/shared (kept local: dashboard is standalone) ----
@@ -131,6 +132,7 @@ export default function ExchangeControlRoom() {
   const chartData = useMemo(() => {
     const buckets = new Map<number, Record<string, { sum: number; n: number }>>();
     for (const p of prices) {
+      if (typeof p.price !== "number" || !Number.isFinite(p.price)) continue; // never plot NaN
       const b = Math.floor(p.ts / 5000) * 5000;
       const row = buckets.get(b) ?? {};
       const cell = row[p.model] ?? { sum: 0, n: 0 };
@@ -154,7 +156,7 @@ export default function ExchangeControlRoom() {
   // settlement asset's "cent": ¢ for USDC, cℏ for HBAR.
   const centLabel = sym === "$" ? "¢" : `c${sym}`;
   const okFeed = feed.filter((f) => f.status === "ok");
-  const totalVolume = okFeed.reduce((s, f) => s + f.price, 0);
+  const totalVolume = sumOf(okFeed, (f) => f.price);
   const liveCount = providers.filter((p) => p.status === "live").length;
   const avgPrice = okFeed.length ? totalVolume / okFeed.length : 0;
   const topicMsgs = audit.filter((m) => m.topic === activeTopic);
@@ -165,11 +167,11 @@ export default function ExchangeControlRoom() {
       <Navbar>
         <NavStats
           stats={[
-            ["VOLUME", `${sym}${totalVolume.toFixed(2)}`, "text-primary-fixed-dim"],
+            ["VOLUME", money(sym, totalVolume, 2), "text-primary-fixed-dim"],
             ["REQUESTS", String(okFeed.length), "text-primary-fixed-dim"],
             ["PROVIDERS", String(liveCount), "text-primary-fixed-dim"],
-            ["AVG PRICE", `${sym}${avgPrice.toFixed(3)}`, "text-primary-fixed-dim"],
-            ["EXCHANGE REVENUE", stats ? `${sym}${stats.feeRevenue.toFixed(4)}` : "—", "text-accent-orange"],
+            ["AVG PRICE", money(sym, avgPrice, 3), "text-primary-fixed-dim"],
+            ["EXCHANGE REVENUE", money(sym, stats?.feeRevenue, 4), "text-accent-orange"],
           ]}
         />
         <StatusPill
@@ -211,7 +213,7 @@ export default function ExchangeControlRoom() {
                 <div className="space-y-4">
                   <div>
                     <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant block">SESSION VOLUME</span>
-                    <span className="font-data text-3xl font-bold text-on-surface"><span className="text-primary-fixed-dim">{sym}</span>{totalVolume.toFixed(2)}</span>
+                    <span className="font-data text-3xl font-bold text-on-surface"><span className="text-primary-fixed-dim">{sym}</span>{amount(totalVolume, 2)}</span>
                   </div>
                   <div className="pt-4 border-t border-outline-variant flex justify-between">
                     <div>
@@ -302,8 +304,8 @@ export default function ExchangeControlRoom() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-on-surface-variant">{p.model}</td>
-                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{sym}{p.price.toFixed(2)}</td>
-                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error font-bold" : ""}`}>{p.stakeHbar.toFixed(0)} ℏ</td>
+                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "opacity-50" : ""}`}>{money(sym, p.price, 2)}</td>
+                        <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error font-bold" : ""}`}>{amount(p.stakeHbar, 0)} ℏ</td>
                         <td className={`px-6 py-4 text-right ${p.status === "slashed" ? "text-hud-error" : "text-accent-cyan"}`}>{p.reputation}%</td>
                         <td className="px-6 py-4 text-center whitespace-nowrap">
                           <div className="flex flex-col items-center gap-1">
@@ -346,7 +348,7 @@ export default function ExchangeControlRoom() {
                         <span className="text-accent-cyan font-bold">PASS</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-on-surface-variant">
-                        <span>Sim Score: {v.similarity.toFixed(2)}</span>
+                        <span>Sim Score: {amount(v.similarity, 2)}</span>
                         <span>Thresh: 0.35</span>
                       </div>
                     </div>
@@ -357,7 +359,7 @@ export default function ExchangeControlRoom() {
                         <span className="text-hud-error font-bold">VERDICT: FRAUD</span>
                       </div>
                       <p className="text-hud-error/80">
-                        Divergence vs witness {v.witness} — similarity {(v.similarity * 100).toFixed(0)}% &lt; 35%
+                        Divergence vs witness {v.witness} — similarity {amount((v.similarity ?? 0) * 100, 0)}% &lt; 35%
                       </p>
                     </div>
                   ))}
@@ -439,9 +441,9 @@ export default function ExchangeControlRoom() {
                         <td className={`px-4 py-3 ${r.status === "error" ? "text-hud-error" : "text-primary-fixed-dim"}`}>{r.provider}</td>
                         <td className="px-4 py-3 opacity-70">{r.model.replace("-versatile", "").replace("-instant", "")}</td>
                         <td className="px-4 py-3 text-on-surface-variant max-w-[220px] truncate">{r.promptPreview}</td>
-                        <td className="px-4 py-3 text-right">{r.price.toFixed(3)}</td>
-                        <td className="px-4 py-3 text-right text-accent-orange">{r.fee != null ? r.fee.toFixed(3) : "—"}</td>
-                        <td className="px-4 py-3 text-right">{r.total != null ? r.total.toFixed(3) : "—"}</td>
+                        <td className="px-4 py-3 text-right">{amount(r.price, 3)}</td>
+                        <td className="px-4 py-3 text-right text-accent-orange">{amount(r.fee, 3)}</td>
+                        <td className="px-4 py-3 text-right">{amount(r.total, 3)}</td>
                         <td className="px-4 py-3 text-right text-accent-cyan">{r.status === "ok" ? `${r.latencyMs}ms` : "--"}</td>
                         <td className="px-4 py-3 text-center">
                           {r.status === "ok" && <span className="text-accent-cyan">SETTLED</span>}

@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import TerminalDots from "@/components/TerminalDots";
 import { AGENT } from "@/lib/config";
 import { useAssetSymbol } from "@/lib/settlement";
+import { amount, money } from "@/lib/format";
 
 // ---- types mirrored from the agent-server contract (dashboard is standalone) ----
 interface Budget { cap: number; spent: number; remaining: number }
@@ -210,8 +211,8 @@ export default function AgentDemoControlRoom() {
       <Navbar>
         <NavStats
           stats={[
-            ["BALANCE", balance == null ? "—" : `${sym}${balance.toFixed(2)}`, "text-primary-fixed-dim"],
-            ["SPENT", `${sym}${budget.spent.toFixed(2)}`, "text-accent-orange"],
+            ["BALANCE", money(sym, balance, 2), "text-primary-fixed-dim"],
+            ["SPENT", money(sym, budget.spent, 2), "text-accent-orange"],
             ["ANSWERS BOUGHT", String(bought.length), "text-primary-fixed-dim"],
           ]}
         />
@@ -260,19 +261,19 @@ export default function AgentDemoControlRoom() {
                 <div>
                   <span className="font-data text-[10px] tracking-[0.1em] text-on-surface-variant block">AGENT WALLET</span>
                   <span className="font-data text-3xl font-bold text-on-surface">
-                    <span className="text-primary-fixed-dim">{sym}</span>{balance == null ? "—" : balance.toFixed(4)}
+                    <span className="text-primary-fixed-dim">{sym}</span>{amount(balance, 4)}
                   </span>
                 </div>
                 <div>
                   <div className="flex justify-between font-data text-[10px] tracking-[0.1em] text-on-surface-variant mb-1.5">
                     <span>BUDGET</span>
-                    <span><span className="text-on-surface">{sym}{budget.spent.toFixed(4)}</span> / {sym}{budget.cap.toFixed(4)}</span>
+                    <span><span className="text-on-surface">{money(sym, budget.spent, 4)}</span> / {money(sym, budget.cap, 4)}</span>
                   </div>
                   <div className="h-2 w-full bg-surface-obsidian border border-outline-variant overflow-hidden">
                     <div className={`h-full transition-all duration-500 ${barClass}`} style={{ width: `${pct}%` }} aria-hidden />
                   </div>
                   <p className="mt-1.5 font-data text-[10px] text-on-surface-variant">
-                    {sym}{budget.remaining.toFixed(4)} REMAINING
+                    {money(sym, budget.remaining, 4)} REMAINING
                   </p>
                 </div>
                 {done && (
@@ -362,7 +363,7 @@ export default function AgentDemoControlRoom() {
                       <div className="shrink-0 font-data text-[11px] text-right">
                         <div>
                           <span className="text-accent-cyan">{b.provider}</span>
-                          <span className="text-on-surface-variant"> · {sym}{b.cost.toFixed(4)}</span>
+                          <span className="text-on-surface-variant"> · {money(sym, b.cost, 4)}</span>
                         </div>
                         {b.hashscan && (
                           <a href={b.hashscan} target="_blank" rel="noreferrer"
@@ -396,7 +397,7 @@ export default function AgentDemoControlRoom() {
                 {done && (
                   <div className="row-in flex flex-wrap gap-6 font-data text-xs border-t border-outline-variant pt-4 text-on-surface-variant">
                     <span className="text-accent-cyan">✓ DONE</span>
-                    <span>TOTAL SPENT <span className="text-on-surface">{sym}{done.spent.toFixed(4)}</span></span>
+                    <span>TOTAL SPENT <span className="text-on-surface">{money(sym, done.spent, 4)}</span></span>
                     <span>FINDINGS <span className="text-on-surface">{done.findings}</span></span>
                   </div>
                 )}

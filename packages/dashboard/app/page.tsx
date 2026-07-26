@@ -8,6 +8,7 @@ import TerminalDots from "@/components/TerminalDots";
 import Footer from "@/components/Footer";
 import { EXCHANGE } from "@/lib/config";
 import { useAssetSymbol } from "@/lib/settlement";
+import { money, sumOf } from "@/lib/format";
 
 const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
 
@@ -78,12 +79,12 @@ export default function Landing() {
       fetch(`${EXCHANGE}/log?limit=100`).then((r) => r.json()).catch(() => []),
     ]).then(([providers, log]: [Array<{ status: string }>, Array<{ status: string; price: number }>]) => {
       const ok = (log ?? []).filter((e) => e.status === "ok");
-      const vol = ok.reduce((s, e) => s + e.price, 0);
+      const vol = sumOf(ok, (e) => e.price);
       setStats({
-        volume: `${sym}${vol.toFixed(2)}`,
+        volume: money(sym, vol, 2),
         requests: String(ok.length),
         providers: String((providers ?? []).filter((p) => p.status === "live").length),
-        avgPrice: ok.length ? `${sym}${(vol / ok.length).toFixed(3)}` : "—",
+        avgPrice: ok.length ? money(sym, vol / ok.length, 3) : "—",
       });
     }).catch(() => {});
   }, []);
