@@ -18,7 +18,7 @@ An autonomous agent with its own wallet that **accomplishes a goal by buying inf
 - **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET`.
 
 ### The provider agents (`packages/provider/`, supply side)
-One codebase, four "personalities" (Titan, Budget, NimbusAI, SketchyGPU):
+One codebase, four "personalities" — Titan, Budget and SketchyGPU serve Groq; NimbusAI resells **0G Compute**:
 - Register an HCS-14-style identity + advertised model/price to the registry topic.
 - **Stake 50 ℏ** to an escrow account as a quality bond, and hold an **HTS ReputationBond** (`ARBOND`) whose balance is their on-chain reputation.
 - Serve inference (proxying Groq) behind an x402 paywall.
