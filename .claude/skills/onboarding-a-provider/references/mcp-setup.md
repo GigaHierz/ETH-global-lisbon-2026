@@ -20,7 +20,7 @@ and a second 50 ℏ stake; see the bottom of this file.
 | `create_provider_account` | Creates + funds a Hedera Testnet account, writes `HEDERA_<role>_ID/KEY/EVM` to `.env` |
 | `stake_collateral` | Moves the 50 ℏ bond to the escrow account, if the service hasn't already |
 | `register_provider` | Publishes the HCS-14 registration, if the service hasn't already |
-| `deploy_provider` | Health-checks an already-running endpoint and records its public URL |
+| `deploy_provider` | Health-checks an already-running endpoint, records its public URL, and returns a Railway/VPS config for the chosen `backend` (`0g` default \| `groq` \| `canned`) — it sets `PROVIDER_BACKEND` and wires the matching key (`ZEROG_API_KEY` / `GROQ_API_KEY`) |
 | `verify_provider_live` | Polls the exchange routing table until the wallet shows `live` |
 | `provision_provider` | Orchestrates all of the above, resumable |
 

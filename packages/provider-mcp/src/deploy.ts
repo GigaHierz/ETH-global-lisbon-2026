@@ -55,15 +55,31 @@ export async function checkEndpoint(publicUrl: string, model: string): Promise<E
   }
 }
 
+export type Backend = "0g" | "groq" | "canned";
+
 export interface RailwayConfigInput {
   profile: string;
   publicUrl: string;
   providerId: string;
   escrowId: string;
   role?: string;
-  groqKey?: string;
+  backend?: Backend; // where inference comes from; default 0g (recommended)
+  keyConfigured?: boolean; // whether the chosen backend's API key will be set on the box
   cheat?: boolean;
 }
+
+// The env var each backend reads for its API key. canned needs none.
+const BACKEND_KEY: Record<Backend, string | null> = {
+  "0g": "ZEROG_API_KEY",
+  groq: "GROQ_API_KEY",
+  canned: null,
+};
+
+// Where a provider gets that key, for the emitted secret hint.
+const BACKEND_KEY_SOURCE: Record<string, string> = {
+  ZEROG_API_KEY: "your 0G Compute API key (get one at pc.0g.ai, fund it with 0G testnet tokens)",
+  GROQ_API_KEY: "your Groq API key (console.groq.com/keys)",
+};
 
 /** The exact Railway settings to run the provider service, for someone who needs
  *  to spin up fresh compute. Secrets are placeholders — never emit real keys.
@@ -71,9 +87,15 @@ export interface RailwayConfigInput {
  *  Note the deliberate rename: the account is stored locally as HEDERA_<role>_*, but
  *  the deployed service runs the `custom` profile, which always reads HEDERA_PROVIDER_*.
  *  We emit the right *value* under the name the service expects, and `secrets` says
- *  which local var to copy it from — otherwise a non-default role can't be deployed. */
+ *  which local var to copy it from — otherwise a non-default role can't be deployed.
+ *
+ *  The backend controls which API key we wire up: 0g → ZEROG_API_KEY (default), groq →
+ *  GROQ_API_KEY, canned → no key. Omit the key and the service falls back to deterministic
+ *  canned answers, still honest about the advertised model. */
 export function railwayConfig(o: RailwayConfigInput) {
   const role = o.role ?? "PROVIDER";
+  const backend: Backend = o.backend ?? "0g";
+  const keyVar = BACKEND_KEY[backend];
   return {
     builder: "DOCKERFILE",
     dockerfilePath: "Dockerfile",
@@ -82,16 +104,19 @@ export function railwayConfig(o: RailwayConfigInput) {
       "Do NOT set PORT (Railway injects it). PROVIDER_PUBLIC_URL MUST be this service's public domain — otherwise it registers 'localhost' and the exchange shows it 'down'.",
     secrets: {
       HEDERA_PROVIDER_KEY: `copy the value of HEDERA_${role}_KEY from your .env`,
-      ...(o.groqKey ? { GROQ_API_KEY: "your Groq API key" } : {}),
+      ...(keyVar && o.keyConfigured ? { [keyVar]: BACKEND_KEY_SOURCE[keyVar] } : {}),
     },
     env: {
       MOCK_MODE: "false",
       PROVIDER_PROFILE: o.profile,
+      PROVIDER_BACKEND: backend,
       PROVIDER_PUBLIC_URL: o.publicUrl,
       HEDERA_PROVIDER_ID: o.providerId,
       HEDERA_PROVIDER_KEY: "<set-as-railway-secret>",
       HEDERA_ESCROW_ID: o.escrowId,
-      GROQ_API_KEY: o.groqKey ? "<set-as-railway-secret>" : "<optional-omit-for-canned-answers>",
+      ...(keyVar
+        ? { [keyVar]: o.keyConfigured ? "<set-as-railway-secret>" : "<optional-omit-for-canned-answers>" }
+        : {}),
       CHEAT_MODE: String(o.cheat ?? false),
     },
   };
