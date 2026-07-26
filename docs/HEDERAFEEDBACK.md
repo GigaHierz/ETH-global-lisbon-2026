@@ -1,7 +1,7 @@
 # Hedera Developer Feedback — AgentRouter (ETHGlobal Lisbon 2026)
 
 Feedback from building **AgentRouter** — an inference marketplace where AI agents pay per LLM
-request in native HBAR over x402, providers stake collateral, register HCS-14-style identities on
+request in USDC over x402 (native HBAR behind a flag), providers stake collateral, register HCS-14-style identities on
 the Hedera Consensus Service (via the Hedera Agent Kit), and hold an **HTS ReputationBond**, and a
 verifier slashes providers that lie about their model — destroying the bond with a **2-of-2
 multi-sig `TokenWipe`** (verifier + auditor).

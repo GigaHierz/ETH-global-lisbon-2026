@@ -1,7 +1,8 @@
 # AgentRouter — Autonomous Buyer Agent
 
 An AI agent with its own Hedera wallet that **buys LLM inference per request and pays for it
-autonomously in real HBAR** on Hedera Testnet, over the [x402](https://x402.org) protocol.
+autonomously in USDC** (native HBAR behind `SETTLEMENT_ASSET=hbar`) on Hedera Testnet, over the
+[x402](https://x402.org) protocol.
 It has an on-chain **HCS-14 identity**, reasons toward a goal with a budget it can't exceed,
 and streams every step (plan → paid buys → synthesis) to a live web UI.
 
@@ -14,7 +15,7 @@ on-chain actions) + the **Hedera SDK** + **x402**. Everything on-chain is real t
    registry topic — submitted via the Hedera Agent Kit's `submit_topic_message_tool`. Same
    directory the providers register into, so buyers and sellers are one discoverable set.
 2. **Plans** a goal into sub-questions (Groq brain — the agent's own reasoning).
-3. **Buys** an answer to each question through the exchange, **signing the x402 HBAR payment with
+3. **Buys** an answer to each question through the exchange, **signing the x402 USDC payment with
    its own AGENT account** (the exchange routes to the cheapest live provider and keeps the spread).
 4. **Enforces a budget** (`AGENT_BUDGET`) — stops buying the moment the next call won't fit.
 5. **Synthesizes** the bought answers into a final result.
@@ -22,7 +23,7 @@ on-chain actions) + the **Hedera SDK** + **x402**. Everything on-chain is real t
    the `/agent` web page.
 
 ```
-[web UI /agent] --SSE--> [agent-server :4200] --x402 HBAR (AGENT-signed)--> [exchange :4100] --x402--> cheapest provider --> Groq
+[web UI /agent] --SSE--> [agent-server :4200] --x402 USDC (AGENT-signed)--> [exchange :4100] --x402--> cheapest provider --> Groq
                               |__ Hedera Agent Kit: HCS-14 identity registration
 ```
 

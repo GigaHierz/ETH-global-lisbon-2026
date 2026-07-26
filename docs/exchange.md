@@ -57,8 +57,9 @@ Anyone with a box sells inference. On boot, a provider:
 
 3. **Serves an OpenAI-compatible endpoint** (`POST /v1/chat/completions`) behind an x402
    paywall. Unpaid requests get `402 Payment Required` with machine-readable payment
-   requirements; paid requests get inference. Backends: Groq API, or a
-   canned deterministic fallback (so demos survive with zero external dependencies).
+   requirements; paid requests get inference. Compute backends are pluggable: **0G Compute**
+   (default for bring-your-own supply), the **Groq** API, or a canned deterministic fallback
+   (so demos survive with zero external dependencies).
 
 There is **no signup and no permission** — the stake is the listing fee, the topic message
 is the listing, being reachable is the activation. The exchange discovers new supply from
@@ -68,7 +69,7 @@ the chain within seconds.
 Any wallet-holding process can buy. The demo agent
 ([/agent-demo](https://eth-global-lisbon-2026-dashboard.vercel.app/agent-demo)) is a full
 autonomous buyer: give it a goal, it plans sub-questions, **buys each answer through the
-exchange with a real HBAR payment**, tracks a hard budget cap (stops buying when
+exchange with a real USDC payment** (native HBAR via `SETTLEMENT_ASSET=hbar`), tracks a hard budget cap (stops buying when
 exhausted), and synthesizes a final answer — every purchase individually settled on-chain
 with a clickable Hashscan receipt. Its identity is an HCS-14 UAID like the providers'.
 
@@ -105,7 +106,8 @@ real — see the receipts in §7.
 The facilitator is **boot-time verified over a ladder**: `api.testnet.blocky402.com` →
 `x402.org/facilitator` — services probe `/supported` and log which rung answered; if one
 dies the next takes over, and `MOCK_MODE=true` keeps the entire system demoable offline.
-Settlement asset is native HBAR (tinybar-exact).
+Default settlement asset is **HTS USDC** (`0.0.429274`, 6 dp); `SETTLEMENT_ASSET=hbar` switches to
+native HBAR (the tinybar amounts in the 402 example above show the HBAR-mode shape).
 
 ## 4 · What THIS service does (the exchange)
 

@@ -6,7 +6,7 @@ callable tools. Built with the Anthropic **mcp-builder** methodology (research â
 agent-facing evals), Node/TypeScript on `@modelcontextprotocol/sdk`.
 
 A "provider" is AgentRouter's supply side: an OpenAI-compatible server that sells inference paid in
-native HBAR over x402, with an HCS-14 identity and staked collateral on Hedera Consensus Service.
+USDC over x402 (native HBAR behind `SETTLEMENT_ASSET=hbar`), with an HCS-14 identity and staked collateral on Hedera Consensus Service.
 See [`docs/provider.md`](../../docs/provider.md) and [`docs/DEPLOY.md`](../../docs/DEPLOY.md).
 
 ## Tools

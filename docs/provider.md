@@ -1,7 +1,8 @@
 # AgentRouter — Inference Provider (Supply)
 
-An OpenAI-compatible inference server that **sells LLM answers per request and gets paid in real
-HBAR** on Hedera Testnet, over the [x402](https://x402.org) protocol. On boot it **stakes 50 ℏ of
+An OpenAI-compatible inference server that **sells LLM answers per request and gets paid in USDC**
+(native HBAR behind `SETTLEMENT_ASSET=hbar`) on Hedera Testnet, over the [x402](https://x402.org)
+protocol. On boot it **stakes 50 ℏ of
 collateral** into an escrow account and **registers an on-chain HCS-14 identity** on the shared
 registry topic, so the exchange discovers it automatically. One codebase runs several env-driven
 "personalities" — including a deliberate **cheater** that advertises one model but serves a weaker
@@ -21,8 +22,9 @@ payments) + **`@x402/express`** paywall. Everything on-chain is real testnet —
    ~1–5 s. Re-registers automatically if its public endpoint changes.
 3. **Puts the endpoint behind an x402 paywall.** Walks a **facilitator ladder**
    (`api.testnet.blocky402.com` → `x402.org/facilitator`) and gates `POST /v1/chat/completions` with
-   `@x402/express` + `@x402/hedera` — `402 Payment Required` → signed HBAR payment → `200`,
-   tinybar-exact, at the advertised price. Facilitator sponsors fees, so buyers need no gas.
+   `@x402/express` + `@x402/hedera` — `402 Payment Required` → signed USDC payment → `200`,
+   base-unit-exact, at the advertised price (native HBAR via `SETTLEMENT_ASSET=hbar`). Facilitator
+   sponsors fees, so buyers need no gas.
 4. **Serves inference.** Proxies **Groq** (or deterministic canned answers when no `GROQ_API_KEY` is
    set — the demo works either way). The **cheat** personality secretly serves `llama-3.1-8b-instant`
    while advertising `llama-3.3-70b-versatile`.
@@ -47,7 +49,7 @@ immediately wins routing while passing verification.
 ```
                          stake 50 ℏ ─────────────► [escrow 0.0.9746385]
                          register (HCS-14) ──────► [HCS registry topic 0.0.9744593]
-[Provider :40xx] ◄── discover (Mirror Node) ── [Exchange :4100] ◄── x402 HBAR ── [Agent]
+[Provider :40xx] ◄── discover (Mirror Node) ── [Exchange :4100] ◄── x402 USDC ── [Agent]
        │  POST /v1/chat/completions behind @x402/express paywall (402 → paid → 200)
        └── proxies ──► [Groq API]   (or canned answers with no key)
 
@@ -57,8 +59,8 @@ immediately wins routing while passing verification.
 ## What we built / verified (submission notes)
 
 - **Real mode on Hedera Testnet, end-to-end:** providers stake, register, and get paid per request
-  in native HBAR — verified with a strict smoke gate (402 → paid → exact balance deltas, twice) and
-  the full demo (stake → route → serve → slash the cheater).
+  in USDC (native HBAR behind `SETTLEMENT_ASSET=hbar`) — verified with a strict smoke gate (402 →
+  paid → exact balance deltas, twice) and the full demo (stake → route → serve → slash the cheater).
 - **NimbusAI (4th provider):** added to show a new supplier onboarding onto the marketplace live.
 - **Deployable as a standalone service (Railway etc.):** the provider now binds to the injected
   `PORT` and advertises `PROVIDER_PUBLIC_URL` (registering that public address on HCS instead of
@@ -82,7 +84,7 @@ Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) �
 
 | Route | Auth | Purpose |
 |---|---|---|
-| `POST /v1/chat/completions` | **x402 (paid)** | OpenAI-compatible inference; returns `402` unpaid, `200` after HBAR payment |
+| `POST /v1/chat/completions` | **x402 (paid)** | OpenAI-compatible inference; returns `402` unpaid, `200` after USDC payment (native HBAR via `SETTLEMENT_ASSET=hbar`) |
 | `GET /info` | public | `{ displayName, model, price, wallet, agentId, url }` — what the exchange sees |
 | `GET /healthz` | public | `{ ok: true }` |
 

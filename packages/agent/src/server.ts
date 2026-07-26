@@ -72,8 +72,15 @@ const state = {
 // Default buy (fallback model); per-run buys are routed against the live market.
 const buy = makeBuy(EXCHANGE, ASK, MODEL);
 
-/** Route the goal to a model tier using the exchange's live provider market. */
-async function routedBuyFor(goal: string) {
+/** Route the goal to a model tier using the exchange's live provider market.
+ *  An explicit `pick` skips the router entirely — the tier heuristic is prompt-shaped,
+ *  which is fine for autonomy but useless when you need to demonstrate a specific
+ *  supply network on demand. */
+async function routedBuyFor(goal: string, pick?: string) {
+  if (pick) {
+    log("agent", `router: overridden — buying ${pick} explicitly`);
+    return { buy: makeBuy(EXCHANGE, ASK, pick), route: { model: pick, tier: "medium" as const, reason: "model chosen explicitly" } };
+  }
   try {
     const providers = (await (await fetch(`${EXCHANGE}/providers`)).json()) as Array<{
       model: string; price?: number; priceHbar?: number; status: string;
@@ -168,6 +175,26 @@ app.get("/healthz", (_req, res) =>
   res.json({ ok: true, ready, error: bootError, agentId: identity.agentId, account, mock: MOCK_MODE }),
 );
 app.get("/identity", (_req, res) => res.json(identity));
+
+// The models the exchange can actually route to right now, cheapest first. The UI
+// reads this to offer an explicit choice instead of hoping the router picks the one
+// you want to show.
+app.get("/models", async (_req, res) => {
+  try {
+    const providers = (await (await fetch(`${EXCHANGE}/providers`)).json()) as Array<{
+      model: string; price?: number; status: string;
+    }>;
+    const cheapest = new Map<string, number>();
+    for (const p of providers) {
+      if (p.status !== "live" || typeof p.price !== "number" || !Number.isFinite(p.price)) continue;
+      const seen = cheapest.get(p.model);
+      if (seen === undefined || p.price < seen) cheapest.set(p.model, p.price);
+    }
+    res.json([...cheapest].sort((a, b) => a[1] - b[1]).map(([model, price]) => ({ model, price })));
+  } catch {
+    res.json([]);
+  }
+});
 app.get("/state", (_req, res) =>
   res.json({
     running: state.running,
@@ -228,8 +255,10 @@ app.get("/events", (req, res) => {
 app.post("/run", async (req, res) => {
   if (!ready) return res.status(503).json({ error: bootError ?? "agent is still starting up" });
   if (state.running) return res.status(409).json({ error: "a run is already in progress" });
-  const goal = (req.body as { goal?: string })?.goal?.trim();
+  const body = req.body as { goal?: string; model?: string };
+  const goal = body?.goal?.trim();
   if (!goal) return res.status(400).json({ error: "goal required" });
+  const pick = body?.model?.trim() || undefined;
 
   state.running = true;
   state.goal = goal;
@@ -239,7 +268,7 @@ app.post("/run", async (req, res) => {
   state.budget = { cap: BUDGET, spent: 0, remaining: BUDGET };
   res.json({ ok: true });
 
-  const routed = await routedBuyFor(goal);
+  const routed = await routedBuyFor(goal, pick);
   broadcast({ type: "route", model: routed.route.model, tier: routed.route.tier, reason: routed.route.reason });
   state.events.push({ type: "route", model: routed.route.model, tier: routed.route.tier, reason: routed.route.reason });
 
