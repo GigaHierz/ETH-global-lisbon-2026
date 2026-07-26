@@ -5,7 +5,7 @@
 
 import express from "express";
 import cors from "cors";
-import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money, publishToTopic, readTopicMessages } from "@agentrouter/shared";
+import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money, publishToTopic, readTopicMessages, mintAgenticId, updateAgenticIdMemory, agenticIdEnabled, agenticIdLink } from "@agentrouter/shared";
 import { Budget } from "./budget.js";
 import { groqBrain } from "./brain.js";
 import { makeBuy } from "./buy.js";
@@ -13,6 +13,7 @@ import { routeModel } from "./route-model.js";
 import { initAgentPayer } from "./payer.js";
 import { registerIdentity, type Identity } from "./identity.js";
 import { runGoal, type AgentEvent } from "./loop.js";
+import { uploadMemory, zeroGStorageEnabled } from "./memory-0g.js";
 
 // Hosts (Railway/Render/Fly) inject PORT; fall back to AGENT_PORT locally.
 const PORT = parseInt(process.env.PORT || process.env.AGENT_PORT || "4200", 10);
@@ -35,6 +36,20 @@ let identity: Identity = { agentId: "(registering…)", account: "", hashscan: "
 let account = "";
 let bootError: string | null = null;
 let ready = false;
+
+// The agent's Agentic ID (ERC-7857-style, on 0G Chain) and the 0G Storage root of
+// its encrypted memory. Minted on demand via POST /agentic-id/mint; null until then.
+interface AgenticIdState {
+  tokenId: string | null;
+  contract: string;
+  explorer: string;
+  memoryRoot: string;
+  memoryTx: string;
+  mintTx: string;
+  callCount: number;
+  updatedAt: number;
+}
+let agenticId: AgenticIdState | null = null;
 
 interface WireBudget {
   cap: number;
@@ -237,6 +252,73 @@ app.get("/calls", async (req, res) => {
   for (const c of [...onChain, ...calls]) byRef.set(c.paymentRef, c);
   const merged = [...byRef.values()].sort((a, b) => b.ts - a.ts).slice(0, limit);
   res.json({ calls: merged });
+});
+
+// Agentic ID — the agent tokenized on 0G Chain (ERC-7857-style), its intelligent
+// data pointing at its encrypted memory in 0G Storage. GET reports current state;
+// POST /agentic-id/mint snapshots the agent's memory → 0G Storage → mints (or
+// re-points) the Agentic ID. All gated on ZEROG_CHAIN_KEY + ZEROG_AGENT_NFT +
+// ZEROG_MEMORY_SECRET; returns 501 when 0G is not configured.
+app.get("/agentic-id", (_req, res) => {
+  res.json({
+    enabled: agenticIdEnabled() && zeroGStorageEnabled(),
+    agentId: identity.agentId,
+    contract: agenticIdLink(),
+    agenticId,
+  });
+});
+
+app.post("/agentic-id/mint", async (_req, res) => {
+  if (!agenticIdEnabled() || !zeroGStorageEnabled()) {
+    return res.status(501).json({
+      error: "0G not configured — set ZEROG_CHAIN_KEY, ZEROG_AGENT_NFT and ZEROG_MEMORY_SECRET",
+    });
+  }
+  try {
+    // Snapshot the agent's memory (its whole call history) and encrypt-upload it.
+    const memory = {
+      agentId: identity.agentId,
+      account: identity.account,
+      goal: state.goal,
+      calls,
+      snapshotAt: Date.now(),
+    };
+    const stored = await uploadMemory(memory);
+    if (!stored) return res.status(501).json({ error: "0G Storage upload returned no result" });
+
+    const description = `AgentRouter buyer agent ${identity.agentId} — encrypted memory (${calls.length} calls) @ 0G Storage ${stored.rootHash}`;
+
+    if (agenticId?.tokenId) {
+      // Already minted: re-point the memory to the new root.
+      const updTx = await updateAgenticIdMemory(agenticId.tokenId, description, stored.rootHash);
+      agenticId = {
+        ...agenticId,
+        memoryRoot: stored.rootHash,
+        memoryTx: stored.txHash,
+        mintTx: updTx ?? agenticId.mintTx,
+        callCount: calls.length,
+        updatedAt: Date.now(),
+      };
+    } else {
+      const minted = await mintAgenticId({ description, memoryRoot: stored.rootHash });
+      if (!minted) return res.status(500).json({ error: "Agentic ID mint returned no result" });
+      agenticId = {
+        tokenId: minted.tokenId,
+        contract: minted.contract,
+        explorer: minted.explorer,
+        memoryRoot: stored.rootHash,
+        memoryTx: stored.txHash,
+        mintTx: minted.txHash,
+        callCount: calls.length,
+        updatedAt: Date.now(),
+      };
+    }
+    log("agent", `Agentic ID ready — token ${agenticId.tokenId ?? "?"}, memory root ${stored.rootHash.slice(0, 18)}…`);
+    res.json({ agenticId });
+  } catch (e) {
+    log("agent", `Agentic ID mint failed: ${(e as Error).message.slice(0, 160)}`);
+    res.status(500).json({ error: (e as Error).message.slice(0, 200) });
+  }
 });
 
 app.get("/events", (req, res) => {

@@ -31,6 +31,13 @@ export interface ChatCompletionResponse {
   /** Upstream-reported model id, preserved verbatim (0G backend only — evidence,
    * not proof; NOT set on the groq path where the cheat-demo mask is load-bearing). */
   upstreamModel?: string;
+  /** True when the 0G Compute broker returned a verifiable (TEE-attested) response
+   * that we cryptographically verified — hard provenance, not just an echoed model id.
+   * Only ever set on the 0G broker path. */
+  teeAttested?: boolean;
+  /** Opaque reference to the attestation we verified (0G broker chatID / signature digest),
+   * carried through the trade record for on-chain provenance. */
+  attestationRef?: string;
 }
 
 export interface ProviderInfo {
@@ -75,6 +82,8 @@ export interface RequestLogEntry {
   isAudit?: boolean; // replay issued by the verifier — never an audit candidate itself
   servedBy?: ServedBy; // compute source as reported by the serving backend
   upstreamModel?: string; // upstream-reported model (0G path), preserved for provenance
+  teeAttested?: boolean; // 0G broker path: response was TEE-attested and verified
+  attestationRef?: string; // opaque attestation reference (0G broker chatID/signature digest)
 }
 
 // Cumulative exchange revenue/refund stats (served by GET /stats)

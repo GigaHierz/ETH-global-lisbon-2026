@@ -19,6 +19,7 @@ import {
   BOND_AMOUNT,
   hederaAccount,
   publishToTopic,
+  recordVerdictOnZeroG,
   bondTokenId,
   freezeBond,
   multiSigWipeBond,
@@ -254,6 +255,34 @@ async function auditOnce() {
     const { request: candidate, accused: target, witness } = selection;
     audited.add(candidate.id); // claim it before the replays, so a slow audit is never re-run
 
+    // TEE short-circuit: a 0G-broker response that carried a *verified* TEE
+    // attestation is cryptographic proof of which model actually ran — the
+    // optimistic Jaccard replay can't do better. Record a verified verdict
+    // (Hedera HCS + 0G chain) and skip the replay/slash path entirely.
+    if (candidate.servedBy === "0g" && candidate.teeAttested) {
+      log("verifier", `🔐 TEE-attested 0G response from ${target.displayName} (${candidate.model}) — attestation is hard proof, no replay needed`);
+      await fetch(`${EXCHANGE}/verify-report`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: target.displayName, witness: "TEE attestation", similarity: 1, verdict: "ok" }),
+      }).catch(() => {});
+      await publishVerdict({
+        type: "verdict", verdict: "ok", provider: target.displayName, account: target.wallet,
+        agentId: target.agentId, model: target.model, method: "tee-attestation",
+        attestationRef: candidate.attestationRef ?? null,
+        hcs14: { feedback: { value: 100, tag1: "tee-verified", tag2: "agentrouter" } },
+      });
+      await recordVerdictOnZeroG({
+        tradeId: candidate.id,
+        provider: target.displayName,
+        model: candidate.upstreamModel ?? candidate.model,
+        servedBy: "0g",
+        teeAttested: true,
+        verdict: "ok",
+      }).catch(() => {});
+      return;
+    }
+
     log("verifier", `🔍 AUDIT: replaying "${candidate.promptPreview.slice(0, 50)}…" — ${target.displayName} vs witness ${witness.displayName} (${target.model}, temp 0)`);
 
     const [targetOutcome, witnessOutcome] = await Promise.all([
@@ -319,6 +348,16 @@ async function auditOnce() {
       slashHbar: SLASH_HBAR, slashTx: tx,
       hcs14: { feedback: { value: -100, tag1: "model-fraud", tag2: "agentrouter" } },
     });
+    // Mirror the fraud verdict onto 0G Chain (no-op without ZEROG_CHAIN_KEY +
+    // registry) so the on-chain verification trail lives on 0G, not just Hedera.
+    await recordVerdictOnZeroG({
+      tradeId: candidate.id,
+      provider: target.displayName,
+      model: target.model,
+      servedBy: candidate.servedBy ?? "",
+      teeAttested: false,
+      verdict: "fraud",
+    }).catch(() => {});
     await fetch(`${EXCHANGE}/slash`, {
       method: "POST",
       headers: { "content-type": "application/json" },

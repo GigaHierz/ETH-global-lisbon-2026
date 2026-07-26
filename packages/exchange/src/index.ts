@@ -20,6 +20,7 @@ import {
   hederaAccount,
   publishToTopic,
   topicLinks,
+  recordVerdictOnZeroG,
   type ChatCompletionRequest,
   type ChatCompletionResponse,
 } from "@agentrouter/shared";
@@ -237,7 +238,23 @@ if (MOCK_MODE) {
         paymentTx: entry.paymentRef,
         ...(entry.servedBy ? { servedBy: entry.servedBy } : {}),
         ...(entry.upstreamModel ? { upstreamModel: entry.upstreamModel } : {}),
+        ...(entry.teeAttested ? { teeAttested: true } : {}),
+        ...(entry.attestationRef ? { attestationRef: entry.attestationRef } : {}),
       }).catch((e) => log("exchange", `HCS trade publish failed: ${(e as Error).message.slice(0, 80)}`));
+      // Mirror 0G-served trades to the 0G-chain VerdictRegistry (no-op without a
+      // funded ZEROG_CHAIN_KEY). Keeps Hedera as the primary log; 0G gets the
+      // on-chain provenance record the infra track asks for. Scoped to servedBy
+      // "0g" so the on-chain trail is 0G-model provenance, not every trade.
+      if (entry.servedBy === "0g") {
+        recordVerdictOnZeroG({
+          tradeId: entry.id,
+          provider: entry.provider,
+          model: entry.upstreamModel ?? entry.model,
+          servedBy: entry.servedBy,
+          teeAttested: !!entry.teeAttested,
+          verdict: "ok",
+        }).catch(() => {});
+      }
     }
   });
   server.onVerifiedPaymentCanceled(async (ctx) => {
@@ -352,6 +369,8 @@ app.post("/v1/chat/completions", async (req, res) => {
       // provenance (additive; absent on legacy providers — never mandatory)
       ...(data.servedBy ? { servedBy: data.servedBy } : {}),
       ...(data.upstreamModel ? { upstreamModel: data.upstreamModel } : {}),
+      ...(data.teeAttested ? { teeAttested: true } : {}),
+      ...(data.attestationRef ? { attestationRef: data.attestationRef } : {}),
     };
     pendingSettles.set(quote.quoteId, entry.id); // real mode: onAfterSettle fills inboundRef + accrues fee
     if (MOCK_MODE) {

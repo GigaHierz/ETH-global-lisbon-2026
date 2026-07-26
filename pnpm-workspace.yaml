@@ -1,9 +1,15 @@
 packages:
   - packages/*
 allowBuilds:
+  # Optional native accelerators pulled in transitively by the 0G SDKs; JS
+  # fallbacks are used, so their build scripts are skipped for portability.
+  blake-hash: false
+  bufferutil: false
+  es5-ext: false
   esbuild: true
   protobufjs: true
   sharp: true
+  utf-8-validate: false
 
 onlyBuiltDependencies:
   - protobufjs

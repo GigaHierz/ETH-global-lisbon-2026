@@ -17,6 +17,9 @@ use the documents below.
 - [HEDERA_BOUNTIES.md](HEDERA_BOUNTIES.md) — how the project maps to each Hedera prize track
   (AI & Agentic Payments, Tokenization/HTS, "No Solidity Allowed"), with `file:line` + Hashscan
   proof.
+- [0G_BOUNTIES.md](0G_BOUNTIES.md) — how the project maps to the 0G prize tracks (Infrastructure &
+  Tooling — model-routing/provenance with on-chain verification; AI Product — Agentic ID + tradeable
+  encrypted memory), across 0G Compute, 0G Chain (Galileo), and 0G Storage, with `file:line` proof.
 
 ## Services
 
@@ -53,9 +56,14 @@ use the documents below.
 
 - [PROOF.md](PROOF.md) — live Hashscan links for real x402 settlements, demo accounts, and
   the HCS audit topics.
+- [PROOF-0G.md](PROOF-0G.md) — live 0G Galileo explorer links: deployed `VerdictRegistry` +
+  `AgentNFT` contracts, every verdict/mint/setMemory/storage transaction, and the deployer wallet.
 - [TRANSACTIONS.md](TRANSACTIONS.md) — on-chain receipts and how native staking / slashing
   works without a smart contract.
 - [RESEARCH.md](RESEARCH.md) — verified integration research: x402 package APIs, HCS-14
   identity, Groq model IDs, with sources.
 - [DEVREL_BRIEF.md](DEVREL_BRIEF.md) — narrative, demo beats, and real-vs-mocked breakdown.
 - [HEDERAFEEDBACK.md](HEDERAFEEDBACK.md) — Hedera developer-experience feedback.
+- [0GFEEDBACK.md](0GFEEDBACK.md) — 0G developer-experience feedback: package scopes, the
+  mainnet/testnet key trap, 0G Storage SDK edges, Agentic-ID gaps, and suggestions for the 0G
+  skills + docs.
