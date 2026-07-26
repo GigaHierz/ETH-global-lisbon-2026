@@ -1,11 +1,12 @@
 // Creates the HTS ReputationBond token (ARBOND) as the operator and grants each
 // provider its starting bond, then records the token id in deployments.json.
-// Idempotent: an existing deployments.hederaTestnet.bondToken is kept. Run: pnpm setup-hts
+// Idempotent: an existing bondToken is kept and providers are topped up to
+// BOND_AMOUNT rather than re-granted. Run: pnpm setup-hts
 //
 // No Solidity — pure Hedera Token Service via the SDK. Key layout (see hts.ts):
 //   treasury/admin/supply/pause/feeSchedule = operator (mints + grants reputation)
 //   freezeKey = verifier (immediate compliance freeze on fraud)
-//   wipeKey   = 2-of-2 KeyList [verifier, auditor] (multi-sig scheduled wipe)
+//   wipeKey   = 2-of-2 KeyList [verifier, auditor] (direct multi-sig wipe)
 //   custom fee = 2% fractional → operator/treasury (the marketplace-fee rail)
 
 import fs from "node:fs";
@@ -33,15 +34,10 @@ async function main() {
   const deployments = JSON.parse(fs.readFileSync(DEPLOYMENTS, "utf8"));
   deployments.hederaTestnet ??= {};
 
-  if (deployments.hederaTestnet.bondToken) {
-    console.log(`= bondToken: ${deployments.hederaTestnet.bondToken} (exists) — skipping`);
-    return;
-  }
-
   const {
     Client, AccountId, PrivateKey, KeyList, TokenType, TokenSupplyType,
     TokenCreateTransaction, TokenAssociateTransaction, TransferTransaction,
-    TokenId, CustomFractionalFee,
+    AccountBalanceQuery, TokenId, CustomFractionalFee,
   } = await import("@hiero-ledger/sdk");
 
   const opKey = PrivateKey.fromStringECDSA(operatorKey);
@@ -59,6 +55,12 @@ async function main() {
     .setDenominator(100)
     .setFeeCollectorAccountId(AccountId.fromString(operatorId));
 
+  // Create the token only once; the grant pass below still runs either way, so a
+  // provider whose bond was wiped (or one added later) can be topped back up.
+  let tokenId: string = deployments.hederaTestnet.bondToken ?? "";
+  if (tokenId) {
+    console.log(`= bondToken: ${tokenId} (exists) — checking provider bonds`);
+  } else {
   console.log("creating ARBOND ReputationBond token…");
   const createReceipt = await (
     await new TokenCreateTransaction()
@@ -74,15 +76,20 @@ async function main() {
       .setPauseKey(opKey.publicKey)
       .setFeeScheduleKey(opKey.publicKey)
       .setFreezeKey(verifierPub) // verifier freezes on fraud (compliance control)
-      .setWipeKey(wipeKey) // multi-sig wipe (scheduled)
+      .setWipeKey(wipeKey) // 2-of-2 multi-sig wipe (TokenWipe is not schedulable)
       .setCustomFees([marketplaceFee])
       .setTokenMemo("agentrouter:reputation-bond")
       .execute(client)
   ).getReceipt(client);
-  const tokenId = createReceipt.tokenId!.toString();
+  tokenId = createReceipt.tokenId!.toString();
   console.log(`✓ ARBOND: ${tokenId}  https://hashscan.io/testnet/token/${tokenId}`);
+  }
 
-  // Associate + grant the starting bond to each provider account present in .env.
+  // Associate + top each provider up to BOND_AMOUNT. Transferring the shortfall
+  // rather than a flat grant keeps this safe to re-run: a provider whose bond the
+  // verifier wiped returns to full, and one already at full is left alone instead
+  // of drifting to 2x and diluting what a wipe means.
+  const token = TokenId.fromString(tokenId);
   for (const role of GRANT_ROLES) {
     const id = env(`HEDERA_${role}_ID`);
     const key = env(`HEDERA_${role}_KEY`);
@@ -104,13 +111,21 @@ async function main() {
         continue;
       }
     }
+    const held = Number(
+      (await new AccountBalanceQuery().setAccountId(id).execute(client)).tokens?.get(token)?.toString() ?? 0,
+    );
+    const shortfall = BOND_AMOUNT - held;
+    if (shortfall <= 0) {
+      console.log(`  = ${role} already holds ${held} ARBOND`);
+      continue;
+    }
     await (
       await new TransferTransaction()
-        .addTokenTransfer(TokenId.fromString(tokenId), AccountId.fromString(operatorId), -BOND_AMOUNT)
-        .addTokenTransfer(TokenId.fromString(tokenId), AccountId.fromString(id), BOND_AMOUNT)
+        .addTokenTransfer(token, AccountId.fromString(operatorId), -shortfall)
+        .addTokenTransfer(token, AccountId.fromString(id), shortfall)
         .execute(client)
     ).getReceipt(client);
-    console.log(`  ✓ granted ${BOND_AMOUNT} ARBOND → ${role} (${id})`);
+    console.log(`  ✓ ${role} (${id}): ${held} → ${BOND_AMOUNT} ARBOND (+${shortfall})`);
   }
 
   deployments.hederaTestnet.bondToken = tokenId;
