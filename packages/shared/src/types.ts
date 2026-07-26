@@ -27,7 +27,7 @@ export interface ChatCompletionResponse {
 export interface ProviderInfo {
   displayName: string;
   model: string; // advertised model
-  priceHbar: number; // per request
+  price: number; // per request
   wallet: string; // Hedera account id (0.0.x)
   agentId: string | null; // HCS-14 UAID (or mock)
   url: string;
@@ -53,9 +53,9 @@ export interface RequestLogEntry {
   model: string;
   provider: string; // displayName
   providerUrl: string;
-  priceHbar: number; // provider's listed price (what the provider receives)
-  feeHbar: number; // exchange fee on top (EXCHANGE_FEE_BPS of price, ceil in tinybars)
-  totalHbar: number; // what the agent pays the exchange (price + fee)
+  price: number; // provider's listed price (what the provider receives)
+  fee: number; // exchange fee on top (EXCHANGE_FEE_BPS of price, ceil in base units)
+  total: number; // what the agent pays the exchange (price + fee)
   latencyMs: number;
   paymentRef: string; // exchange→provider settle tx (or mock ref)
   inboundRef?: string; // agent→exchange settle tx (or mock ref), set post-settlement
@@ -68,12 +68,13 @@ export interface RequestLogEntry {
 
 // Cumulative exchange revenue/refund stats (served by GET /stats)
 export interface ExchangeStats {
-  totalVolumeHbar: number; // sum of provider prices settled
+  totalVolume: number; // sum of provider prices settled
   requests: number; // successful routed requests
-  feeRevenueHbar: number; // accrued exchange fees (ceil-rounded tinybars, displayed as ℏ)
+  feeRevenue: number; // accrued exchange fees (ceil-rounded base units, shown as a decimal)
   refunds: number; // refunded trades
   refundFailures: number; // refunds that themselves failed (logged loudly)
   feeBps: number; // active EXCHANGE_FEE_BPS
+  asset: string; // what every amount above is denominated in (USDC / HBAR)
 }
 
 // SSE events pushed by the exchange to the dashboard

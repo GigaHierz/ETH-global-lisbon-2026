@@ -3,7 +3,7 @@
 // provider identically to a self-booted one. Idempotency via .registry-cache.json
 // keyed by account id (same file/shape the provider service uses).
 
-import { publishToTopic } from "@agentrouter/shared";
+import { publishToTopic, ASSET_LABEL } from "@agentrouter/shared";
 import { readCache, writeCache } from "./envStore.js";
 
 export interface CacheEntry {
@@ -33,7 +33,7 @@ export interface RegistrationInput {
   key: string;
   displayName: string;
   model: string;
-  priceHbar: number;
+  price: number;
   endpoint: string;
   stakeHbar: number;
   stakeTx: string | null;
@@ -56,9 +56,11 @@ export async function registerOnHcs(input: RegistrationInput): Promise<string> {
       account: input.id,
       displayName: input.displayName,
       model: input.model,
-      priceHbar: input.priceHbar,
+      price: input.price,
+      // HCS messages are immutable, so the price unit travels with the price.
+      asset: ASSET_LABEL,
       endpoint: input.endpoint,
-      stakeHbar: input.stakeHbar,
+      stakeHbar: input.stakeHbar, // the bond is native HBAR regardless of settlement asset
       stakeTx: input.stakeTx,
       hcs14: {
         uaid: agentId,

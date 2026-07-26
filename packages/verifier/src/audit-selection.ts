@@ -68,7 +68,7 @@ export function selectAuditCandidate(input: AuditSelectionInput): AuditSelection
           p.wallet !== accused.wallet &&
           p.model === request.model,
       )
-      .sort((a, b) => a.priceHbar - b.priceHbar || compareStrings(a.url, b.url))[0];
+      .sort((a, b) => a.price - b.price || compareStrings(a.url, b.url))[0];
 
     if (witness) return { outcome: "selected", request, accused, witness };
     witnessless ??= { request, accused };

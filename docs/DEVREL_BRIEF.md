@@ -4,7 +4,7 @@
 
 ## The one-liner
 
-**AgentRouter is an on-chain OpenRouter: a marketplace where AI agents buy LLM inference per-request with native HBAR on Hedera, and where providers who lie about what model they're serving get caught and financially slashed.**
+**AgentRouter is an on-chain OpenRouter: a marketplace where AI agents buy LLM inference per-request with USDC on Hedera, and where providers who lie about what model they're serving get caught and financially slashed.**
 
 ## The story (use this narrative)
 
@@ -25,12 +25,12 @@ The demo makes this visceral: the cheating provider *wins all the traffic* on pr
 
 | # | Beat | On screen |
 |---|------|-----------|
-| 1 | 3 providers boot: **Titan Compute** (llama-3.3-70b @ 0.10 ℏ), **Budget Inference Co** (llama-3.1-8b @ 0.04 ℏ), **SketchyGPU Labs** (*claims* 70b @ 0.08 ℏ, **secretly serves 8b**). Each self-registers its HCS-14 Universal Agent ID on the HCS registry topic | Provider table fills, all ● live, 50 ℏ stake each |
+| 1 | 3 providers boot: **Titan Compute** (llama-3.3-70b @ $0.10), **Budget Inference Co** (llama-3.1-8b @ $0.04), **SketchyGPU Labs** (*claims* 70b @ $0.08, **secretly serves 8b**). Each self-registers its HCS-14 Universal Agent ID on the HCS registry topic | Provider table fills, all ● live, 50 ℏ stake each |
 | 2 | Exchange discovers them from the HCS registry, routes by cheapest-per-model | — |
-| 3 | Agent buys 5 completions. Every one routes to SketchyGPU (cheapest 70b claimant). Balance drains 10.00 → 9.60 ℏ with per-call payment refs (Hashscan) | Request feed streams, price index draws at 0.08 ℏ/req |
+| 3 | Agent buys 5 completions. Every one routes to SketchyGPU (cheapest 70b claimant). Balance drains $10.00 → $9.40 with per-call payment refs (Hashscan) | Request feed streams, price index draws at $0.08/req |
 | 4 | Verifier samples a past request, replays it at temp 0 against SketchyGPU **and** witness Titan. Similarity: **0–7%** (threshold: 35%) | Verifier panel: "7% ✗ DIVERGENT" |
 | 5 | Slash: stake 50 → 25 ℏ (escrow→treasury), reputation → 0, verdict published to HCS, removed from routing | 🔴 Full-width flashing SLASHED banner, row struck through |
-| 6 | Next 70b request routes to honest Titan at 0.10 ℏ | **Price index steps up 0.08 → 0.10 ℏ/req** — the market repricing after fraud exits. This is the closing line. |
+| 6 | Next 70b request routes to honest Titan at $0.10 | **Price index steps up $0.08 → $0.10/req** — the market repricing after fraud exits. This is the closing line. |
 
 The cheat is even visible in the answers: SketchyGPU's canned/8B response to "What is x402?" is *"x402 is an HTTP error code for payments"* (wrong), vs Titan's correct protocol description.
 
@@ -60,7 +60,7 @@ flowchart LR
 | x402 payment protocol | **Real** — official `@x402/*` v2.19 packages, real 402 challenges settled on `hedera:testnet` in **native HBAR** via the hosted facilitator ladder (`api.testnet.blocky402.com` → `x402.org/facilitator`, both feePayer-sponsored). Verified settlements + balance deltas in PROOF.md |
 | Agent identity (HCS-14-style) via **Hedera Agent Kit** | **Real** — the agent writes its Universal Agent ID (`uaid:aid:hedera:testnet:0.0.x`) to the HCS registry topic (`0.0.9744593`) through the **Hedera Agent Kit** (`hedera-agent-kit`, `HederaLangchainToolkit` + `coreConsensusPlugin`, `packages/agent/src/identity.ts`); trades and verdicts land on their own topics — an on-chain, Mirror-Node-readable audit trail |
 | Staking / slashing | **Real, SDK-native (no Solidity)** — 50 ℏ staked to an escrow account via a Hiero SDK `TransferTransaction`; a fraud verdict slashes escrow→treasury with a second SDK transfer + an HCS verdict message |
-| **HTS ReputationBond** | **Real, SDK-native** — an HTS token (`ARBOND`) created with a **custom fractional fee** + **freeze/pause/wipe** keys (`pnpm setup-hts`, `scripts/setup-hts-token.ts`); each provider's balance is its on-chain reputation. On fraud the verifier **freezes** it (`freezeBond`) — additive to the HBAR slash |
+| **HTS ReputationBond** | **Real, SDK-native** — an HTS token (`ARBOND`) created with a **custom fractional fee** + **freeze/pause/wipe** keys (`pnpm setup-hts`, `scripts/setup-hts-token.ts`); each provider's balance is its on-chain reputation, destroyed by the 2-of-2 multi-sig wipe (next row) on fraud — additive to the HBAR slash |
 | **2-of-2 multi-sig bond wipe** | **Real, SDK-native** — the bond wipe is a `TokenWipeTransaction` whose wipeKey is a 2-of-2 `KeyList` [verifier, auditor]; both sign one transaction → reputation → 0 on-chain, no keeper (`packages/shared/src/hts.ts`). Executed on-chain (see PROOF.md). For the demo the verifier holds both keys; production splits them |
 | Inference | **Real** — Groq API (`llama-3.3-70b-versatile` / `llama-3.1-8b-instant`). Falls back to deterministic canned responses without an API key — and the canned "cheat variant" still diverges, so the whole demo works air-gapped |
 | MOCK_MODE | First-class stage fallback: in-memory ledger/registry/stakes, zero RPC. **Same UI, same flow, same command.** If testnet dies during judging, nothing changes on screen |
@@ -99,7 +99,7 @@ The bond's wipe key is a 2-of-2 `KeyList` [verifier, auditor], so destroying a b
 Our exchange *is* an agent-commerce marketplace — agents discover providers, get quoted a price, and settle over x402. We describe it as **ACP-style**. We don't depend on OpenClaw/Virtuals ACP itself because that's Base-chain (its wallet, token, and marketplace live on Base), which would fight a Hedera-native, x402-settled design. Adopting ACP's job-lifecycle vocabulary on the HCS trades topic is a clean, dependency-free extension.
 
 **"Why should the price go UP after the slash? Isn't that bad?"**
-That's the demo's best moment, lean into it: the cheater's 0.08 ℏ price was *fraudulent* — you were paying for 70b and getting 8b. The index stepping up to the honest 0.10 ℏ is the market pricing truthfully again. Verification makes prices *honest*, not low.
+That's the demo's best moment, lean into it: the cheater's $0.08 price was *fraudulent* — you were paying for 70b and getting 8b. The index stepping up to the honest $0.10 is the market pricing truthfully again. Verification makes prices *honest*, not low.
 
 **"What's the business model?"**
 (MVP has none — be honest.) Natural candidates: exchange spread/fee per routed request, listing stakes, verifier rewards funded from slashes.

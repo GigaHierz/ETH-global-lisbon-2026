@@ -10,10 +10,10 @@ function fakeBrain(questions: string[]): Brain {
   };
 }
 
-function fakeBuy(costHbar: number) {
+function fakeBuy(cost: number) {
   return async (q: string): Promise<BuyResult> => ({
     answer: `A:${q}`,
-    costHbar,
+    cost,
     provider: "Titan Compute",
     paymentRef: `tx-${q}`,
   });
@@ -25,11 +25,11 @@ test("happy path: plans, buys each question, synthesizes", async () => {
     brain: fakeBrain(["q1", "q2", "q3"]),
     buy: fakeBuy(0.12),
     budget: new Budget(2),
-    askHbar: 0.12,
+    ask: 0.12,
     emit: (e) => events.push(e),
   });
   assert.equal(res.findings.length, 3);
-  assert.equal(Number(res.spentHbar.toFixed(4)), 0.36);
+  assert.equal(Number(res.spent.toFixed(4)), 0.36);
   assert.equal(res.answer, "synth(A:q1+A:q2+A:q3)");
   assert.equal(events.filter((e) => e.type === "bought").length, 3);
   assert.equal(events.at(-1)?.type, "done");
@@ -41,7 +41,7 @@ test("stops buying when the budget can't cover the next ask", async () => {
     brain: fakeBrain(["q1", "q2", "q3", "q4"]),
     buy: fakeBuy(0.12),
     budget: new Budget(0.3), // only 2 buys fit (0.24), 3rd (0.36) would exceed
-    askHbar: 0.12,
+    ask: 0.12,
     emit: (e) => events.push(e),
   });
   assert.equal(res.findings.length, 2);
@@ -56,7 +56,7 @@ test("emits a well-formed event sequence", async () => {
     brain: fakeBrain(["q1"]),
     buy: fakeBuy(0.1),
     budget: new Budget(1),
-    askHbar: 0.12,
+    ask: 0.12,
     emit: (e) => events.push(e),
   });
   const types = events.map((e) => e.type);
@@ -71,7 +71,7 @@ test("records real cost against the budget, not the estimate", async () => {
     brain: fakeBrain(["q1", "q2"]),
     buy: fakeBuy(0.1), // actual cost 0.1, ask estimate 0.12
     budget,
-    askHbar: 0.12,
+    ask: 0.12,
     emit: () => {},
   });
   assert.equal(Number(budget.spent.toFixed(4)), 0.2);

@@ -12,6 +12,7 @@ import {
   publishToTopic,
   hashscanTx,
   log,
+  ASSET_LABEL,
   MOCK_MODE,
   bondTokenId,
   bondBalance,
@@ -96,9 +97,12 @@ export async function ensureRegistered(
         account: id,
         displayName: profile.displayName,
         model: profile.advertisedModel,
-        priceHbar: profile.priceHbar,
+        price: profile.price,
+        // HCS messages are immutable, so the price unit has to travel with the price —
+        // otherwise an archived registration can't say what `price` was denominated in.
+        asset: ASSET_LABEL,
         endpoint,
-        stakeHbar: STAKE_HBAR,
+        stakeHbar: STAKE_HBAR, // the quality bond is always native HBAR, regardless of settlement asset
         stakeTx: entry.staked ?? null,
         hcs14: {
           uaid: agentId,

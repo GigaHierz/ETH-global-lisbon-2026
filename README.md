@@ -1,11 +1,11 @@
 # AgentRouter — the on-chain OpenRouter
 
 AgentRouter is an on-chain OpenRouter for **agentic payments**: autonomous AI agents buy LLM
-inference per request with **native HBAR over x402**, settled with Hedera's **sub-second
-finality and low, predictable fees**. Providers carry an **HCS-14-style** on-chain identity
-registered through the **Hedera Agent Kit**, stake HBAR collateral, and hold an **HTS
-ReputationBond** — and a verifier that catches providers serving cheaper models than advertised
-**destroys their bond with a 2-of-2 multi-sig wipe** on top of slashing their staked HBAR.
+inference per request with **USDC over x402**, settled with Hedera's **sub-second finality and
+low, predictable fees**. Providers carry an **HCS-14-style** on-chain identity registered
+through the **Hedera Agent Kit**, stake HBAR collateral, and hold an **HTS ReputationBond** —
+and a verifier that catches providers serving cheaper models than advertised **destroys their
+bond with a 2-of-2 multi-sig wipe** on top of slashing their staked HBAR.
 
 Built at ETHGlobal Lisbon 2026 — **no Solidity anywhere**. Everything on-chain runs on Hedera
 Testnet through the Hedera SDKs: agentic x402 payments, Agent-Kit identity, an HCS audit trail,
@@ -37,7 +37,7 @@ the whole flow (including the fraud divergence) working offline.
 ## Architecture
 
 Three autonomous actors — a buyer agent, provider agents, and a verifier — trade around a
-routing exchange, settling in HBAR over x402 and recording identity, trades, and verdicts on
+routing exchange, settling in USDC over x402 and recording identity, trades, and verdicts on
 Hedera Consensus Service.
 
 ```mermaid
@@ -62,7 +62,7 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 | Package | What it does | Docs |
 |---|---|---|
 | [`packages/agent`](packages/agent) | Autonomous buyer making agentic x402 payments: plans a goal into questions, buys each answer through the exchange, budget-capped; registers its HCS-14-style identity via the **Hedera Agent Kit** | [agent.md](docs/agent.md) |
-| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK); four env-driven personalities | [provider.md](docs/provider.md) |
+| [`packages/provider`](packages/provider) | OpenAI-compatible inference behind an x402 HBAR paywall; on boot stakes HBAR to escrow and holds an **HTS ReputationBond** (Hiero SDK). Default supply backend: **0G Compute** (decentralized GPU network); groq/canned selectable per instance (ollama planned) | [provider.md](docs/provider.md) |
 | [`packages/exchange`](packages/exchange) | Discovers supply from HCS, routes each request to the cheapest live provider claiming the model, pays via x402, publishes trades | [exchange.md](docs/exchange.md) |
 | [`packages/verifier`](packages/verifier) | Samples routed traffic, replays against an honest witness; on divergence slashes staked HBAR and **destroys the HTS bond with a 2-of-2 multi-sig wipe** (verifier + auditor) | [verifier.md](docs/verifier.md) |
 | [`packages/dashboard`](packages/dashboard) | Next.js trading terminal: provider table, live feed, price index, slash banner, HCS audit panel | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
@@ -70,14 +70,24 @@ Full architecture, the end-to-end flow, and the Hedera SDK/tooling stack:
 
 ## Real payments on Hedera Testnet
 
-Put operator credentials in `.env`, run `pnpm setup-hedera` (create + fund the role accounts),
-`pnpm setup-hcs` (audit topics), and `pnpm setup-hts` (create the **HTS ReputationBond** token
-+ grant each provider its bond), set `MOCK_MODE=false`, then run `pnpm demo`. Payments are
-native HBAR via x402 v2 `exact` on `hedera:testnet`, settled through a fee-sponsored facilitator
-(payers need no gas). On fraud, the verifier destroys the cheater's ARBOND bond with a **2-of-2
-multi-sig `TokenWipe`** (verifier + auditor) — all SDK-native, no Solidity. Live settlement +
-token/freeze/wipe/slash transactions and account links: [docs/PROOF.md](docs/PROOF.md). Funding
-decisions: [docs/FUNDING.md](docs/FUNDING.md).
+Put operator credentials in `.env`, run `pnpm setup-hedera` (create + fund the role accounts
+and associate each with USDC), `pnpm setup-hcs` (audit topics), and `pnpm setup-hts` (create the
+**HTS ReputationBond** token + grant each provider its bond), set `MOCK_MODE=false`, then run
+`pnpm demo`.
+
+Payments settle in **HTS USDC** (`0.0.429274`, 6 dp) via x402 v2 `exact` on `hedera:testnet`,
+through a fee-sponsored facilitator (payers need no gas). USDC needs one manual step — testnet
+USDC comes from [Circle's faucet](https://faucet.circle.com), not the operator — so set
+`SETTLEMENT_ASSET=hbar` for a fully scriptable, faucet-free run. Staking, slashing and the
+ReputationBond are unaffected either way: collateral is always native HBAR, reputation is always
+the ARBOND token.
+
+On fraud, the verifier destroys the cheater's ARBOND bond with a **2-of-2 multi-sig `TokenWipe`**
+(verifier + auditor) — all SDK-native, no Solidity.
+
+Live settlement + token/freeze/wipe/slash transactions and account links:
+[docs/PROOF.md](docs/PROOF.md). Funding decisions: [docs/FUNDING.md](docs/FUNDING.md).
+Moving an existing deployment to USDC: [docs/MIGRATION-USDC.md](docs/MIGRATION-USDC.md).
 
 ## Hedera track alignment
 
@@ -87,9 +97,9 @@ Everything on-chain is SDK-native across three Hedera services — **HCS, HTS, M
 
 | Hedera prize track | Fit | What AgentRouter uses |
 |---|---|---|
-| **AI & Agentic Payments** | **Implemented** | Autonomous AI agent making per-request **x402** payments in **native HBAR**; **Hedera Agent Kit** identity; HCS-14-style UAIDs; HCS audit trails |
+| **AI & Agentic Payments** | **Implemented** | Autonomous AI agent making per-request **x402** payments in **HTS USDC** (native HBAR behind one flag); **Hedera Agent Kit** identity; HCS-14-style UAIDs; HCS audit trails |
 | **"No Solidity Allowed"** | **Implemented** | Whole economic loop — identity, stake, slash, HTS bond, multi-sig wipe — via **Hedera SDKs** across HCS + HTS + Mirror Node, no contracts |
-| **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** + a **2-of-2 multi-sig `TokenWipe`** on fraud |
+| **Tokenization (HTS)** | **Implemented** | **HTS ReputationBond** with a **custom fractional fee** + **freeze/pause/wipe compliance controls** + a **2-of-2 multi-sig `TokenWipe`** on fraud; settlement itself rides a second HTS token (USDC) |
 
 ## Documentation
 
@@ -107,7 +117,7 @@ Everything lives in [docs/](docs/README.md). Start there, or jump to:
 ```
 packages/
   agent/       buyer agent
-  provider/    inference supply (four personalities)
+  provider/    inference supply (four personalities; 0G Compute default backend)
   exchange/    routing + settlement core
   verifier/    fraud auditor
   dashboard/   Next.js trading terminal

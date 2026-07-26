@@ -14,8 +14,8 @@ There are three kinds of autonomous actors, each with its own Hedera account + H
 An autonomous agent with its own wallet that **accomplishes a goal by buying inference**:
 - Registers an **HCS-14-style identity** (`uaid:aid:hedera:testnet:0.0.9746264`) on-chain **via the Hedera Agent Kit**.
 - Given a goal, **plans** sub-questions, **buys** an answer to each through the exchange (paying
-  real HBAR via x402 from its own account), and **synthesizes** a result.
-- **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET_HBAR`.
+  real USDC via x402 from its own account), and **synthesizes** a result.
+- **Budget-aware**: it stops the moment the next purchase would exceed `AGENT_BUDGET`.
 
 ### The provider agents (`packages/provider/`, supply side)
 One codebase, four "personalities" (Titan, Budget, NimbusAI, SketchyGPU):
@@ -39,7 +39,7 @@ An autonomous auditor:
 provider ──stake 50 ℏ──▶ escrow account          provider ──register──▶ HCS registry topic
 agent ──register HCS-14──▶ registry topic
 agent goal ─▶ plan (Groq) ─▶ for each question:
-    agent ──0.12 ℏ x402──▶ exchange ──routes to cheapest──▶ provider ──▶ Groq completion
+    agent ──$0.12 x402──▶ exchange ──routes to cheapest──▶ provider ──▶ Groq completion
     (exchange keeps the spread; every buy logged to the trades topic)
 verifier ─▶ sample log ─▶ replay accused vs witness ─▶ divergent?
     ─▶ slash 25 ℏ (escrow→treasury) + 2-of-2 multi-sig wipe of ARBOND bond + verdict to HCS
@@ -61,10 +61,10 @@ verifier ─▶ sample log ─▶ replay accused vs witness ─▶ divergent?
 |---|---|
 | **Hedera SDK** (`@hiero-ledger/sdk`) | `TransferTransaction` (x402 HBAR payments, 50 ℏ stakes, 25 ℏ slash), `TopicMessageSubmitTransaction` / `TopicCreateTransaction` (HCS), `TokenCreateTransaction` / `TokenAssociateTransaction` / `TokenFreezeTransaction` / `TokenWipeTransaction` (HTS bond), `KeyList` (2-of-2 wipe key) / `CustomFractionalFee`, `AccountCreateTransaction` + `setECDSAKeyWithAlias`, `AccountBalanceQuery`, `PrivateKey.fromStringECDSA` |
 | **Hedera Consensus Service (HCS)** | 3 topics — **registry** (`0.0.9744593`, identities), **trades** (`0.0.9744594`), **verdicts** (`0.0.9744595`) — the identity directory + audit trail |
-| **Hedera Token Service (HTS)** | The **ReputationBond** (`ARBOND`) — fungible token created via SDK with a **custom fractional fee** + **freeze/pause/wipe compliance controls**; on fraud a **2-of-2 multi-sig `TokenWipe`** (wipeKey = `KeyList` [verifier, auditor]) destroys it; balance = on-chain reputation (`scripts/setup-hts-token.ts`, `packages/shared/src/hts.ts`) |
+| **Hedera Token Service (HTS)** | Two tokens: settlement rides **USDC** (`0.0.429274`), and the **ReputationBond** (`ARBOND`) is created via SDK with a **custom fractional fee** + **freeze/pause/wipe compliance controls**; on fraud a **2-of-2 multi-sig `TokenWipe`** (wipeKey = `KeyList` [verifier, auditor]) destroys it; bond balance = on-chain reputation (`scripts/setup-hts-token.ts`, `packages/shared/src/hts.ts`) |
 | **Hedera Agent Kit** (`hedera-agent-kit` v3) | The buyer agent registers its HCS-14-style identity via the kit's `HederaLangchainToolkit` + `coreConsensusPlugin` → `submit_topic_message_tool` (autonomous mode) |
 | **HCS-14-style (Universal Agent IDs)** | Every actor's on-chain identity: `uaid:aid:hedera:testnet:0.0.x` |
-| **x402 + `@x402/hedera`** | `ExactHederaScheme` + `createClientHederaSigner` for HBAR settlement on `hedera:testnet`; hosted facilitator ladder (fee-sponsored) |
+| **x402 + `@x402/hedera`** | `ExactHederaScheme` + `createClientHederaSigner` for USDC (or HBAR via `SETTLEMENT_ASSET=hbar`) settlement on `hedera:testnet`; hosted facilitator ladder (fee-sponsored) |
 | **Mirror Node REST API** | Reading topic messages, balances, and tx history (dashboard audit panel + verifier + our proofs) |
 | **Hashscan** | Explorer links for every payment, stake, slash, token, freeze, multi-sig wipe, and topic |
 | **Hedera Portal / Testnet** | Operator account + funding |

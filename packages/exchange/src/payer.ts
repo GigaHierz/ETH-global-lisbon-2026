@@ -1,11 +1,12 @@
 // The exchange's paying HTTP client. Real mode: x402 wrapped fetch signing
-// HBAR transfers with the exchange's Hedera key (settlement fees sponsored by
+// settlement-asset transfers with the exchange's Hedera key (settlement fees sponsored by
 // the facilitator feePayer). Mock mode: plain fetch + mock payment header.
 
 import {
   MOCK_MODE,
   MOCK_PAYMENT_HEADER,
   HEDERA_NETWORK,
+  ASSET_LABEL,
   hederaAccount,
   log,
 } from "@agentrouter/shared";
@@ -46,23 +47,23 @@ export async function initPayer() {
       return "settled";
     }
   };
-  log("exchange", `x402 payer ready: ${id} (HBAR on ${HEDERA_NETWORK})`);
+  log("exchange", `x402 payer ready: ${id} (${ASSET_LABEL} on ${HEDERA_NETWORK})`);
 }
 
 export async function paidPost(
   url: string,
   body: unknown,
-  priceHbar: number,
+  price: number,
   providerWallet: string,
 ): Promise<PaidResult> {
   if (MOCK_MODE) {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", [MOCK_PAYMENT_HEADER]: String(priceHbar) },
+      headers: { "content-type": "application/json", [MOCK_PAYMENT_HEADER]: String(price) },
       body: JSON.stringify(body),
     });
     const ref = `mock-pay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    mockLedger.set(providerWallet, (mockLedger.get(providerWallet) ?? 0) + priceHbar);
+    mockLedger.set(providerWallet, (mockLedger.get(providerWallet) ?? 0) + price);
     return { res, paymentRef: ref };
   }
   const res = await realFetch!(url, {

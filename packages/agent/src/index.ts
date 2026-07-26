@@ -5,12 +5,12 @@
 // payment for the exchange's 402 ask (see payer.ts). The exchange routes to the
 // cheapest live provider and settles that leg itself.
 
-import { MOCK_MODE, hbarBalance, hederaAccount, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK_HBAR } from "@agentrouter/shared";
+import { MOCK_MODE, settlementBalance, hederaAccount, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money } from "@agentrouter/shared";
 import { initAgentPayer, paidPost } from "./payer.js";
 
 const EXCHANGE = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const MODEL = process.env.AGENT_MODEL || DEFAULT_MODEL;
-const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR)); // mock-mode payment amount
+const ASK = parseFloat(process.env.EXCHANGE_ASK || String(DEFAULT_EXCHANGE_ASK)); // mock-mode payment amount
 
 const QUESTIONS = [
   "What is the capital of Portugal? One sentence.",
@@ -23,11 +23,11 @@ const QUESTIONS = [
 const spamIdx = process.argv.indexOf("--spam");
 const spamN = spamIdx >= 0 ? parseInt(process.argv[spamIdx + 1] || "10", 10) : 0;
 
-let mockBalance = parseFloat(process.env.AGENT_MOCK_BALANCE_HBAR || "10");
+let mockBalance = parseFloat(process.env.AGENT_MOCK_BALANCE || "10");
 let spent = 0; // running total (price + fee) across the run
 
 async function realBalance(): Promise<string> {
-  return (await hbarBalance(hederaAccount("AGENT").id)).toFixed(4);
+  return (await settlementBalance(hederaAccount("AGENT").id)).toFixed(4);
 }
 
 async function callOnce(prompt: string, i: number, total: number) {
@@ -43,14 +43,14 @@ async function callOnce(prompt: string, i: number, total: number) {
   }
   const data = await res.json();
   const m = data.agentrouter;
-  const paidTotal = m.totalHbar ?? m.pricePaidHbar ?? 0;
+  const paidTotal = m.total ?? 0;
   spent += paidTotal;
   mockBalance -= paidTotal;
-  const balanceStr = MOCK_MODE ? `${mockBalance.toFixed(4)} ℏ (mock)` : `${await realBalance()} ℏ`;
+  const balanceStr = MOCK_MODE ? `${money(mockBalance.toFixed(4))} (mock)` : `${money(await realBalance())}`;
   log("agent", `[${i}/${total}] "${prompt.slice(0, 40)}…"`);
   log(
     "agent",
-    `    → ${m.provider} | price ${m.priceHbar ?? "?"} + fee ${m.feeHbar ?? "?"} = ${paidTotal} ℏ | spent ${spent.toFixed(4)} ℏ | ${Date.now() - t0}ms | balance ${balanceStr}`,
+    `    → ${m.provider} | price ${money(m.price ?? "?")} + fee ${money(m.fee ?? "?")} = ${money(paidTotal)} | spent ${money(spent.toFixed(4))} | ${Date.now() - t0}ms | balance ${balanceStr}`,
   );
   log("agent", `    ✦ ${data.choices[0].message.content.slice(0, 90)}`);
 }
@@ -58,8 +58,8 @@ async function callOnce(prompt: string, i: number, total: number) {
 async function main() {
   log("agent", `AgentRouter demo agent → ${EXCHANGE} | model ${MODEL} | MOCK_MODE=${MOCK_MODE}`);
   await initAgentPayer();
-  if (!MOCK_MODE) log("agent", `starting HBAR balance: ${await realBalance()} ℏ`);
-  else log("agent", `starting mock balance: ${mockBalance.toFixed(4)} ℏ`);
+  if (!MOCK_MODE) log("agent", `starting ${ASSET_LABEL} balance: ${money(await realBalance())}`);
+  else log("agent", `starting mock balance: ${money(mockBalance.toFixed(4))}`);
 
   if (spamN > 0) {
     log("agent", `--spam ${spamN}: firing volume`);
@@ -72,7 +72,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 800));
     }
   }
-  log("agent", `done. total spent (incl. fees): ${spent.toFixed(4)} ℏ${MOCK_MODE ? " (mock)" : ""}`);
+  log("agent", `done. total spent (incl. fees): ${money(spent.toFixed(4))}${MOCK_MODE ? " (mock)" : ""}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
