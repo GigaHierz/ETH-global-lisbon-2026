@@ -66,6 +66,9 @@ export default function ExchangeControlRoom() {
     fetch(`${EXCHANGE}/log?limit=50`).then((r) => r.json()).then((l) => setFeed(l.reverse())).catch(() => {});
     fetch(`${EXCHANGE}/price-index`).then((r) => r.json()).then(setPrices).catch(() => {});
     fetch(`${EXCHANGE}/stats`).then((r) => r.json()).then(setStats).catch(() => {});
+    // Backfill the verifier audit log so it isn't empty on load: the exchange
+    // returns oldest→newest, but live SSE prepends, so reverse to newest-first.
+    fetch(`${EXCHANGE}/verifies?limit=10`).then((r) => r.json()).then((v: VerifyEvent[]) => setVerifies(v.reverse())).catch(() => {});
 
     const es = new EventSource(`${EXCHANGE}/events`);
     es.onopen = () => setConnected(true);

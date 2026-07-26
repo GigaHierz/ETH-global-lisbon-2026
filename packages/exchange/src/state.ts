@@ -2,11 +2,16 @@
 // No DB by design — hackathon MVP.
 
 import { EXCHANGE_FEE_BPS, ASSET_LABEL, REQUEST_LOG_LIMIT, fromBaseUnits } from "@agentrouter/shared";
-import type { ProviderRow, RequestLogEntry, ExchangeEvent, ExchangeStats } from "@agentrouter/shared";
+import type { ProviderRow, RequestLogEntry, ExchangeEvent, ExchangeStats, VerifyEntry } from "@agentrouter/shared";
 
 export const providers = new Map<string, ProviderRow>(); // key: provider url
 export const requestLog: RequestLogEntry[] = [];
 export const priceIndex: Array<{ ts: number; model: string; price: number }> = [];
+// Verifier comparisons, oldest→newest. Kept so a dashboard that connects after
+// an audit fired (or reloads) can backfill via GET /verifies instead of showing
+// an empty log until the next live event happens to land.
+export const verifyLog: VerifyEntry[] = [];
+const VERIFY_LOG_LIMIT = 50;
 
 // MOCK_MODE ledger: hbar balances per role/wallet
 export const mockLedger = new Map<string, number>();
@@ -64,4 +69,10 @@ export function pushRequest(entry: RequestLogEntry) {
   priceIndex.push({ ts: entry.ts, model: entry.model, price: entry.price });
   if (priceIndex.length > 2000) priceIndex.shift();
   broadcast({ type: "request", entry });
+}
+
+export function pushVerify(entry: VerifyEntry) {
+  verifyLog.push(entry);
+  if (verifyLog.length > VERIFY_LOG_LIMIT) verifyLog.shift();
+  broadcast({ type: "verify", ...entry });
 }
