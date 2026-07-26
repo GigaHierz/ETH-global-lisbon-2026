@@ -33,10 +33,10 @@ payments) + **`@x402/express`** paywall. Everything on-chain is real testnet —
 
 | Profile | Name | Advertises | Actually serves | Price | Port |
 |---|---|---|---|---|---|
-| `provider1` | Titan Compute | llama-3.3-70b-versatile | same (honest) | 0.10 ℏ | 4021 |
-| `provider2` | Budget Inference Co | llama-3.1-8b-instant | same (honest) | 0.04 ℏ | 4022 |
-| `provider3` | SketchyGPU Labs | llama-3.3-70b-versatile | **8b when `CHEAT_MODE=true`** | 0.08 ℏ | 4023 |
-| `provider4` | NimbusAI | llama-3.3-70b-versatile | same (honest) | 0.06 ℏ | 4024 |
+| `provider1` | Titan Compute | llama-3.3-70b-versatile | same (honest) | $0.10 | 4021 |
+| `provider2` | Budget Inference Co | llama-3.1-8b-instant | same (honest) | $0.04 | 4022 |
+| `provider3` | SketchyGPU Labs | llama-3.3-70b-versatile | **8b when `CHEAT_MODE=true`** | $0.08 | 4023 |
+| `provider4` | NimbusAI | llama-3.3-70b-versatile | same (honest) | $0.06 | 4024 |
 
 `provider4` (NimbusAI) was added to demonstrate **permissionless supply joining live**: it boots,
 stakes, registers, is discovered within seconds, and — being the cheapest *honest* 70b seller —
@@ -73,7 +73,7 @@ pnpm provider1      # :4021  Titan Compute (honest 70b)
 pnpm provider2      # :4022  Budget Inference Co (honest 8b)
 pnpm provider3      # :4023  SketchyGPU Labs (cheater, CHEAT_MODE=true)
 pnpm provider4      # :4024  NimbusAI (honest 70b)
-curl -s localhost:4024/info   # sanity: name, model, priceHbar, wallet
+curl -s localhost:4024/info   # sanity: name, model, price, wallet
 ```
 
 Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) — same flow, same UI.
@@ -83,7 +83,7 @@ Set `MOCK_MODE=true` to run with no chain (in-memory payments/registry/stakes) �
 | Route | Auth | Purpose |
 |---|---|---|
 | `POST /v1/chat/completions` | **x402 (paid)** | OpenAI-compatible inference; returns `402` unpaid, `200` after HBAR payment |
-| `GET /info` | public | `{ displayName, model, priceHbar, wallet, agentId, url }` — what the exchange sees |
+| `GET /info` | public | `{ displayName, model, price, wallet, agentId, url }` — what the exchange sees |
 | `GET /healthz` | public | `{ ok: true }` |
 
 ## Config (env)
@@ -107,6 +107,9 @@ NimbusAI [`0.0.9746711`](https://hashscan.io/testnet/account/0.0.9746711)
 **HCS registry topic:** [`0.0.9744593`](https://hashscan.io/testnet/topic/0.0.9744593) ·
 **HCS verdicts topic:** [`0.0.9744595`](https://hashscan.io/testnet/topic/0.0.9744595)
 
+> Amounts in these receipts are native HBAR — they predate the move to USDC settlement.
+
+
 | Event | Transaction id |
 |---|---|
 | NimbusAI stake (50 ℏ → escrow) | `0.0.9746711@1784994358.055333186` |
@@ -120,3 +123,21 @@ NimbusAI [`0.0.9746711`](https://hashscan.io/testnet/account/0.0.9746711)
 
 *Component of **AgentRouter** — the on-chain OpenRouter. See the root [`README.md`](../README.md) for the full
 system and [`agent.md`](agent.md) for the buyer side.*
+
+
+## Compute backends (default: 0G Compute)
+
+Where a provider's completions actually come from is pluggable
+(`packages/provider/src/backends/`):
+
+| Backend | What | Select |
+|---|---|---|
+| `0g` (**default** for bring-your-own) | 0G Compute Router — one OpenAI-compatible endpoint over 0G's decentralized GPU marketplace (`router-api.0g.ai/v1`, TEE-signed results). Needs `ZEROG_API_KEY` from https://pc.0g.ai funded with 0G testnet tokens | `PROVIDER_BACKEND=0g` |
+| `groq` | Groq API (deterministic at temp 0 — the demo's verifier arc depends on it) | `PROVIDER_BACKEND=groq` |
+| `canned` | Deterministic offline answers | automatic fallback when the chosen backend is unreachable/unkeyed |
+
+The named demo profiles pin their backend: **p1/p2/p3 are frozen on `groq`** (the
+slash arc needs deterministic same-model outputs) and **provider4 (NimbusAI) is the
+0G personality** — honest, `0gm-1.0-35b-a3b` at 0.06 ℏ. Its model id is unique on
+the exchange, so the verifier logs "no witness available" instead of auditing it
+(cross-backend outputs aren't comparable under the similarity threshold).

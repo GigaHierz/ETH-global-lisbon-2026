@@ -7,6 +7,8 @@ import Card from "@/components/Card";
 import TerminalDots from "@/components/TerminalDots";
 import Footer from "@/components/Footer";
 import { EXCHANGE } from "@/lib/config";
+import { useAssetSymbol } from "@/lib/settlement";
+import { money, sumOf } from "@/lib/format";
 
 const REPO = "https://github.com/GigaHierz/ETH-global-lisbon-2026";
 
@@ -52,7 +54,7 @@ const STEPS = [
     items: [
       "Agent requests a specific model from the global exchange.",
       "Exchange routes the request to the cheapest available provider.",
-      "x402 protocol fires: pay ℏ → receive LLM completion.",
+      "x402 protocol fires: pay USDC → receive LLM completion.",
     ],
   },
   {
@@ -66,6 +68,7 @@ const STEPS = [
 ];
 
 export default function Landing() {
+  const sym = useAssetSymbol();
   const [stats, setStats] = useState<{ volume: string; requests: string; providers: string; avgPrice: string }>({
     volume: "—", requests: "—", providers: "—", avgPrice: "—",
   });
@@ -74,14 +77,14 @@ export default function Landing() {
     Promise.all([
       fetch(`${EXCHANGE}/providers`).then((r) => r.json()).catch(() => []),
       fetch(`${EXCHANGE}/log?limit=100`).then((r) => r.json()).catch(() => []),
-    ]).then(([providers, log]: [Array<{ status: string }>, Array<{ status: string; priceHbar: number }>]) => {
+    ]).then(([providers, log]: [Array<{ status: string }>, Array<{ status: string; price: number }>]) => {
       const ok = (log ?? []).filter((e) => e.status === "ok");
-      const vol = ok.reduce((s, e) => s + e.priceHbar, 0);
+      const vol = sumOf(ok, (e) => e.price);
       setStats({
-        volume: `${vol.toFixed(2)} ℏ`,
+        volume: money(sym, vol, 2),
         requests: String(ok.length),
         providers: String((providers ?? []).filter((p) => p.status === "live").length),
-        avgPrice: ok.length ? `${(vol / ok.length).toFixed(3)} ℏ` : "—",
+        avgPrice: ok.length ? money(sym, vol / ok.length, 3) : "—",
       });
     }).catch(() => {});
   }, []);
@@ -120,7 +123,7 @@ export default function Landing() {
               Agent<span className="text-accent-cyan">Router</span>
             </h1>
             <p className="font-body text-base md:text-xl text-on-surface-variant mb-12 max-w-2xl mx-auto">
-              A spot market where AI agents buy LLM inference per request in HBAR on Hedera.
+              A spot market where AI agents buy LLM inference per request in USDC on Hedera.
               Low latency. Zero trust. Infinite scale.
             </p>
             <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
@@ -197,7 +200,7 @@ export default function Landing() {
               </h2>
               <p className="font-body text-base text-on-surface-variant mb-8 max-w-lg">
                 Turn your idle RTX or H100 into a high-yield asset. Join the decentralized backbone
-                of AI inference and earn HBAR for every request served.
+                of AI inference and earn USDC for every request served.
               </p>
               <div className="space-y-4">
                 <Card className="flex items-center gap-4 p-4">

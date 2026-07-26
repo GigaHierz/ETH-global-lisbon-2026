@@ -58,7 +58,7 @@ Universal Agent ID and publishes a registration record to the HCS registry topic
 
 - **UAID:** `uaid:aid:hedera:testnet:0.0.<account>` (see `packages/provider/src/registry.ts`).
 - **Registration:** a signed JSON message to the HCS registry topic (`0.0.9744593`) carrying
-  `{agentId, account, displayName, model, priceHbar, stakeHbar, stakeTx}` — the on-chain,
+  `{agentId, account, displayName, model, price, stakeHbar, stakeTx}` — the on-chain,
   Mirror-Node-readable directory the exchange discovers providers from.
 - **Reputation / audit:** trades → topic `0.0.9744594`, verifier verdicts → topic `0.0.9744595`.
 - **Staking / slash (no Solidity):** stake 50 ℏ to the escrow account via a Hedera SDK
@@ -78,7 +78,21 @@ Spec: https://hol.org/docs/standards/hcs-14/
 ## Decisions
 
 1. Identity/reputation are HCS-native (HCS-14 UAID + HCS topics) — no registry contract to deploy.
-2. Chain: **Hedera Testnet** (`hedera:testnet`), native HBAR settlement.
+2. Chain: **Hedera Testnet** (`hedera:testnet`), HTS USDC settlement (native HBAR behind `SETTLEMENT_ASSET=hbar`).
 3. Funding: create a testnet operator at https://portal.hedera.com, then `pnpm setup-hedera`
    creates + funds all role accounts from the operator — no faucets on the critical path.
 4. MOCK_MODE=true is a first-class path: in-memory ledger/registry/stakes, no RPC, canned Groq responses if no key.
+
+
+## 0G Compute (verified 2026-07-26)
+
+- **Compute Router** (recommended consumer path): `https://router-api.0g.ai/v1` —
+  OpenAI-compatible; `GET /v1/models` is public (23 models live incl. in-house
+  `0gm-1.0-35b-a3b`, deepseek-v4, qwen3.x, glm-5); completions require
+  `Authorization: Bearer <ZEROG_API_KEY>` from https://pc.0g.ai (funded with 0G
+  testnet tokens). Probed live: unauthenticated completion → `missing_authorization`.
+- **Direct SDK**: `@0gfoundation/0g-compute-ts-sdk` — wallet-signed per-provider
+  requests on the 0G chain, TEE-verified responses, fine-tuning. Future work: TEE
+  attestation could upgrade our optimistic verifier to hard proof for 0G-backed
+  providers.
+- Provider4 (NimbusAI) advertises `0gm-1.0-35b-a3b` (pinned from the live list).

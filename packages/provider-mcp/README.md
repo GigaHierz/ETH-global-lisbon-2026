@@ -80,7 +80,7 @@ Then the agent can call, e.g.:
 provision_provider({
   "name": "Acme Inference",
   "model": "llama-3.3-70b-versatile",
-  "priceHbar": 0.08,
+  "price": 0.08,
   "publicUrl": "https://acme-inference.up.railway.app",
   "exchangeUrl": "https://your-exchange.example.com"
 })

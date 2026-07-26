@@ -7,9 +7,10 @@ import type { ProviderRow } from "@agentrouter/shared";
 // first wallet match would report `down` for a provider that is actually live.
 const WALLET = "0.0.9755667";
 const row = (url: string, status: ProviderRow["status"], wallet = WALLET): ProviderRow => ({
-  displayName: "QA", model: "llama-3.3-70b-versatile", priceHbar: 0.1,
+  displayName: "QA", model: "llama-3.3-70b-versatile", price: 0.1,
   wallet, agentId: `uaid:aid:hedera:testnet:${wallet}`, url,
   status, reputation: 100, stakeHbar: 50, requestsServed: 0,
+  bondTokens: 0, bondStatus: "active",
 });
 
 describe("pickRow", () => {

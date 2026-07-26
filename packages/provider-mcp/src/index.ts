@@ -24,7 +24,7 @@ import {
   HBAR_PER_ACCOUNT_DEFAULT,
   STAKE_HBAR_DEFAULT,
   DEFAULT_MODEL,
-  DEFAULT_PRICE_HBAR,
+  DEFAULT_PRICE,
   DEFAULT_ROLE,
   DEFAULT_EXCHANGE_URL,
   CHARACTER_LIMIT,
@@ -161,7 +161,7 @@ async function coreDeploy(role: string, publicUrl: string, model: string, profil
   };
 }
 
-async function coreRegister(role: string, name: string, model: string, priceHbar: number, endpoint: string) {
+async function coreRegister(role: string, name: string, model: string, price: number, endpoint: string) {
   const { id, key } = requireProviderAccount(role);
   const stakeHbar = parseFloat(readEnvVar("STAKE_HBAR") ?? String(STAKE_HBAR_DEFAULT));
   const cached = getCacheEntry(id);
@@ -184,7 +184,7 @@ async function coreRegister(role: string, name: string, model: string, priceHbar
     key,
     displayName: name,
     model,
-    priceHbar,
+    price,
     endpoint,
     stakeHbar,
     stakeTx: cached.staked ?? null,
@@ -270,17 +270,17 @@ server.registerTool(
   {
     title: "Register HCS-14 identity on the registry topic",
     description:
-      "Publish the provider's HCS-14 registration (uaid, displayName, model, priceHbar, endpoint, stakeTx) to the Hedera Consensus Service registry topic so the exchange discovers it. Idempotent: skips if already registered for the same endpoint; re-registers automatically if the endpoint changed. Requires a public endpoint (pass publicUrl or set PROVIDER_PUBLIC_URL — localhost only works if the exchange is on the same box).",
+      "Publish the provider's HCS-14 registration (uaid, displayName, model, price, endpoint, stakeTx) to the Hedera Consensus Service registry topic so the exchange discovers it. Idempotent: skips if already registered for the same endpoint; re-registers automatically if the endpoint changed. Requires a public endpoint (pass publicUrl or set PROVIDER_PUBLIC_URL — localhost only works if the exchange is on the same box).",
     inputSchema: {
       role: z.string().default(DEFAULT_ROLE).describe("Provider account role (HEDERA_<role>_ID/KEY)."),
       name: z.string().min(1).describe("Display name shown in the exchange routing table."),
       model: z.string().default(DEFAULT_MODEL).describe("Model you advertise — you must actually serve it (the verifier checks)."),
-      priceHbar: z.number().positive().default(DEFAULT_PRICE_HBAR).describe("Price per request in HBAR."),
+      price: z.number().positive().default(DEFAULT_PRICE).describe("Price per request, in the exchange's settlement asset (USDC by default)."),
       publicUrl: z.string().url().optional().describe("Public endpoint to register. Falls back to PROVIDER_PUBLIC_URL if omitted."),
     },
     annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: true },
   },
-  async ({ role, name, model, priceHbar, publicUrl }) => {
+  async ({ role, name, model, price, publicUrl }) => {
     try {
       const endpoint = publicUrl ?? readEnvVar("PROVIDER_PUBLIC_URL");
       if (!endpoint) {
@@ -288,7 +288,7 @@ server.registerTool(
           new ProvisionError("PUBLIC_URL_MISSING", "No endpoint to register", "Pass publicUrl, or run deploy_provider first to attach your running endpoint."),
         );
       }
-      const r = await coreRegister(role, name, model, priceHbar, endpoint);
+      const r = await coreRegister(role, name, model, price, endpoint);
       return ok(r.alreadyRegistered ? `Already registered for ${endpoint} (idempotent).` : `Registered ${name} on HCS for ${endpoint}.`, r);
     } catch (e) {
       return fail(e);
@@ -373,7 +373,7 @@ server.registerTool(
       name: z.string().min(1).describe("Provider display name."),
       publicUrl: z.string().url().describe("Public URL where the provider service is (or will be) running."),
       model: z.string().default(DEFAULT_MODEL).describe("Advertised = served model."),
-      priceHbar: z.number().positive().default(DEFAULT_PRICE_HBAR).describe("Price per request in HBAR."),
+      price: z.number().positive().default(DEFAULT_PRICE).describe("Price per request, in the exchange's settlement asset (USDC by default)."),
       role: z.string().default(DEFAULT_ROLE).describe("Env account role."),
       initialBalanceHbar: z.number().positive().max(10000).default(HBAR_PER_ACCOUNT_DEFAULT).describe("Funding for a newly created account."),
       stakeHbar: z.number().positive().max(10000).default(STAKE_HBAR_DEFAULT).describe("Collateral to stake."),
@@ -405,7 +405,7 @@ server.registerTool(
         steps.deploy_provider = { skipped: true, reason: "requireEndpoint=false", publicUrl: args.publicUrl };
       }
 
-      steps.register_provider = await coreRegister(args.role, args.name, args.model, args.priceHbar, args.publicUrl);
+      steps.register_provider = await coreRegister(args.role, args.name, args.model, args.price, args.publicUrl);
       steps.verify_provider_live = await coreVerify(args.role, args.publicUrl, args.exchangeUrl, args.verifyTimeoutMs);
 
       const live = (steps.verify_provider_live as { live?: boolean }).live === true;

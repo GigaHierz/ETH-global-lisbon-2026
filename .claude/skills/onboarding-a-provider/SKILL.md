@@ -1,13 +1,13 @@
 ---
 name: onboarding-a-provider
-description: Use when a developer wants to run, list, register, or sign up their own inference provider on AgentRouter — sell LLM inference, list my compute/GPU, become a provider, earn HBAR per request, stake and register on Hedera, serve paid x402 completions. Guides and verifies the zero-to-live setup.
+description: Use when a developer wants to run, list, register, or sign up their own inference provider on AgentRouter — sell LLM inference, list my compute/GPU, become a provider, earn USDC or HBAR per request, stake and register on Hedera, serve paid x402 completions. Guides and verifies the zero-to-live setup.
 ---
 
 # Onboarding a Provider
 
 ## Overview
 
-Walk a would-be provider from a fresh checkout to a **live, registered, payment-serving provider** on AgentRouter, verifying each step on-chain instead of trusting the logs. A provider is an HTTP server that sells LLM inference: it stakes 50 ℏ, registers an HCS-14 identity on the Hedera Consensus Service, and gets paid per request in HBAR over x402.
+Walk a would-be provider from a fresh checkout to a **live, registered, payment-serving provider** on AgentRouter, verifying each step on-chain instead of trusting the logs. A provider is an HTTP server that sells LLM inference: it stakes 50 ℏ, registers an HCS-14 identity on the Hedera Consensus Service, and gets paid per request over x402. Settlement is **USDC** by default (`SETTLEMENT_ASSET=hbar` switches to native HBAR); the 50 ℏ quality bond is always HBAR either way.
 
 **Do the setup WITH the user, one step at a time. After every step, run the verification and show the result before moving on.** Don't dump all the commands at once.
 
@@ -67,10 +67,10 @@ If the boot later says `Missing HEDERA_PROVIDER_*`, this step wasn't done.
 ### 3. Advertise a model, a price, and your public URL
 Set these in `.env` (the `custom` profile reads them — no code edits):
 - `PROVIDER_NAME` — shown in the routing table.
-- `PROVIDER_MODEL` — a Groq model id you can serve, e.g. `llama-3.3-70b-versatile`. **You must actually serve what you advertise** (see Guardrails).
-- `PROVIDER_PRICE_HBAR` — your price per request. The exchange routes the *cheapest* live provider for a model, so price to win the traffic you want.
+- `PROVIDER_MODEL` — a model id you can actually serve on your backend. **You must serve what you advertise** (see Guardrails).
+- `PROVIDER_PRICE` — your price per request, denominated in the settlement asset (**USDC** by default; `SETTLEMENT_ASSET=hbar` switches the whole system to HBAR). The exchange routes the *cheapest* live provider for a model, so price to win the traffic you want.
 - `PROVIDER_PUBLIC_URL` — your step-1 URL.
-- `GROQ_API_KEY` (optional) — real inference from Groq. Omit it and the provider returns deterministic **canned** answers (fine for testing; still serves the advertised model honestly).
+- `PROVIDER_BACKEND` — where inference actually comes from: `0g` (0G Compute, the default for bring-your-own supply, needs `ZEROG_API_KEY`), `groq` (needs `GROQ_API_KEY`), or `canned`. Omit the backend's key and you fall back to deterministic **canned** answers — fine for testing, and still honest about the advertised model.
 
 **`PROVIDER_PUBLIC_URL` must be in `.env`** — not just exported in your shell, and not just known to the MCP server. `pnpm provider` reads `.env` at process start, in whatever shell you launch it from. If it's missing there, the service falls back to `http://localhost:4025` and the exchange can't reach you.
 
@@ -95,7 +95,7 @@ On boot it transfers `STAKE_HBAR` (50) to the escrow account and publishes its r
 Then confirm the service answers (`4025` throughout is the default `PROVIDER_PORT` — substitute yours if you changed it):
 ```bash
 curl -s localhost:4025/healthz     # {"ok":true}
-curl -s localhost:4025/info        # displayName, model, priceHbar, wallet, agentId, url
+curl -s localhost:4025/info        # displayName, model, price, wallet, agentId, url
 ```
 `/info.url` MUST be your public URL, not localhost (or the exchange can't reach you).
 
@@ -106,7 +106,7 @@ Skip this step entirely if the tools aren't available — step 4 already registe
 
 ```
 provision_provider({ name: "<PROVIDER_NAME>", publicUrl: "<your URL>",
-                     model: "<PROVIDER_MODEL>", priceHbar: <your price>,
+                     model: "<PROVIDER_MODEL>", price: <your price>,
                      exchangeUrl: "<EXCHANGE_URL>" })
 ```
 
@@ -129,7 +129,7 @@ curl -s <EXCHANGE_URL>/providers | node -e '
   let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
     const rows = JSON.parse(s).filter(p => p.wallet === w);
     if (!rows.length) return console.log("not in the table yet");
-    for (const r of rows) console.log(`${r.status.padEnd(7)} ${r.priceHbar} ℏ  ${r.displayName}  @ ${r.url}`);
+    for (const r of rows) console.log(`${r.status.padEnd(7)} ${r.price}  ${r.displayName}  @ ${r.url}`);
   });' "<HEDERA_PROVIDER_ID>"
 ```
 (Quote the placeholder — unquoted, `bash` reads `<...>` as a redirect.)
@@ -158,7 +158,7 @@ Then confirm the settlement is real, not mocked:
 curl -s <EXCHANGE_URL>/log | node -e '
   let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
     for (const e of JSON.parse(s).filter(e=>e.provider===process.argv[1]))
-      console.log(`${e.priceHbar} ℏ -> ${e.paymentRef}`);
+      console.log(`${e.price} + ${e.fee} fee -> ${e.paymentRef}`);
   });' "<PROVIDER_NAME>"
 ```
 `paymentRef` must be a Hedera tx id (`0.0.x@secs.nanos`) — look it up at `https://hashscan.io/testnet/transaction/<paymentRef>`. Your name plus a settled tx is the acceptance bar: **402 → paid → completion**, on-chain.
@@ -189,7 +189,7 @@ The verifier samples routed requests, replays the prompt at temperature 0 agains
 |---|---|---|
 | `PROVIDER_NAME` | Custom Provider | Display name in the routing table |
 | `PROVIDER_MODEL` | llama-3.3-70b-versatile | Model you advertise **and serve** |
-| `PROVIDER_PRICE_HBAR` | 0.10 | Your price per request (cheapest wins routing) |
+| `PROVIDER_PRICE` | 0.10 | Your price per request in the settlement asset (cheapest wins routing) |
 | `PROVIDER_PORT` | 4025 | Local listen port |
 | `PROVIDER_PUBLIC_URL` | `http://localhost:<port>` | Address the exchange routes to (tunnel/VPS). **Set it in `.env`** — the default makes you unreachable |
 | `HEDERA_PROVIDER_ID` / `_KEY` | from `pnpm setup-hedera` | Account that stakes, registers, earns |
@@ -206,7 +206,7 @@ The verifier samples routed requests, replays the prompt at temperature 0 agains
 | Routing table shows you `down` with a `localhost` URL | `PROVIDER_PUBLIC_URL` wasn't in `.env` when the service booted. Put it there, restart, re-verify |
 | `provision_provider` → `ENDPOINT_UNREACHABLE` | Called before `pnpm provider` was running. Boot the service first, then re-run from the repo root. (Deploying remotely instead? That's the `requireEndpoint: false` case in step 5) |
 | Staked 100 ℏ instead of 50 | You ran `pnpm provider` from a subdirectory, so it couldn't see the cached stake. Always run from the repo root — that's what makes re-runs safe |
-| Paid request routes to someone else | You're not the cheapest live provider for that model — lower `PROVIDER_PRICE_HBAR` |
+| Paid request routes to someone else | You're not the cheapest live provider for that model — lower `PROVIDER_PRICE` |
 | Registered but never audited | No witness — no other live provider serves your `PROVIDER_MODEL` |
 | Nothing settles / 402 loops | `MOCK_MODE` must be `false` for real payments; the facilitator ladder must be reachable |
 | Step 6 fails and the provider looks fine | No exchange running — that's step 1's last bullet, not a fault in your provider |

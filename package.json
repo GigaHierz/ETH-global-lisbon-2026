@@ -26,6 +26,7 @@
     "smoke": "tsx --env-file=.env scripts/smoke-paid-call.ts",
     "setup-hedera": "tsx scripts/setup-hedera-accounts.ts",
     "setup-hcs": "tsx scripts/setup-hcs-topics.ts",
+    "setup-hts": "tsx scripts/setup-hts-token.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

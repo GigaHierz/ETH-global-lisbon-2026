@@ -7,7 +7,7 @@ function rows(): ProviderRow[] {
     {
       displayName: "SketchyGPU Labs",
       model: "llama-3.3-70b-versatile",
-      priceHbar: 0.08,
+      price: 0.08,
       wallet: "0.0.9746383",
       agentId: null,
       url: "http://localhost:4023",
@@ -15,6 +15,8 @@ function rows(): ProviderRow[] {
       reputation: 100,
       stakeHbar: 50,
       requestsServed: 3,
+      bondTokens: 100,
+      bondStatus: "active",
     },
   ];
 }

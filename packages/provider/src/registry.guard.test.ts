@@ -13,12 +13,16 @@ import { join } from "node:path";
 const publish = vi.fn(async () => "0.0.7@new.registration");
 const logs: string[] = [];
 
-vi.mock("@agentrouter/shared", () => ({
+// Partial mock: keep every real export and override only what would hit the network
+// or the local .env, so exports added to shared later don't break these tests.
+vi.mock(import("@agentrouter/shared"), async (importOriginal) => ({
+  ...(await importOriginal()),
   MOCK_MODE: false,
   hederaAccount: () => ({ id: ACCOUNT, key: "0xkey" }),
   publishToTopic: (...a: unknown[]) => publish(...(a as [])),
   hashscanTx: (t: string) => `https://hashscan.io/testnet/transaction/${t}`,
   log: (_k: string, m: string) => logs.push(m),
+  bondTokenId: () => null, // no HTS ReputationBond configured in these tests
 }));
 
 const ACCOUNT = "0.0.4242";

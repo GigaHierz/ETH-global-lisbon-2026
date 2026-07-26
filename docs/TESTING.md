@@ -7,27 +7,27 @@
 | What | URL |
 |---|---|
 | **Dashboard** (the terminal UI) | https://eth-global-lisbon-2026-dashboard.vercel.app |
-| **Exchange API** (buy inference) | https://agent-router-exchange-production.up.railway.app |
+| **Exchange API** (buy inference) | https://exchange-production-275a.up.railway.app |
 
-Everything behind these is running in **real mode**: HBAR settlements on Hedera Testnet, HCS audit trail, live escrow staking. Topic links + tx receipts: [PROOF.md](PROOF.md).
+Everything behind these is running in **real mode**: USDC settlements on Hedera Testnet, HCS audit trail, live escrow staking. Topic links + tx receipts: [PROOF.md](PROOF.md).
 
 ## Try the exchange from your terminal
 
 See the routing table:
 
 ```bash
-curl -s https://agent-router-exchange-production.up.railway.app/providers | jq
+curl -s https://exchange-production-275a.up.railway.app/providers | jq
 ```
 
 Buy an inference call (the exchange pays the provider via x402 — you're the demo agent):
 
 ```bash
-curl -s -X POST https://agent-router-exchange-production.up.railway.app/v1/chat/completions \
+curl -s -X POST https://exchange-production-275a.up.railway.app/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"What is x402? One sentence."}]}' | jq .agentrouter
 ```
 
-You'll get the answer plus `{provider, priceHbar, feeHbar, totalHbar, latencyMs, paymentRef}` — the `paymentRef` is a real Hedera transaction id.
+You'll get the answer plus `{provider, price, fee, total, asset, latencyMs, paymentRef}` — the `paymentRef` is a real Hedera transaction id.
 
 To see a raw **402** (the paywall itself), hit a provider directly — providers aren't tunneled, so run one locally (`pnpm provider1`, then `curl -X POST localhost:4021/v1/chat/completions -H 'content-type: application/json' -d '{"model":"x","messages":[{"role":"user","content":"hi"}]}'` → HTTP 402 with payment requirements).
 

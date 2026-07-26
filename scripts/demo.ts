@@ -6,11 +6,11 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK_HBAR, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL } from "@agentrouter/shared";
+import { MOCK_PAYMENT_HEADER, DEFAULT_EXCHANGE_ASK, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, ZEROG_MODEL, money } from "@agentrouter/shared";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCK = process.env.MOCK_MODE !== "false";
-const EXCHANGE_ASK_HBAR = process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR);
+const EXCHANGE_ASK = process.env.EXCHANGE_ASK || String(DEFAULT_EXCHANGE_ASK);
 const EXCHANGE_URL = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const procs: ChildProcess[] = [];
 
@@ -63,15 +63,19 @@ async function main() {
   console.log(`  HCS verdicts topic: ${h.topics.verdicts}`);
 
   // 1. providers
-  banner("1/5 · booting 3 providers (provider3 is CHEATING: advertises 70b, serves 8b)");
+  banner("1/5 · booting 4 providers (provider3 CHEATS: advertises 70b, serves 8b · provider4 resells 0G Compute)");
   boot("provider1", ["packages/provider/src/index.ts", "--profile", "provider1"]);
   boot("provider2", ["packages/provider/src/index.ts", "--profile", "provider2"]);
   boot("provider3", ["packages/provider/src/index.ts", "--profile", "provider3"], { CHEAT_MODE: "true" });
-  await Promise.all([4021, 4022, 4023].map((p) => waitFor(`http://localhost:${p}/healthz`)));
+  boot("provider4", ["packages/provider/src/index.ts", "--profile", "provider4"]); // 0G Compute-backed, unique model
+  await Promise.all([4021, 4022, 4023, 4024].map((p) => waitFor(`http://localhost:${p}/healthz`)));
 
   // 2. exchange
   banner("2/5 · booting exchange (routes to cheapest provider per model)");
-  boot("exchange", ["packages/exchange/src/index.ts"]);
+  boot("exchange", ["packages/exchange/src/index.ts"], {
+    // seed discovery with all four local providers (mock mode has no HCS registry)
+    PROVIDER_URLS: [4021, 4022, 4023, 4024].map((p) => `http://localhost:${p}`).join(","),
+  });
   await waitFor(`${EXCHANGE_URL}/healthz`);
   await new Promise((r) => setTimeout(r, 1500)); // let discovery run
 
@@ -95,29 +99,50 @@ async function main() {
     const providers = await fetch(`${EXCHANGE_URL}/providers`).then((r) => r.json());
     const slashed = providers.find((p: { status: string }) => p.status === "slashed");
     if (slashed) {
-      banner(`⚡ SLASHED: ${slashed.displayName} — stake cut, reputation zeroed, OUT of routing`);
+      banner(`⚡ SLASHED: ${slashed.displayName} — HBAR stake cut, HTS bond wiped via 2-of-2 multi-sig, OUT of routing`);
       // Same paywall as every other buyer call: in mock mode the exchange wants
       // the mock payment header, in real mode the caller must settle over x402.
       const res = await fetch(`${EXCHANGE_URL}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK_HBAR } : {}),
+          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: EXCHANGE_ASK } : {}),
         },
         body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "What is Ethereum? One sentence." }] }),
       });
       const raw = await res.text();
-      // The exchange returns priceHbar/feeHbar/totalHbar; pricePaidHbar is the legacy
-      // flat-ask name kept as a fallback (same as packages/agent/src/buy.ts).
-      type Routed = { provider: string; priceHbar?: number; pricePaidHbar?: number };
-      let routed: Routed | undefined;
+      let routed: { provider: string; total: number } | undefined;
       try {
-        routed = (JSON.parse(raw) as { agentrouter?: Routed }).agentrouter;
+        routed = (JSON.parse(raw) as { agentrouter?: { provider: string; total: number } }).agentrouter;
       } catch { /* non-JSON error body — reported below */ }
       if (res.ok && routed) {
-        console.log(`  next 70b request now routes to: ${routed.provider} (${routed.priceHbar ?? routed.pricePaidHbar} ℏ/req)`);
+        console.log(`  next 70b request now routes to: ${routed.provider} (${money(routed.total)}/req incl. fee)`);
       } else {
         console.log(`  reroute check failed: exchange answered HTTP ${res.status} — ${raw.slice(0, 120)}`);
+      }
+
+      // 6. bonus beat: buy one completion sourced from 0G Compute's decentralized
+      // GPU network (provider4's unique model — doesn't touch the 70b arc).
+      banner(`6/6 · one trade sourced from 0G Compute (${ZEROG_MODEL} via NimbusAI)`);
+      const zg = await fetch(`${EXCHANGE_URL}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(MOCK ? { [MOCK_PAYMENT_HEADER]: "0.10" } : {}),
+        },
+        body: JSON.stringify({ model: ZEROG_MODEL, messages: [{ role: "user", content: "What is 0G? One sentence." }] }),
+      });
+      const zgRaw = await zg.text();
+      try {
+        const zgJson = JSON.parse(zgRaw) as { agentrouter?: { provider: string; total?: number; paymentRef?: string }; choices?: Array<{ message?: { content?: string } }> };
+        if (zg.ok && zgJson.agentrouter) {
+          console.log(`  0G trade: ${zgJson.agentrouter.provider} | ${money(zgJson.agentrouter.total ?? "?")} | pay=${(zgJson.agentrouter.paymentRef ?? "").slice(0, 24)}`);
+          console.log(`  ✦ ${(zgJson.choices?.[0]?.message?.content ?? "").slice(0, 90)}`);
+        } else {
+          console.log(`  0G trade skipped: HTTP ${zg.status} — ${zgRaw.slice(0, 100)}`);
+        }
+      } catch {
+        console.log(`  0G trade skipped: HTTP ${zg.status} — ${zgRaw.slice(0, 100)}`);
       }
       banner("DEMO COMPLETE — services stay up for dashboard exploration. Ctrl-C to stop.");
       return; // keep processes alive

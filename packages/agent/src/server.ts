@@ -5,7 +5,7 @@
 
 import express from "express";
 import cors from "cors";
-import { MOCK_MODE, hbarBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK_HBAR } from "@agentrouter/shared";
+import { MOCK_MODE, settlementBalance, hederaAccount, hashscanTx, log, DEFAULT_EXCHANGE_URL, DEFAULT_MODEL, DEFAULT_EXCHANGE_ASK, ASSET_LABEL, money } from "@agentrouter/shared";
 import { Budget } from "./budget.js";
 import { groqBrain } from "./brain.js";
 import { makeBuy } from "./buy.js";
@@ -17,8 +17,8 @@ import { runGoal, type AgentEvent } from "./loop.js";
 const PORT = parseInt(process.env.PORT || process.env.AGENT_PORT || "4200", 10);
 const EXCHANGE = process.env.EXCHANGE_URL || DEFAULT_EXCHANGE_URL;
 const MODEL = process.env.AGENT_MODEL || DEFAULT_MODEL;
-const ASK = parseFloat(process.env.EXCHANGE_ASK_HBAR || String(DEFAULT_EXCHANGE_ASK_HBAR));
-const BUDGET_HBAR = parseFloat(process.env.AGENT_BUDGET_HBAR || "2");
+const ASK = parseFloat(process.env.EXCHANGE_ASK || String(DEFAULT_EXCHANGE_ASK));
+const BUDGET = parseFloat(process.env.AGENT_BUDGET || "2");
 // Public URL advertised in the HCS-14 registration (set to the host's URL in prod).
 const ENDPOINT = process.env.AGENT_PUBLIC_URL || `http://localhost:${PORT}`;
 
@@ -28,15 +28,15 @@ const identity: Identity = await registerIdentity({ displayName: "AgentRouter De
 const account = MOCK_MODE ? "0.0.mock-agent" : hederaAccount("AGENT").id;
 
 interface WireBudget {
-  capHbar: number;
-  spentHbar: number;
-  remainingHbar: number;
+  cap: number;
+  spent: number;
+  remaining: number;
 }
 const state = {
   running: false,
   goal: null as string | null,
-  balanceHbar: MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE_HBAR || "10") : await hbarBalance(account),
-  budget: { capHbar: BUDGET_HBAR, spentHbar: 0, remainingHbar: BUDGET_HBAR } as WireBudget,
+  balance: MOCK_MODE ? parseFloat(process.env.AGENT_MOCK_BALANCE || "10") : await settlementBalance(account),
+  budget: { cap: BUDGET, spent: 0, remaining: BUDGET } as WireBudget,
   findings: [] as { q: string; a: string }[],
   events: [] as unknown[],
 };
@@ -61,10 +61,10 @@ function broadcast(event: unknown) {
 function emit(ev: AgentEvent) {
   if (ev.type === "bought") {
     const wire = { ...ev, hashscan: hashscanTx(ev.paymentRef) };
-    state.balanceHbar -= ev.costHbar;
+    state.balance -= ev.cost;
     state.events.push(wire);
     broadcast(wire);
-    broadcast({ type: "balance", hbar: state.balanceHbar });
+    broadcast({ type: "balance", amount: state.balance, asset: ASSET_LABEL });
     return;
   }
   state.events.push(ev);
@@ -81,7 +81,7 @@ app.get("/state", (_req, res) =>
   res.json({
     running: state.running,
     goal: state.goal,
-    balanceHbar: state.balanceHbar,
+    balance: state.balance,
     budget: state.budget,
     findings: state.findings,
     events: state.events,
@@ -95,7 +95,7 @@ app.get("/events", (req, res) => {
     connection: "keep-alive",
   });
   res.write(`data: ${JSON.stringify({ type: "identity", agentId: identity.agentId, hashscan: identity.hashscan })}\n\n`);
-  res.write(`data: ${JSON.stringify({ type: "balance", hbar: state.balanceHbar })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: "balance", amount: state.balance, asset: ASSET_LABEL })}\n\n`);
   const write = (chunk: string) => res.write(chunk);
   clients.add(write);
   req.on("close", () => clients.delete(write));
@@ -110,18 +110,18 @@ app.post("/run", (req, res) => {
   state.goal = goal;
   state.events = [];
   state.findings = [];
-  const budget = new Budget(BUDGET_HBAR);
-  state.budget = { capHbar: BUDGET_HBAR, spentHbar: 0, remainingHbar: BUDGET_HBAR };
+  const budget = new Budget(BUDGET);
+  state.budget = { cap: BUDGET, spent: 0, remaining: BUDGET };
   res.json({ ok: true });
 
   runGoal(goal, {
     brain: groqBrain,
     buy,
     budget,
-    askHbar: ASK,
+    ask: ASK,
     emit: (ev) => {
       emit(ev);
-      state.budget = { capHbar: BUDGET_HBAR, spentHbar: budget.spent, remainingHbar: budget.remaining };
+      state.budget = { cap: BUDGET, spent: budget.spent, remaining: budget.remaining };
     },
   })
     .then((r) => {
@@ -138,6 +138,6 @@ app.post("/run", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  log("agent", `agent-server on :${PORT} | ${identity.agentId} | budget ${BUDGET_HBAR} ℏ | MOCK_MODE=${MOCK_MODE}`);
-  log("agent", `buying ${MODEL} via ${EXCHANGE} @ ${ASK} ℏ/req | balance ${state.balanceHbar.toFixed(4)} ℏ`);
+  log("agent", `agent-server on :${PORT} | ${identity.agentId} | budget ${money(BUDGET)} | MOCK_MODE=${MOCK_MODE}`);
+  log("agent", `buying ${MODEL} via ${EXCHANGE} @ ${money(ASK)}/req | balance ${money(state.balance.toFixed(4))}`);
 });
